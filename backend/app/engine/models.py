@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from app.engine.hex import Hex
 from app.engine.terrain import Feature, Resource, Terrain
+
+if TYPE_CHECKING:
+    from app.engine.diplomacy import DiplomaticMessage
 
 
 class UnitType(str, Enum):
@@ -117,6 +121,7 @@ class Civilization:
     starting_position: Hex | None = None
     color: str = "#888888"
     traits: tuple[str, ...] = ()
+    persona: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +135,7 @@ class GameState:
     current_civ_idx: int = 0
     diplomacy: dict[tuple[int, int], DiplomaticStance] = field(default_factory=dict)
     visibility: dict[int, frozenset[Hex]] = field(default_factory=dict)
+    messages: tuple["DiplomaticMessage", ...] = ()
 
     def units_for(self, civ_id: int) -> tuple[Unit, ...]:
         return tuple(u for u in self.units if u.owner == civ_id)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.engine.diplomacy import DiplomaticMessage, conversation_between, inbox_for
 from app.engine.fog_of_war import visible_tiles
 from app.engine.hex import Hex
 from app.engine.models import City, Civilization, GameState, Tile, Unit
@@ -67,6 +68,16 @@ def _serialize_civ_summary(civ: Civilization) -> dict[str, Any]:
     }
 
 
+def _serialize_message(m: DiplomaticMessage) -> dict[str, Any]:
+    return {
+        "from_civ_id": m.from_civ_id,
+        "to_civ_id": m.to_civ_id,
+        "turn": m.turn,
+        "kind": m.kind.value,
+        "text": m.text,
+    }
+
+
 def _serialize_self(civ: Civilization) -> dict[str, Any]:
     return {
         "id": civ.id,
@@ -112,10 +123,26 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
         met_ids.add(u.owner)
     for c in visible_cities:
         met_ids.add(c.owner)
+    # Anyone who has corresponded with us is also "met".
+    for m in state.messages:
+        if m.from_civ_id == civ_id:
+            met_ids.add(m.to_civ_id)
+        if m.to_civ_id == civ_id:
+            met_ids.add(m.from_civ_id)
+
     known_civs = sorted(
         (_serialize_civ_summary(c) for c in state.civs if c.id in met_ids),
         key=lambda d: d["id"],
     )
+
+    inbox = [_serialize_message(m) for m in inbox_for(state, civ_id)]
+
+    stances: list[dict[str, Any]] = []
+    for other_id in sorted(met_ids - {civ_id}):
+        stances.append({
+            "civ_id": other_id,
+            "stance": state.stance_between(civ_id, other_id).value,
+        })
 
     return {
         "turn": state.turn,
@@ -127,4 +154,6 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
         "visible_tiles": tiles_out,
         "visible_units": units_out,
         "visible_cities": cities_out,
+        "inbox": inbox,
+        "diplomatic_stances": stances,
     }
