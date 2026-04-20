@@ -125,7 +125,7 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
 
 
 class CreateGameRequest(BaseModel):
-    radius: int = Field(default=5, ge=1, le=12)
+    radius: int = Field(default=8, ge=1, le=12)
     seed: int = 0
 
 

@@ -28,6 +28,7 @@ from app.engine.playthrough import (
     run_playthrough,
     _advance_civ,
 )
+from app.engine.starting_positions import MIN_START_DISTANCE
 from app.engine.terrain import Terrain
 
 
@@ -234,6 +235,91 @@ def test_random_playthrough_completes():
 
 
 @pytest.mark.integration
+def test_playthrough_includes_feedback_and_calls_turn_observer():
+    class FeedbackSource:
+        def __init__(self) -> None:
+            self.turn = 1
+            self.feedback_seen: dict[int, list[str]] = {}
+
+        def decide(self, view: dict, civ_id: int):
+            if civ_id != 0:
+                return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+            feedback = view.get("last_turn_feedback", [])
+            self.feedback_seen[self.turn] = list(feedback)
+            if self.turn == 1:
+                return type(
+                    "DecisionsProxy",
+                    (),
+                    {"goals": (MoveTo(unit_id=2, target=Hex(-2, 0)),), "diplomacy": ()},
+                )()
+            return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+
+    state = _two_civ_state()
+    source = FeedbackSource()
+    observed_turns: list[int] = []
+
+    run_playthrough(
+        state,
+        {0: source, 1: RandomGoalSource(seed=1)},
+        max_turns=2,
+        turn_observer=lambda s: observed_turns.append(s.turn),
+    )
+
+    assert source.feedback_seen[1] == []
+    assert any("occupied" in item for item in source.feedback_seen[2])
+    assert observed_turns == [2, 3]
+
+
+@pytest.mark.integration
+def test_playthrough_rejects_found_city_goal_for_non_settler_and_feeds_back_reason():
+    class BadFoundingSource:
+        def __init__(self) -> None:
+            self.turn = 1
+            self.feedback_seen: dict[int, list[str]] = {}
+
+        def decide(self, view: dict, civ_id: int):
+            if civ_id != 0:
+                return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+            self.feedback_seen[self.turn] = list(view.get("last_turn_feedback", []))
+            if self.turn == 1:
+                return type(
+                    "DecisionsProxy",
+                    (),
+                    {
+                        "goals": (
+                            FoundCityNear(unit_id=1, target=Hex(-2, 0), name="Alpha-1"),
+                        ),
+                        "diplomacy": (),
+                    },
+                )()
+            if self.turn == 2:
+                return type(
+                    "DecisionsProxy",
+                    (),
+                    {
+                        "goals": (
+                            FoundCityNear(unit_id=2, target=Hex(-1, 0), name="Alpha-2"),
+                        ),
+                        "diplomacy": (),
+                    },
+                )()
+            return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+
+    state = _two_civ_state()
+    source = BadFoundingSource()
+
+    result = run_playthrough(
+        state,
+        {0: source, 1: RandomGoalSource(seed=1)},
+        max_turns=3,
+    )
+
+    assert result.actions_rejected >= 1
+    assert source.feedback_seen[1] == []
+    assert any("not a settler" in item for item in source.feedback_seen[3])
+
+
+@pytest.mark.integration
 def test_playthrough_ends_on_domination():
     """If one civ eliminates the other, victory should trigger."""
     warrior_stats = UNIT_STATS[UnitType.WARRIOR]
@@ -270,3 +356,18 @@ def test_playthrough_with_generated_map():
     assert isinstance(result, PlaythroughResult)
     # Should have done *something*.
     assert result.actions_applied + result.actions_rejected > 0
+
+
+@pytest.mark.integration
+def test_new_game_assigns_spread_out_starting_positions():
+    from app.api.game_factory import new_game
+    from app.engine.hex import hex_distance
+
+    state = new_game(seed=42, num_civs=4, include_human=False)
+    starts = [civ.starting_position for civ in state.civs]
+
+    assert all(start is not None for start in starts)
+    for i, start in enumerate(starts):
+        assert start in state.map
+        for other in starts[i + 1:]:
+            assert hex_distance(start, other) >= MIN_START_DISTANCE

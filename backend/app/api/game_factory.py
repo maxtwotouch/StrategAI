@@ -6,6 +6,8 @@ with persona prompts that drive their LLM behavior.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from app.engine.hex import Hex
 from app.engine.map_generator import generate_map
 from app.engine.models import (
@@ -15,6 +17,7 @@ from app.engine.models import (
     Unit,
     UnitType,
 )
+from app.engine.starting_positions import starting_positions
 from app.engine.terrain import is_passable
 
 
@@ -91,7 +94,8 @@ attacked, respond decisively to end the conflict.\
 )
 
 
-def _starting_tiles(state_map, count: int) -> list[Hex]:
+def _fallback_starting_tiles(state_map, count: int) -> list[Hex]:
+    """Best-effort fallback for tiny maps where strict spacing is impossible."""
     radius = state_map.radius
     candidates = [
         Hex(0, -radius + 2),
@@ -100,20 +104,23 @@ def _starting_tiles(state_map, count: int) -> list[Hex]:
         Hex(radius - 2, 0),
     ]
     chosen: list[Hex] = []
-    for c in candidates:
-        tile = state_map.tiles.get(c)
+    for coord in candidates:
+        tile = state_map.tiles.get(coord)
         if tile and is_passable(tile.terrain):
-            chosen.append(c)
-        if len(chosen) == count:
-            break
-    if len(chosen) < count:
-        for coord, tile in state_map.tiles.items():
-            if coord in chosen or not is_passable(tile.terrain):
-                continue
             chosen.append(coord)
-            if len(chosen) == count:
-                break
-    return chosen
+        if len(chosen) == count:
+            return chosen
+
+    for coord, tile in state_map.tiles.items():
+        if coord in chosen or not is_passable(tile.terrain):
+            continue
+        chosen.append(coord)
+        if len(chosen) == count:
+            return chosen
+
+    raise ValueError(
+        f"could not place {count} civilizations on radius-{state_map.radius} map"
+    )
 
 
 def _build_civ(idx: int, spec: tuple) -> Civilization:
@@ -130,7 +137,7 @@ def _build_civ(idx: int, spec: tuple) -> Civilization:
 
 
 def new_game(
-    radius: int = 5,
+    radius: int = 8,
     seed: int = 0,
     num_civs: int = 4,
     include_human: bool = True,
@@ -149,9 +156,14 @@ def new_game(
     specs.extend(_AI_ROSTER)
     specs = specs[:num_civs]
 
-    civs = tuple(_build_civ(i, spec) for i, spec in enumerate(specs))
-
-    starts = _starting_tiles(game_map, len(civs))
+    try:
+        starts = starting_positions(game_map, len(specs))
+    except ValueError:
+        starts = _fallback_starting_tiles(game_map, len(specs))
+    civs = tuple(
+        replace(_build_civ(i, spec), starting_position=starts[i])
+        for i, spec in enumerate(specs)
+    )
     settler_stats = UNIT_STATS[UnitType.SETTLER]
     warrior_stats = UNIT_STATS[UnitType.WARRIOR]
 

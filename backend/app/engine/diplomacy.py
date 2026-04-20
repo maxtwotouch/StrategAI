@@ -14,6 +14,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Union
 
+from app.engine.fog_of_war import visible_tiles
 from app.engine.models import DiplomaticStance, GameState
 
 
@@ -65,6 +66,26 @@ class DiplomacyError(ValueError):
     """Raised when a diplomatic action is invalid."""
 
 
+def met_civs(state: GameState, civ_id: int) -> set[int]:
+    """Civilizations this civ has already encountered."""
+    met_ids = {civ_id}
+    visible = visible_tiles(state, civ_id)
+
+    for unit in state.units:
+        if unit.location in visible:
+            met_ids.add(unit.owner)
+    for city in state.cities:
+        if city.location in visible:
+            met_ids.add(city.owner)
+    for message in state.messages:
+        if message.from_civ_id == civ_id:
+            met_ids.add(message.to_civ_id)
+        if message.to_civ_id == civ_id:
+            met_ids.add(message.from_civ_id)
+
+    return met_ids
+
+
 # ---------------------------------------------------------------------------
 # Stance helpers
 # ---------------------------------------------------------------------------
@@ -95,6 +116,8 @@ def apply_diplomatic_action(
             raise DiplomacyError("cannot send message to self")
         if not any(c.id == action.to_civ_id for c in state.civs):
             raise DiplomacyError(f"unknown recipient civ {action.to_civ_id}")
+        if action.to_civ_id not in met_civs(state, civ_id):
+            raise DiplomacyError(f"cannot message unmet civ {action.to_civ_id}")
         msg = DiplomaticMessage(
             from_civ_id=civ_id,
             to_civ_id=action.to_civ_id,
@@ -118,6 +141,8 @@ def apply_diplomatic_action(
         return new_state
 
     if isinstance(action, SetStance):
+        if action.target_civ_id not in met_civs(state, civ_id):
+            raise DiplomacyError(f"cannot change stance with unmet civ {action.target_civ_id}")
         return set_stance(state, civ_id, action.target_civ_id, action.stance)
 
     raise DiplomacyError(f"unknown diplomatic action type {type(action).__name__}")

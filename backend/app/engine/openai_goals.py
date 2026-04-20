@@ -20,6 +20,7 @@ import logging
 import os
 from typing import Any
 
+from dotenv import load_dotenv
 from openai import OpenAI
 
 from app.engine.diplomacy import (
@@ -34,6 +35,8 @@ from app.engine.models import DiplomaticStance
 from app.engine.playthrough import Decisions
 
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Tool definitions (OpenAI function-calling schema)
@@ -163,13 +166,20 @@ known civilizations.  Issue your turn by calling tools.  You may call several
 tools per turn — both unit goals and diplomatic actions.
 
 Key view fields:
+- "your_civ_id": YOUR civilization id.  Never use it as a message recipient
+  or stance target — that is yourself.
 - "self": your civilization (gold, science, culture, techs)
 - "visible_units" / "visible_cities": entities you can see
 - "visible_tiles": currently-visible terrain
 - "known_civs": leaders you have met
 - "inbox": diplomatic messages addressed to you
 - "diplomatic_stances": current stance (peace/war/alliance) per known civ
+- "last_turn_feedback": engine rejection reasons from your previous turn
 - "turn": current turn number
+
+ID namespaces are separate.  unit_id and civ_id are unrelated — a unit with
+unit_id 2 has nothing to do with civ_id 2.  When attacking, attacker_id and
+target_id both refer to UNIT ids, never civ ids.
 
 Respond to messages in character.  React to insults, threats, and offers
 according to your persona.  Be decisive — issue at least one tool call.\
@@ -178,9 +188,31 @@ according to your persona.  Be decisive — issue at least one tool call.\
 
 def build_system_prompt(persona: str | None = None) -> str:
     """Concatenate the base prompt with an optional per-leader persona."""
+    tactical_rules = """\
+
+Hard gameplay priorities:
+- If you have a settler and no city yet, your top priority is to found your first city immediately.
+- If you do not control any settler, do not call `found_city_near`.
+- Only settlers can found cities. Warriors and scouts cannot found cities.
+- Prefer `found_city_near` over `move_to` for settlers when you intend to establish a city.
+- Do not repeatedly target occupied or unreachable tiles. Read `last_turn_feedback` and change plan if an action was rejected.
+- Only message or change stance with civilizations in `known_civs`.
+- Never address a message or stance change to your own civ_id (`your_civ_id`).
+- If your `diplomatic_stances` already shows `war` with a target, do NOT call
+  `send_message` with kind=`declare_war` again — attack their units instead.
+  Re-declaring war is wasted; act on it.
+- Read `recent_actions` and `recent_messages` to remember what you and others
+  have already done. Avoid repeating the same failed plan two turns in a row.
+- Do not spend whole turns only chatting unless you have no useful legal game action available.
+"""
     if not persona:
-        return BASE_SYSTEM_PROMPT
-    return BASE_SYSTEM_PROMPT + "\n\n--- YOUR PERSONA ---\n" + persona.strip()
+        return BASE_SYSTEM_PROMPT + tactical_rules
+    return (
+        BASE_SYSTEM_PROMPT
+        + tactical_rules
+        + "\n\n--- YOUR PERSONA ---\n"
+        + persona.strip()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -233,15 +265,27 @@ def _parse_tool_call(name: str, args: dict[str, Any]) -> Goal | DiplomaticAction
 # OpenAIGoalSource
 # ---------------------------------------------------------------------------
 
+_MEMORY_TURNS = 8
+_MEMORY_ACTIONS = 32
+
+
 class OpenAIGoalSource:
-    """GoalSource backed by an OpenAI chat-completions model with tool use."""
+    """GoalSource backed by an OpenAI chat-completions model with tool use.
+
+    Maintains a small per-civ rolling memory of (a) what actions this leader
+    issued in recent turns and (b) what diplomatic messages this leader has
+    seen.  The memory is injected into the user view as `recent_actions` and
+    `recent_messages` so the model has continuity across turns without
+    blowing up the prompt.
+    """
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-5.4-mini",
         api_key: str | None = None,
         temperature: float = 0.7,
         persona: str | None = None,
+        memory_turns: int = _MEMORY_TURNS,
     ) -> None:
         key = api_key or os.environ.get("OPENAI_API_KEY")
         if not key:
@@ -252,23 +296,75 @@ class OpenAIGoalSource:
         self._model = model
         self._temperature = temperature
         self._system_prompt = build_system_prompt(persona)
+        self._memory_turns = memory_turns
+        self._action_log: list[dict[str, Any]] = []
+        self._message_log: list[dict[str, Any]] = []
+        self._last_seen_message_turn: int = -1
+
+    def _record_actions(
+        self,
+        turn: int,
+        goals: list[Goal],
+        diplomacy: list[DiplomaticAction],
+    ) -> None:
+        for g in goals:
+            self._action_log.append({"turn": turn, "type": type(g).__name__, "data": _summarize(g)})
+        for d in diplomacy:
+            self._action_log.append({"turn": turn, "type": type(d).__name__, "data": _summarize(d)})
+        if len(self._action_log) > _MEMORY_ACTIONS:
+            del self._action_log[: len(self._action_log) - _MEMORY_ACTIONS]
+
+    def _ingest_inbox(self, view: dict) -> None:
+        for m in view.get("inbox", []):
+            turn = m.get("turn", -1)
+            if turn <= self._last_seen_message_turn:
+                continue
+            self._message_log.append(m)
+            if turn > self._last_seen_message_turn:
+                self._last_seen_message_turn = turn
+        if len(self._message_log) > _MEMORY_ACTIONS:
+            del self._message_log[: len(self._message_log) - _MEMORY_ACTIONS]
 
     def decide(self, view: dict, civ_id: int) -> Decisions:
-        user_msg = json.dumps(view, sort_keys=True)
+        self._ingest_inbox(view)
+
+        current_turn = view.get("turn", 0)
+        cutoff = current_turn - self._memory_turns
+        recent_actions = [a for a in self._action_log if a["turn"] >= cutoff]
+        recent_messages = [m for m in self._message_log if m.get("turn", -1) >= cutoff]
+
+        payload = dict(view)
+        payload["your_civ_id"] = civ_id
+        payload["recent_actions"] = recent_actions
+        payload["recent_messages"] = recent_messages
+        user_msg = json.dumps(payload, sort_keys=True, default=str)
+        logger.info(
+            "Requesting LLM turn for civ %d: %d visible units, %d visible cities, %d known civs, %d inbox messages, %d remembered actions",
+            civ_id,
+            len(view.get("visible_units", [])),
+            len(view.get("visible_cities", [])),
+            len(view.get("known_civs", [])),
+            len(view.get("inbox", [])),
+            len(recent_actions),
+        )
+
+        request_kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": self._system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+            "tools": TOOLS,
+            "tool_choice": "required",
+        }
+        if not self._model.startswith(("gpt-5", "o1", "o3", "o4")):
+            request_kwargs["temperature"] = self._temperature
 
         try:
-            response = self._client.chat.completions.create(
-                model=self._model,
-                temperature=self._temperature,
-                messages=[
-                    {"role": "system", "content": self._system_prompt},
-                    {"role": "user", "content": user_msg},
-                ],
-                tools=TOOLS,
-                tool_choice="required",
-            )
-        except Exception:
-            logger.exception("OpenAI API call failed for civ %d", civ_id)
+            response = self._client.chat.completions.create(**request_kwargs)
+        except Exception as exc:
+            logger.warning("OpenAI API call failed for civ %d: %s", civ_id, exc)
+            logger.debug("OpenAI API failure details for civ %d", civ_id, exc_info=True)
             return Decisions()
 
         message = response.choices[0].message
@@ -276,6 +372,7 @@ class OpenAIGoalSource:
             logger.info("LLM returned no tool calls for civ %d", civ_id)
             return Decisions()
 
+        logger.info("LLM returned %d tool calls for civ %d", len(message.tool_calls), civ_id)
         goals: list[Goal] = []
         diplomacy: list[DiplomaticAction] = []
         for tc in message.tool_calls:
@@ -295,4 +392,25 @@ class OpenAIGoalSource:
                 "Civ %d → %s(%s)", civ_id, tc.function.name, tc.function.arguments
             )
 
+        self._record_actions(current_turn, goals, diplomacy)
         return Decisions(goals=tuple(goals), diplomacy=tuple(diplomacy))
+
+
+def _summarize(action: Goal | DiplomaticAction) -> dict[str, Any]:
+    """Compact JSON-friendly representation of an issued action for memory."""
+    if isinstance(action, MoveTo):
+        return {"unit_id": action.unit_id, "target_q": action.target.q, "target_r": action.target.r}
+    if isinstance(action, FoundCityNear):
+        return {
+            "unit_id": action.unit_id,
+            "target_q": action.target.q,
+            "target_r": action.target.r,
+            "name": action.name,
+        }
+    if isinstance(action, AttackUnit):
+        return {"attacker_id": action.attacker_id, "target_id": action.target_id}
+    if isinstance(action, SendMessage):
+        return {"to_civ_id": action.to_civ_id, "kind": action.kind.value, "text": action.text}
+    if isinstance(action, SetStance):
+        return {"target_civ_id": action.target_civ_id, "stance": action.stance.value}
+    return {}

@@ -117,8 +117,13 @@ def test_diplomacy_tools_present():
 
 @pytest.mark.unit
 def test_build_system_prompt_no_persona():
-    assert build_system_prompt(None) == BASE_SYSTEM_PROMPT
-    assert build_system_prompt("") == BASE_SYSTEM_PROMPT
+    prompt = build_system_prompt(None)
+    assert BASE_SYSTEM_PROMPT in prompt
+    assert "Hard gameplay priorities" in prompt
+
+    prompt_empty = build_system_prompt("")
+    assert BASE_SYSTEM_PROMPT in prompt_empty
+    assert "Hard gameplay priorities" in prompt_empty
 
 
 @pytest.mark.unit
@@ -156,6 +161,10 @@ def _make_source(persona: str | None = None) -> OpenAIGoalSource:
     src._temperature = 0.7
     src._client = MagicMock()
     src._system_prompt = build_system_prompt(persona)
+    src._memory_turns = 8
+    src._action_log = []
+    src._message_log = []
+    src._last_seen_message_turn = -1
     return src
 
 
@@ -234,6 +243,72 @@ def test_openai_source_skips_bad_json():
     decisions = source.decide({}, civ_id=0)
     assert len(decisions.goals) == 1
     assert isinstance(decisions.goals[0], MoveTo)
+
+
+@pytest.mark.unit
+def test_openai_source_injects_your_civ_id():
+    source = _make_source()
+    source._client.chat.completions.create.return_value = _mock_response()
+    source.decide({"turn": 1}, civ_id=3)
+    call_kwargs = source._client.chat.completions.create.call_args
+    user_msg = call_kwargs.kwargs["messages"][1]
+    assert user_msg["role"] == "user"
+    payload = json.loads(user_msg["content"])
+    assert payload["your_civ_id"] == 3
+
+
+@pytest.mark.unit
+def test_openai_source_remembers_recent_actions_across_turns():
+    source = _make_source()
+    source._client.chat.completions.create.return_value = _mock_response(
+        ("move_to", {"unit_id": 1, "target_q": 2, "target_r": -1}),
+    )
+    source.decide({"turn": 1}, civ_id=0)
+
+    source._client.chat.completions.create.return_value = _mock_response()
+    source.decide({"turn": 2}, civ_id=0)
+
+    last_call = source._client.chat.completions.create.call_args
+    payload = json.loads(last_call.kwargs["messages"][1]["content"])
+    assert payload["recent_actions"], "expected memory of the prior MoveTo"
+    assert payload["recent_actions"][0]["type"] == "MoveTo"
+    assert payload["recent_actions"][0]["data"] == {
+        "unit_id": 1, "target_q": 2, "target_r": -1,
+    }
+
+
+@pytest.mark.unit
+def test_openai_source_remembers_inbox_messages():
+    source = _make_source()
+    source._client.chat.completions.create.return_value = _mock_response()
+    inbox_msg = {"turn": 1, "from_civ_id": 1, "to_civ_id": 0,
+                 "kind": "threat", "text": "bow"}
+    source.decide({"turn": 1, "inbox": [inbox_msg]}, civ_id=0)
+
+    source._client.chat.completions.create.return_value = _mock_response()
+    source.decide({"turn": 2, "inbox": []}, civ_id=0)
+
+    last_call = source._client.chat.completions.create.call_args
+    payload = json.loads(last_call.kwargs["messages"][1]["content"])
+    assert payload["recent_messages"], "expected to remember the prior inbox message"
+    assert payload["recent_messages"][0]["text"] == "bow"
+
+
+@pytest.mark.unit
+def test_openai_source_memory_drops_old_turns():
+    source = _make_source()
+    source._memory_turns = 2
+    source._client.chat.completions.create.return_value = _mock_response(
+        ("move_to", {"unit_id": 1, "target_q": 0, "target_r": 0}),
+    )
+    source.decide({"turn": 1}, civ_id=0)
+
+    source._client.chat.completions.create.return_value = _mock_response()
+    source.decide({"turn": 10}, civ_id=0)
+
+    last_call = source._client.chat.completions.create.call_args
+    payload = json.loads(last_call.kwargs["messages"][1]["content"])
+    assert payload["recent_actions"] == [], "old action should have aged out"
 
 
 @pytest.mark.unit

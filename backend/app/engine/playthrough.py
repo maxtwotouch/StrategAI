@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass, replace
-from typing import Protocol
+from typing import Callable, Protocol
 
 from app.api.actions import (
     Action,
@@ -63,6 +63,96 @@ class GoalSource(Protocol):
     """Produces decisions for a civilization given its local view."""
 
     def decide(self, view: dict, civ_id: int) -> Decisions: ...
+
+
+def _describe_goal(goal: Goal) -> str:
+    if isinstance(goal, MoveTo):
+        return f"MoveTo unit={goal.unit_id} target=({goal.target.q},{goal.target.r})"
+    if isinstance(goal, FoundCityNear):
+        return (
+            f"FoundCityNear unit={goal.unit_id} "
+            f"target=({goal.target.q},{goal.target.r}) name={goal.name!r}"
+        )
+    if isinstance(goal, AttackUnit):
+        return f"AttackUnit attacker={goal.attacker_id} target={goal.target_id}"
+    return repr(goal)
+
+
+def _describe_diplomatic_action(action: DiplomaticAction) -> str:
+    if hasattr(action, "kind") and hasattr(action, "to_civ_id"):
+        text = getattr(action, "text", "")
+        return (
+            f"{type(action).__name__} to={action.to_civ_id} "
+            f"kind={action.kind.value} text={text!r}"
+        )
+    if hasattr(action, "target_civ_id") and hasattr(action, "stance"):
+        return (
+            f"{type(action).__name__} target={action.target_civ_id} "
+            f"stance={action.stance.value}"
+        )
+    return repr(action)
+
+
+def _goal_rejection_reason(state: GameState, civ_id: int, goal: Goal) -> str | None:
+    def unit_by_id(unit_id: int):
+        return next((unit for unit in state.units if unit.id == unit_id), None)
+
+    if isinstance(goal, MoveTo):
+        unit = unit_by_id(goal.unit_id)
+        if unit is None:
+            return f"unit {goal.unit_id} does not exist"
+        if unit.owner != civ_id:
+            return f"unit {goal.unit_id} is not owned by civ {civ_id}"
+        if unit.location == goal.target:
+            return f"unit {goal.unit_id} is already at ({goal.target.q},{goal.target.r})"
+        if goal.target not in state.map:
+            return f"target ({goal.target.q},{goal.target.r}) is outside the map"
+        tile = state.map.get(goal.target)
+        if tile is None or not is_passable(tile.terrain):
+            return f"target ({goal.target.q},{goal.target.r}) is impassable"
+        if any(
+            other.location == goal.target and other.id != goal.unit_id
+            for other in state.units
+        ):
+            return f"target ({goal.target.q},{goal.target.r}) is occupied"
+        return "no path or no movement available this turn"
+
+    if isinstance(goal, FoundCityNear):
+        unit = unit_by_id(goal.unit_id)
+        if unit is None:
+            return f"unit {goal.unit_id} does not exist"
+        if unit.owner != civ_id:
+            return f"unit {goal.unit_id} is not owned by civ {civ_id}"
+        if unit.type is not UnitType.SETTLER:
+            return f"unit {goal.unit_id} is a {unit.type.value}, not a settler"
+        if goal.target not in state.map:
+            return f"target ({goal.target.q},{goal.target.r}) is outside the map"
+        tile = state.map.get(goal.target)
+        if tile is None or not is_passable(tile.terrain):
+            return f"target ({goal.target.q},{goal.target.r}) is impassable"
+        if any(
+            other.location == goal.target and other.id != goal.unit_id
+            for other in state.units
+        ):
+            return f"target ({goal.target.q},{goal.target.r}) is occupied"
+        if any(city.location == goal.target for city in state.cities):
+            return f"target ({goal.target.q},{goal.target.r}) already has a city"
+        return "no path or city cannot be founded there this turn"
+
+    if isinstance(goal, AttackUnit):
+        attacker = unit_by_id(goal.attacker_id)
+        target = unit_by_id(goal.target_id)
+        if attacker is None:
+            return f"attacker unit {goal.attacker_id} does not exist"
+        if attacker.owner != civ_id:
+            return f"attacker unit {goal.attacker_id} is not owned by civ {civ_id}"
+        if target is None:
+            return f"target unit {goal.target_id} does not exist"
+        if target.owner == civ_id:
+            return f"target unit {goal.target_id} is friendly"
+        return "target is unreachable or attack is not legal this turn"
+
+    return "goal could not be executed"
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +298,9 @@ class PlaythroughResult:
     actions_rejected: int
 
 
+Observer = Callable[[GameState], None]
+
+
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
@@ -216,6 +309,7 @@ def run_playthrough(
     initial_state: GameState,
     goal_source: GoalSource | dict[int, GoalSource],
     max_turns: int = 50,
+    turn_observer: Observer | None = None,
 ) -> PlaythroughResult:
     """Execute a headless game from *initial_state* until victory or turn cap.
 
@@ -227,6 +321,7 @@ def run_playthrough(
     applied = 0
     rejected = 0
     goal_sources = goal_source
+    feedback_by_civ: dict[int, list[str]] = {}
 
     while state.turn <= max_turns:
         victory = check_victory(state)
@@ -245,6 +340,16 @@ def run_playthrough(
         civ_id = civ.id
         source = _resolve_source(goal_sources, civ_id)
 
+        logger.info(
+            "Turn %d civ %d (%s of %s): %d cities, %d units",
+            state.turn,
+            civ_id,
+            civ.leader_name,
+            civ.name,
+            len(state.cities_for(civ_id)),
+            len(state.units_for(civ_id)),
+        )
+
         if is_eliminated(state, civ):
             state = _advance_civ(state)
             continue
@@ -254,7 +359,21 @@ def run_playthrough(
             source.turn = state.turn  # type: ignore[attr-defined]
 
         view = local_view(state, civ_id)
+        if feedback_by_civ.get(civ_id):
+            view["last_turn_feedback"] = list(feedback_by_civ[civ_id])
         decisions = source.decide(view, civ_id)
+        feedback_for_civ: list[str] = []
+        logger.info(
+            "Turn %d civ %d decided on %d goals and %d diplomatic actions",
+            state.turn,
+            civ_id,
+            len(decisions.goals),
+            len(decisions.diplomacy),
+        )
+        for goal in decisions.goals:
+            logger.info("  goal: %s", _describe_goal(goal))
+        for dipl_action in decisions.diplomacy:
+            logger.info("  diplomacy: %s", _describe_diplomatic_action(dipl_action))
 
         # Diplomatic actions first — they may legalize/illegalize subsequent
         # combat actions in the same turn (e.g. a fresh war declaration).
@@ -262,24 +381,47 @@ def run_playthrough(
             try:
                 state = apply_diplomatic_action(state, civ_id, dipl_action)
                 applied += 1
-                logger.debug("  diplomacy: %s", dipl_action)
+                logger.info("  applied diplomacy: %s", _describe_diplomatic_action(dipl_action))
             except DiplomacyError as e:
                 rejected += 1
-                logger.debug("  diplomacy rejected: %s — %s", dipl_action, e)
+                feedback_for_civ.append(
+                    f"Diplomatic action rejected: {_describe_diplomatic_action(dipl_action)} -- {e}"
+                )
+                logger.warning(
+                    "  rejected diplomacy: %s -- %s",
+                    _describe_diplomatic_action(dipl_action),
+                    e,
+                )
 
         for goal in decisions.goals:
             actions = execute_goal(state, civ_id, goal)
+            logger.info("  expanded %s into %d actions", _describe_goal(goal), len(actions))
+            if not actions:
+                reason = _goal_rejection_reason(state, civ_id, goal)
+                if reason is not None:
+                    rejected += 1
+                    feedback_for_civ.append(
+                        f"Goal rejected: {_describe_goal(goal)} -- {reason}"
+                    )
+                    logger.warning("  rejected goal: %s -- %s", _describe_goal(goal), reason)
             for action in actions:
                 result = validate(action, state, civ_id)
                 if isinstance(result, ValidationOk):
                     state = apply_action(state, action, civ_id)
                     applied += 1
-                    logger.debug("  applied: %s", action)
+                    logger.info("  applied action: %s", action)
                 elif isinstance(result, ValidationError):
                     rejected += 1
-                    logger.debug("  rejected: %s — %s", action, result.reason)
+                    feedback_for_civ.append(
+                        f"Action rejected: {action} -- {result.reason}"
+                    )
+                    logger.warning("  rejected action: %s -- %s", action, result.reason)
 
+        feedback_by_civ[civ_id] = feedback_for_civ[-8:]
+        prev_turn = state.turn
         state = _advance_civ(state)
+        if turn_observer is not None and state.turn != prev_turn:
+            turn_observer(state)
 
     return PlaythroughResult(
         final_state=state,

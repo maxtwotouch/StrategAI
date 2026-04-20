@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.engine.diplomacy import DiplomaticMessage, conversation_between, inbox_for
+from app.engine.diplomacy import DiplomaticMessage, inbox_for, met_civs
 from app.engine.fog_of_war import visible_tiles
 from app.engine.hex import Hex
 from app.engine.models import City, Civilization, GameState, Tile, Unit
@@ -118,17 +118,7 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
     )
     cities_out = [_serialize_city(c) for c in visible_cities]
 
-    met_ids = {civ_id}
-    for u in visible_units:
-        met_ids.add(u.owner)
-    for c in visible_cities:
-        met_ids.add(c.owner)
-    # Anyone who has corresponded with us is also "met".
-    for m in state.messages:
-        if m.from_civ_id == civ_id:
-            met_ids.add(m.to_civ_id)
-        if m.to_civ_id == civ_id:
-            met_ids.add(m.from_civ_id)
+    met_ids = met_civs(state, civ_id)
 
     known_civs = sorted(
         (_serialize_civ_summary(c) for c in state.civs if c.id in met_ids),
