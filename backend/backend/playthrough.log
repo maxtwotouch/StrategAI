@@ -2143,3 +2143,1112 @@
 2026-04-17 19:30:20,076 INFO app.engine.playthrough: Turn 20 civ 2 decided on 0 goals and 1 diplomatic actions
 2026-04-17 19:30:20,076 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India hears your saber-rattling and notes it without fear. A wise ruler remembers that the strongest fortress is not stone, but self-command. We seek peace, but we do not mistake patience for surrender. Let us each tend our own fields, and spare our people the grief of needless war.'
 2026-04-17 19:30:20,076 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India hears your saber-rattling and notes it without fear. A wise ruler remembers that the strongest fortress is not stone, but self-command. We seek peace, but we do not mistake patience for surrender. Let us each tend our own fields, and spare our people the grief of needless war.'
+2026-04-20 11:32:45,055 INFO app.engine.playthrough: Turn 1 civ 0 (Genghis Khan of Mongolia): 0 cities, 2 units
+2026-04-20 11:32:45,055 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered actions
+2026-04-20 11:32:48,008 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:48,021 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:32:48,021 INFO app.engine.openai_goals: Civ 0 → found_city_near({"unit_id":1,"target_q":0,"target_r":0,"name":"Khanbaliq"})
+2026-04-20 11:32:48,021 INFO app.engine.playthrough: Turn 1 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:48,021 INFO app.engine.playthrough:   goal: FoundCityNear unit=1 target=(0,0) name='Khanbaliq'
+2026-04-20 11:32:48,022 INFO app.engine.playthrough:   expanded FoundCityNear unit=1 target=(0,0) name='Khanbaliq' into 2 actions
+2026-04-20 11:32:48,022 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=1, destination=Hex(q=0, r=0))
+2026-04-20 11:32:48,022 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=1, name='Khanbaliq')
+2026-04-20 11:32:48,022 INFO app.engine.playthrough: Turn 1 civ 1 (Cleopatra of Egypt): 0 cities, 2 units
+2026-04-20 11:32:48,022 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered actions
+2026-04-20 11:32:49,465 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:49,466 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:32:49,466 INFO app.engine.openai_goals: Civ 1 → found_city_near({"unit_id":3,"target_q":-4,"target_r":1,"name":"Alexandria"})
+2026-04-20 11:32:49,466 INFO app.engine.playthrough: Turn 1 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:49,466 INFO app.engine.playthrough:   goal: FoundCityNear unit=3 target=(-4,1) name='Alexandria'
+2026-04-20 11:32:49,466 INFO app.engine.playthrough:   expanded FoundCityNear unit=3 target=(-4,1) name='Alexandria' into 2 actions
+2026-04-20 11:32:49,466 WARNING app.engine.playthrough:   rejected action: MoveAction(unit_id=3, destination=Hex(q=-4, r=1)) -- destination Hex(q=-4, r=1) is occupied
+2026-04-20 11:32:49,466 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=3, name='Alexandria')
+2026-04-20 11:32:49,466 INFO app.engine.playthrough: Turn 1 civ 2 (Mahatma Gandhi of India): 0 cities, 2 units
+2026-04-20 11:32:49,467 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered actions
+2026-04-20 11:32:51,269 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:51,272 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:32:51,272 INFO app.engine.openai_goals: Civ 2 → found_city_near({"unit_id":5,"target_q":0,"target_r":-1,"name":"Sarnath"})
+2026-04-20 11:32:51,272 INFO app.engine.playthrough: Turn 1 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:51,273 INFO app.engine.playthrough:   goal: FoundCityNear unit=5 target=(0,-1) name='Sarnath'
+2026-04-20 11:32:51,273 INFO app.engine.playthrough:   expanded FoundCityNear unit=5 target=(0,-1) name='Sarnath' into 3 actions
+2026-04-20 11:32:51,273 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=5, destination=Hex(q=0, r=-2))
+2026-04-20 11:32:51,273 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=5, destination=Hex(q=0, r=-1))
+2026-04-20 11:32:51,273 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=5, name='Sarnath')
+2026-04-20 11:32:51,275 INFO app.engine.playthrough: Turn 2 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:32:51,276 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 1 remembered actions
+2026-04-20 11:32:52,049 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:52,050 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:32:52,051 INFO app.engine.openai_goals: Civ 0 → move_to({"unit_id":2,"target_q":0,"target_r":-1})
+2026-04-20 11:32:52,051 INFO app.engine.playthrough: Turn 2 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:52,051 INFO app.engine.playthrough:   goal: MoveTo unit=2 target=(0,-1)
+2026-04-20 11:32:52,051 INFO app.engine.playthrough:   expanded MoveTo unit=2 target=(0,-1) into 2 actions
+2026-04-20 11:32:52,051 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=0, r=0))
+2026-04-20 11:32:52,051 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=0, r=-1))
+2026-04-20 11:32:52,051 INFO app.engine.playthrough: Turn 2 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:32:52,052 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 1 remembered actions
+2026-04-20 11:32:52,892 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:52,893 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:32:52,893 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-5,"target_r":1})
+2026-04-20 11:32:52,893 INFO app.engine.playthrough: Turn 2 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:52,893 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-5,1)
+2026-04-20 11:32:52,893 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-5,1) into 1 actions
+2026-04-20 11:32:52,893 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-5, r=1))
+2026-04-20 11:32:52,893 INFO app.engine.playthrough: Turn 2 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 11:32:52,894 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 1 remembered actions
+2026-04-20 11:32:53,810 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:53,812 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:32:53,813 INFO app.engine.openai_goals: Civ 2 → move_to({"unit_id":6,"target_q":0,"target_r":-1})
+2026-04-20 11:32:53,813 INFO app.engine.playthrough: Turn 2 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:53,813 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(0,-1)
+2026-04-20 11:32:53,814 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(0,-1) into 2 actions
+2026-04-20 11:32:53,814 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=0, r=-2))
+2026-04-20 11:32:53,814 WARNING app.engine.playthrough:   rejected action: MoveAction(unit_id=6, destination=Hex(q=0, r=-1)) -- destination Hex(q=0, r=-1) is occupied
+2026-04-20 11:32:53,816 INFO app.engine.playthrough: Turn 3 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:32:53,817 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 2 remembered actions
+2026-04-20 11:32:54,856 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:54,858 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:32:54,858 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":6})
+2026-04-20 11:32:54,858 INFO app.engine.playthrough: Turn 3 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:54,858 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=6
+2026-04-20 11:32:54,858 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=6 into 1 actions
+2026-04-20 11:32:54,858 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=6) -- civs 0 and 2 are not at war
+2026-04-20 11:32:54,858 INFO app.engine.playthrough: Turn 3 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:32:54,859 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 2 remembered actions
+2026-04-20 11:32:55,708 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:55,708 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:32:55,708 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-4,"target_r":1})
+2026-04-20 11:32:55,708 INFO app.engine.playthrough: Turn 3 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:55,708 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-4,1)
+2026-04-20 11:32:55,708 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-4,1) into 1 actions
+2026-04-20 11:32:55,708 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-4, r=1))
+2026-04-20 11:32:55,708 INFO app.engine.playthrough: Turn 3 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 11:32:55,709 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 2 remembered actions
+2026-04-20 11:32:56,485 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:56,486 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:32:56,486 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id":6,"target_id":2})
+2026-04-20 11:32:56,486 INFO app.engine.playthrough: Turn 3 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:56,486 INFO app.engine.playthrough:   goal: AttackUnit attacker=6 target=2
+2026-04-20 11:32:56,486 INFO app.engine.playthrough:   expanded AttackUnit attacker=6 target=2 into 1 actions
+2026-04-20 11:32:56,486 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=6, target_id=2) -- civs 2 and 0 are not at war
+2026-04-20 11:32:56,487 INFO app.engine.playthrough: Turn 4 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:32:56,487 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 3 remembered actions
+2026-04-20 11:32:57,911 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:57,914 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 0
+2026-04-20 11:32:57,914 INFO app.engine.openai_goals: Civ 0 → send_message({"to_civ_id": 2, "kind": "declare_war", "text": "You sit on my border and hide behind peace. No more. Mongolia comes for you."})
+2026-04-20 11:32:57,914 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id": 2, "target_id": 6})
+2026-04-20 11:32:57,914 INFO app.engine.playthrough: Turn 4 civ 0 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:32:57,914 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=6
+2026-04-20 11:32:57,914 INFO app.engine.playthrough:   diplomacy: SendMessage to=2 kind=declare_war text='You sit on my border and hide behind peace. No more. Mongolia comes for you.'
+2026-04-20 11:32:57,915 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=2 kind=declare_war text='You sit on my border and hide behind peace. No more. Mongolia comes for you.'
+2026-04-20 11:32:57,915 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=6 into 1 actions
+2026-04-20 11:32:57,915 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=6)
+2026-04-20 11:32:57,915 INFO app.engine.playthrough: Turn 4 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:32:57,916 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 3 remembered actions
+2026-04-20 11:32:58,814 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:32:58,815 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:32:58,816 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-3,"target_r":1})
+2026-04-20 11:32:58,816 INFO app.engine.playthrough: Turn 4 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:32:58,816 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-3,1)
+2026-04-20 11:32:58,816 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-3,1) into 1 actions
+2026-04-20 11:32:58,817 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-3, r=1))
+2026-04-20 11:32:58,817 INFO app.engine.playthrough: Turn 4 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 11:32:58,817 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 3 remembered actions
+2026-04-20 11:33:00,021 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:00,022 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:00,022 INFO app.engine.openai_goals: Civ 2 → set_stance({"target_civ_id":0,"stance":"war"})
+2026-04-20 11:33:00,022 INFO app.engine.playthrough: Turn 4 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:00,023 INFO app.engine.playthrough:   diplomacy: SetStance target=0 stance=war
+2026-04-20 11:33:00,023 INFO app.engine.playthrough:   applied diplomacy: SetStance target=0 stance=war
+2026-04-20 11:33:00,025 INFO app.engine.playthrough: Turn 5 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:00,026 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 5 remembered actions
+2026-04-20 11:33:01,343 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:01,350 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:01,351 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":6})
+2026-04-20 11:33:01,351 INFO app.engine.playthrough: Turn 5 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:01,351 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=6
+2026-04-20 11:33:01,351 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=6 into 1 actions
+2026-04-20 11:33:01,351 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=6)
+2026-04-20 11:33:01,351 INFO app.engine.playthrough: Turn 5 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:01,352 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 4 remembered actions
+2026-04-20 11:33:02,578 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:02,579 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:02,580 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-2,"target_r":1})
+2026-04-20 11:33:02,580 INFO app.engine.playthrough: Turn 5 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:02,580 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-2,1)
+2026-04-20 11:33:02,580 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-2,1) into 1 actions
+2026-04-20 11:33:02,580 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-2, r=1))
+2026-04-20 11:33:02,581 INFO app.engine.playthrough: Turn 5 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 11:33:02,581 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 3 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 4 remembered actions
+2026-04-20 11:33:03,947 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:03,948 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 2
+2026-04-20 11:33:03,948 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id": 6, "target_id": 2})
+2026-04-20 11:33:03,948 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id": 0, "kind": "chat", "text": "Your declaration is answered with sorrow, not hatred. We seek no quarrel, yet we shall defend our people with steadfast resolve. May wisdom yet find a path where pride has opened a wound."})
+2026-04-20 11:33:03,949 INFO app.engine.playthrough: Turn 5 civ 2 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:33:03,949 INFO app.engine.playthrough:   goal: AttackUnit attacker=6 target=2
+2026-04-20 11:33:03,949 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Your declaration is answered with sorrow, not hatred. We seek no quarrel, yet we shall defend our people with steadfast resolve. May wisdom yet find a path where pride has opened a wound.'
+2026-04-20 11:33:03,949 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Your declaration is answered with sorrow, not hatred. We seek no quarrel, yet we shall defend our people with steadfast resolve. May wisdom yet find a path where pride has opened a wound.'
+2026-04-20 11:33:03,949 INFO app.engine.playthrough:   expanded AttackUnit attacker=6 target=2 into 1 actions
+2026-04-20 11:33:03,949 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=6, target_id=2)
+2026-04-20 11:33:03,951 INFO app.engine.playthrough: Turn 6 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:03,952 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 3 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 6 remembered actions
+2026-04-20 11:33:05,272 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:05,274 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:05,275 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":6})
+2026-04-20 11:33:05,275 INFO app.engine.playthrough: Turn 6 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:05,275 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=6
+2026-04-20 11:33:05,275 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=6 into 1 actions
+2026-04-20 11:33:05,275 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=6)
+2026-04-20 11:33:05,275 INFO app.engine.playthrough: Turn 6 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:05,276 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 5 remembered actions
+2026-04-20 11:33:06,039 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:06,040 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:06,040 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id":4,"target_id":2})
+2026-04-20 11:33:06,040 INFO app.engine.playthrough: Turn 6 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:06,040 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 11:33:06,040 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 2 actions
+2026-04-20 11:33:06,040 WARNING app.engine.playthrough:   rejected action: MoveAction(unit_id=4, destination=Hex(q=-1, r=0)) -- terrain ocean is impassable
+2026-04-20 11:33:06,040 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=4, target_id=2) -- target is not adjacent
+2026-04-20 11:33:06,040 INFO app.engine.playthrough: Turn 6 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 11:33:06,041 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 3 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 6 remembered actions
+2026-04-20 11:33:07,485 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:07,490 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:07,491 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Your words are heard, Genghis Khan. We grieve the path that has led us to arms, yet we shall stand firm in defense of our people. May wisdom one day temper the fire of ambition, as a river gradually shapes the stone."})
+2026-04-20 11:33:07,491 INFO app.engine.playthrough: Turn 6 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:07,491 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Your words are heard, Genghis Khan. We grieve the path that has led us to arms, yet we shall stand firm in defense of our people. May wisdom one day temper the fire of ambition, as a river gradually shapes the stone.'
+2026-04-20 11:33:07,491 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Your words are heard, Genghis Khan. We grieve the path that has led us to arms, yet we shall stand firm in defense of our people. May wisdom one day temper the fire of ambition, as a river gradually shapes the stone.'
+2026-04-20 11:33:07,493 INFO app.engine.playthrough: Turn 7 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:07,493 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 3 visible units, 2 visible cities, 3 known civs, 2 inbox messages, 7 remembered actions
+2026-04-20 11:33:08,345 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:08,347 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:08,347 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":6})
+2026-04-20 11:33:08,347 INFO app.engine.playthrough: Turn 7 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:08,347 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=6
+2026-04-20 11:33:08,347 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=6 into 1 actions
+2026-04-20 11:33:08,347 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=6)
+2026-04-20 11:33:08,347 INFO app.engine.playthrough: Turn 7 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:08,348 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 6 remembered actions
+2026-04-20 11:33:09,231 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:09,232 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:09,233 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-3,"target_r":1})
+2026-04-20 11:33:09,233 INFO app.engine.playthrough: Turn 7 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:09,233 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-3,1)
+2026-04-20 11:33:09,233 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-3,1) into 1 actions
+2026-04-20 11:33:09,233 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-3, r=1))
+2026-04-20 11:33:09,233 INFO app.engine.playthrough: Turn 7 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:09,234 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 7 remembered actions
+2026-04-20 11:33:10,531 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:10,533 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:10,534 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Your warning is received, Genghis Khan. We did not seek this quarrel, yet we shall protect our people with resolve and restraint. As a lamp does not curse the wind, but simply burns brighter, so too shall India endure and seek the day when courage serves peace."})
+2026-04-20 11:33:10,534 INFO app.engine.playthrough: Turn 7 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:10,534 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Your warning is received, Genghis Khan. We did not seek this quarrel, yet we shall protect our people with resolve and restraint. As a lamp does not curse the wind, but simply burns brighter, so too shall India endure and seek the day when courage serves peace.'
+2026-04-20 11:33:10,535 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Your warning is received, Genghis Khan. We did not seek this quarrel, yet we shall protect our people with resolve and restraint. As a lamp does not curse the wind, but simply burns brighter, so too shall India endure and seek the day when courage serves peace.'
+2026-04-20 11:33:10,538 INFO app.engine.playthrough: Turn 8 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:10,539 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 2 visible cities, 2 known civs, 3 inbox messages, 8 remembered actions
+2026-04-20 11:33:11,481 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:11,482 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:11,482 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":6})
+2026-04-20 11:33:11,482 INFO app.engine.playthrough: Turn 8 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:11,482 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=6
+2026-04-20 11:33:11,482 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=6 into 0 actions
+2026-04-20 11:33:11,482 WARNING app.engine.playthrough:   rejected goal: AttackUnit attacker=2 target=6 -- target unit 6 does not exist
+2026-04-20 11:33:11,483 INFO app.engine.playthrough: Turn 8 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:11,483 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 7 remembered actions
+2026-04-20 11:33:12,259 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:12,265 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:12,266 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-2,"target_r":1})
+2026-04-20 11:33:12,266 INFO app.engine.playthrough: Turn 8 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:12,266 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-2,1)
+2026-04-20 11:33:12,266 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-2,1) into 1 actions
+2026-04-20 11:33:12,266 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-2, r=1))
+2026-04-20 11:33:12,266 INFO app.engine.playthrough: Turn 8 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:12,267 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 8 remembered actions
+2026-04-20 11:33:15,269 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:15,273 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:15,274 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, your message is received with sorrow. India did not seek this fire, yet we shall stand firm in defense of our people. Even the fiercest storm must one day pass; may wisdom still find a gate where pride has closed one."})
+2026-04-20 11:33:15,274 INFO app.engine.playthrough: Turn 8 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:15,274 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, your message is received with sorrow. India did not seek this fire, yet we shall stand firm in defense of our people. Even the fiercest storm must one day pass; may wisdom still find a gate where pride has closed one.'
+2026-04-20 11:33:15,274 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, your message is received with sorrow. India did not seek this fire, yet we shall stand firm in defense of our people. Even the fiercest storm must one day pass; may wisdom still find a gate where pride has closed one.'
+2026-04-20 11:33:15,276 INFO app.engine.playthrough: Turn 9 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:15,277 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 4 inbox messages, 9 remembered actions
+2026-04-20 11:33:16,056 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:16,057 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:16,057 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:16,057 INFO app.engine.playthrough: Turn 9 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:16,057 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:16,057 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:16,057 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=0, r=-1))
+2026-04-20 11:33:16,058 INFO app.engine.playthrough: Turn 9 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:16,058 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 8 remembered actions
+2026-04-20 11:33:16,805 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:16,807 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:16,807 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id":4,"target_id":2})
+2026-04-20 11:33:16,807 INFO app.engine.playthrough: Turn 9 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:16,807 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 11:33:16,807 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 2 actions
+2026-04-20 11:33:16,807 WARNING app.engine.playthrough:   rejected action: MoveAction(unit_id=4, destination=Hex(q=-1, r=0)) -- terrain ocean is impassable
+2026-04-20 11:33:16,807 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=4, target_id=2) -- target is not adjacent
+2026-04-20 11:33:16,807 INFO app.engine.playthrough: Turn 9 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:16,808 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:17,543 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:17,548 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:17,548 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id":6,"target_id":2})
+2026-04-20 11:33:17,548 INFO app.engine.playthrough: Turn 9 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:17,549 INFO app.engine.playthrough:   goal: AttackUnit attacker=6 target=2
+2026-04-20 11:33:17,549 INFO app.engine.playthrough:   expanded AttackUnit attacker=6 target=2 into 0 actions
+2026-04-20 11:33:17,549 WARNING app.engine.playthrough:   rejected goal: AttackUnit attacker=6 target=2 -- attacker unit 6 does not exist
+2026-04-20 11:33:17,550 INFO app.engine.playthrough: Turn 10 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:17,551 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 4 inbox messages, 9 remembered actions
+2026-04-20 11:33:18,354 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:18,356 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:18,356 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:18,357 INFO app.engine.playthrough: Turn 10 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:18,357 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:18,357 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 2 actions
+2026-04-20 11:33:18,357 WARNING app.engine.playthrough:   rejected action: MoveAction(unit_id=2, destination=Hex(q=-1, r=0)) -- terrain ocean is impassable
+2026-04-20 11:33:18,357 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- target is not adjacent
+2026-04-20 11:33:18,357 INFO app.engine.playthrough: Turn 10 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:18,358 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 8 remembered actions
+2026-04-20 11:33:19,177 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:19,181 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:19,182 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-3,"target_r":1})
+2026-04-20 11:33:19,182 INFO app.engine.playthrough: Turn 10 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:19,182 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-3,1)
+2026-04-20 11:33:19,182 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-3,1) into 1 actions
+2026-04-20 11:33:19,182 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-3, r=1))
+2026-04-20 11:33:19,182 INFO app.engine.playthrough: Turn 10 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:19,183 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:20,081 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:20,082 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:20,082 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id":2,"target_id":2})
+2026-04-20 11:33:20,082 INFO app.engine.playthrough: Turn 10 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:20,082 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=2
+2026-04-20 11:33:20,083 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=2 into 1 actions
+2026-04-20 11:33:20,083 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=2) -- attacker 2 not owned by civ 2
+2026-04-20 11:33:20,085 INFO app.engine.playthrough: Turn 11 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:20,088 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 2 visible cities, 2 known civs, 4 inbox messages, 9 remembered actions
+2026-04-20 11:33:21,148 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:21,150 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:21,151 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:21,151 INFO app.engine.playthrough: Turn 11 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:21,151 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:21,151 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:21,151 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=0, r=0))
+2026-04-20 11:33:21,151 INFO app.engine.playthrough: Turn 11 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:21,152 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered actions
+2026-04-20 11:33:22,052 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:22,056 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:22,056 INFO app.engine.openai_goals: Civ 1 → move_to({"unit_id":4,"target_q":-2,"target_r":1})
+2026-04-20 11:33:22,057 INFO app.engine.playthrough: Turn 11 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:22,057 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-2,1)
+2026-04-20 11:33:22,057 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-2,1) into 1 actions
+2026-04-20 11:33:22,057 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-2, r=1))
+2026-04-20 11:33:22,057 INFO app.engine.playthrough: Turn 11 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:22,058 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:23,666 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:23,668 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:23,668 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, your message is received with sorrow. India did not seek this conflict, yet we shall defend our people with steadfast resolve. As a storm may bruise the riverbank but cannot still the river, so too shall we endure and hold to the hope that wisdom may yet soften pride."})
+2026-04-20 11:33:23,668 INFO app.engine.playthrough: Turn 11 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:23,668 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, your message is received with sorrow. India did not seek this conflict, yet we shall defend our people with steadfast resolve. As a storm may bruise the riverbank but cannot still the river, so too shall we endure and hold to the hope that wisdom may yet soften pride.'
+2026-04-20 11:33:23,669 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, your message is received with sorrow. India did not seek this conflict, yet we shall defend our people with steadfast resolve. As a storm may bruise the riverbank but cannot still the river, so too shall we endure and hold to the hope that wisdom may yet soften pride.'
+2026-04-20 11:33:23,674 INFO app.engine.playthrough: Turn 12 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:23,674 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 5 inbox messages, 9 remembered actions
+2026-04-20 11:33:24,462 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:24,464 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:24,464 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:24,464 INFO app.engine.playthrough: Turn 12 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:24,464 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:24,464 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 2 actions
+2026-04-20 11:33:24,464 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=-1, r=1))
+2026-04-20 11:33:24,464 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:24,465 INFO app.engine.playthrough: Turn 12 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:24,466 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 8 remembered actions
+2026-04-20 11:33:25,613 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:25,615 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:25,615 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id":4,"target_id":2})
+2026-04-20 11:33:25,615 INFO app.engine.playthrough: Turn 12 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:25,615 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 11:33:25,615 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 1 actions
+2026-04-20 11:33:25,615 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=4, target_id=2) -- civs 1 and 0 are not at war
+2026-04-20 11:33:25,615 INFO app.engine.playthrough: Turn 12 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:25,616 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:26,973 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:26,974 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:26,974 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, we hear your anger, though we did not seek this clash. India stands only to defend her people and her dignity. A river does not dispute with a rock; it simply continues onward. May this sorrow yet give way to wisdom, if not today, then in time."})
+2026-04-20 11:33:26,974 INFO app.engine.playthrough: Turn 12 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:26,974 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, we hear your anger, though we did not seek this clash. India stands only to defend her people and her dignity. A river does not dispute with a rock; it simply continues onward. May this sorrow yet give way to wisdom, if not today, then in time.'
+2026-04-20 11:33:26,975 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, we hear your anger, though we did not seek this clash. India stands only to defend her people and her dignity. A river does not dispute with a rock; it simply continues onward. May this sorrow yet give way to wisdom, if not today, then in time.'
+2026-04-20 11:33:26,977 INFO app.engine.playthrough: Turn 13 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:26,981 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 6 inbox messages, 8 remembered actions
+2026-04-20 11:33:28,013 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:28,014 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:28,015 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:28,015 INFO app.engine.playthrough: Turn 13 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:28,015 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:28,015 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:28,015 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:28,015 INFO app.engine.playthrough: Turn 13 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:28,016 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 8 remembered actions
+2026-04-20 11:33:29,399 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:29,401 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 1
+2026-04-20 11:33:29,401 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id": 4, "target_id": 2})
+2026-04-20 11:33:29,401 INFO app.engine.openai_goals: Civ 1 → send_message({"to_civ_id": 0, "kind": "threat", "text": "Genghis Khan, your warrior circles my border like a jackal in a silk cloak. Pull back, and I may forget this irritation. Persist, and Egypt will answer in kind."})
+2026-04-20 11:33:29,401 INFO app.engine.playthrough: Turn 13 civ 1 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:33:29,402 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 11:33:29,402 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Genghis Khan, your warrior circles my border like a jackal in a silk cloak. Pull back, and I may forget this irritation. Persist, and Egypt will answer in kind.'
+2026-04-20 11:33:29,402 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Genghis Khan, your warrior circles my border like a jackal in a silk cloak. Pull back, and I may forget this irritation. Persist, and Egypt will answer in kind.'
+2026-04-20 11:33:29,402 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 1 actions
+2026-04-20 11:33:29,402 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=4, target_id=2) -- civs 1 and 0 are not at war
+2026-04-20 11:33:29,402 INFO app.engine.playthrough: Turn 13 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:29,407 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:30,834 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:30,835 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:30,835 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, India receives your hostility with sorrow, yet also with firmness. We did not seek this conflict, but we shall continue to protect our people with resolve and restraint. Even a harsh wind cannot uproot what is rooted in purpose. May wisdom still find you, though war has clouded the road."})
+2026-04-20 11:33:30,835 INFO app.engine.playthrough: Turn 13 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:30,835 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet also with firmness. We did not seek this conflict, but we shall continue to protect our people with resolve and restraint. Even a harsh wind cannot uproot what is rooted in purpose. May wisdom still find you, though war has clouded the road.'
+2026-04-20 11:33:30,836 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet also with firmness. We did not seek this conflict, but we shall continue to protect our people with resolve and restraint. Even a harsh wind cannot uproot what is rooted in purpose. May wisdom still find you, though war has clouded the road.'
+2026-04-20 11:33:30,838 INFO app.engine.playthrough: Turn 14 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:30,839 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 8 inbox messages, 8 remembered actions
+2026-04-20 11:33:31,648 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:31,649 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:31,649 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:31,649 INFO app.engine.playthrough: Turn 14 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:31,649 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:31,649 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:31,649 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:31,649 INFO app.engine.playthrough: Turn 14 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:31,650 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 0 inbox messages, 9 remembered actions
+2026-04-20 11:33:32,644 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:32,646 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:32,646 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:32,646 INFO app.engine.playthrough: Turn 14 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:32,646 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:32,646 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:32,646 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- attacker 2 not owned by civ 1
+2026-04-20 11:33:32,646 INFO app.engine.playthrough: Turn 14 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:32,647 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 8 remembered actions
+2026-04-20 11:33:34,573 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:34,575 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:34,575 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, India receives your hostility with sorrow, yet also with firmness. We did not seek this conflict, but we shall defend our people with resolve and restraint. As a river remains a river whether the wind is calm or fierce, so too shall we continue onward, hoping that wisdom may still one day open a path to peace."})
+2026-04-20 11:33:34,575 INFO app.engine.playthrough: Turn 14 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:34,575 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet also with firmness. We did not seek this conflict, but we shall defend our people with resolve and restraint. As a river remains a river whether the wind is calm or fierce, so too shall we continue onward, hoping that wisdom may still one day open a path to peace.'
+2026-04-20 11:33:34,575 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet also with firmness. We did not seek this conflict, but we shall defend our people with resolve and restraint. As a river remains a river whether the wind is calm or fierce, so too shall we continue onward, hoping that wisdom may still one day open a path to peace.'
+2026-04-20 11:33:34,581 INFO app.engine.playthrough: Turn 15 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:34,582 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 9 inbox messages, 8 remembered actions
+2026-04-20 11:33:35,876 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:35,881 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 0
+2026-04-20 11:33:35,881 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id": 2, "target_id": 4})
+2026-04-20 11:33:35,881 INFO app.engine.openai_goals: Civ 0 → send_message({"to_civ_id": 1, "kind": "threat", "text": "Your border-games end when I say. Move again, and I break your spear."})
+2026-04-20 11:33:35,881 INFO app.engine.playthrough: Turn 15 civ 0 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:33:35,881 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:35,881 INFO app.engine.playthrough:   diplomacy: SendMessage to=1 kind=threat text='Your border-games end when I say. Move again, and I break your spear.'
+2026-04-20 11:33:35,882 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=1 kind=threat text='Your border-games end when I say. Move again, and I break your spear.'
+2026-04-20 11:33:35,882 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:35,882 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:35,882 INFO app.engine.playthrough: Turn 15 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:35,882 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:37,322 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:37,324 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:37,324 INFO app.engine.openai_goals: Civ 1 → send_message({"to_civ_id":0,"kind":"threat","text":"How fierce you sound, Khan. Egypt is not impressed by a rattled spear and a shouted boundary. Keep your warrior on his leash, and I may pretend this was dignity rather than bluster. Touch my borders again, and I will answer with a smile sharp enough to draw blood."})
+2026-04-20 11:33:37,324 INFO app.engine.playthrough: Turn 15 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:37,324 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='How fierce you sound, Khan. Egypt is not impressed by a rattled spear and a shouted boundary. Keep your warrior on his leash, and I may pretend this was dignity rather than bluster. Touch my borders again, and I will answer with a smile sharp enough to draw blood.'
+2026-04-20 11:33:37,324 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='How fierce you sound, Khan. Egypt is not impressed by a rattled spear and a shouted boundary. Keep your warrior on his leash, and I may pretend this was dignity rather than bluster. Touch my borders again, and I will answer with a smile sharp enough to draw blood.'
+2026-04-20 11:33:37,325 INFO app.engine.playthrough: Turn 15 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:37,325 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 8 remembered actions
+2026-04-20 11:33:38,751 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:38,759 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 2
+2026-04-20 11:33:38,759 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id": 0, "kind": "chat", "text": "Genghis Khan, your hostility is received with sorrow, yet also with firmness. India did not seek this conflict, but we shall defend our people with resolve and restraint. As a river continues its course beneath storm-clouds, so too must a just people endure. May wisdom still find a path where anger has closed one."})
+2026-04-20 11:33:38,759 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id": 2, "target_id": 4})
+2026-04-20 11:33:38,759 INFO app.engine.playthrough: Turn 15 civ 2 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:33:38,759 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:38,759 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, your hostility is received with sorrow, yet also with firmness. India did not seek this conflict, but we shall defend our people with resolve and restraint. As a river continues its course beneath storm-clouds, so too must a just people endure. May wisdom still find a path where anger has closed one.'
+2026-04-20 11:33:38,759 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, your hostility is received with sorrow, yet also with firmness. India did not seek this conflict, but we shall defend our people with resolve and restraint. As a river continues its course beneath storm-clouds, so too must a just people endure. May wisdom still find a path where anger has closed one.'
+2026-04-20 11:33:38,759 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:38,759 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- attacker 2 not owned by civ 2
+2026-04-20 11:33:38,760 INFO app.engine.playthrough: Turn 16 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:38,760 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 11 inbox messages, 9 remembered actions
+2026-04-20 11:33:39,513 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:39,514 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:39,514 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:39,514 INFO app.engine.playthrough: Turn 16 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:39,514 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:39,514 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:39,514 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:39,514 INFO app.engine.playthrough: Turn 16 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:39,514 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:41,030 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:41,032 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:41,033 INFO app.engine.openai_goals: Civ 1 → send_message({"to_civ_id":0,"kind":"threat","text":"How touching, Khan—so brave when the spear is already raised. Egypt will not be herded by a man who mistakes noise for power. Keep your hands off my border, and I may yet decide this was merely a performance for the ages. Step closer, and I will teach you the price of bad manners."})
+2026-04-20 11:33:41,033 INFO app.engine.playthrough: Turn 16 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:41,033 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='How touching, Khan—so brave when the spear is already raised. Egypt will not be herded by a man who mistakes noise for power. Keep your hands off my border, and I may yet decide this was merely a performance for the ages. Step closer, and I will teach you the price of bad manners.'
+2026-04-20 11:33:41,033 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='How touching, Khan—so brave when the spear is already raised. Egypt will not be herded by a man who mistakes noise for power. Keep your hands off my border, and I may yet decide this was merely a performance for the ages. Step closer, and I will teach you the price of bad manners.'
+2026-04-20 11:33:41,034 INFO app.engine.playthrough: Turn 16 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:41,034 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:42,384 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:42,385 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:42,386 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, India receives your challenge with sorrow, yet with steadfast resolve. We did not seek this quarrel, but we shall not abandon our people. Like a lamp shielding its flame from a harsh wind, we will endure until wisdom or fortune changes the hour."})
+2026-04-20 11:33:42,386 INFO app.engine.playthrough: Turn 16 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:42,386 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your challenge with sorrow, yet with steadfast resolve. We did not seek this quarrel, but we shall not abandon our people. Like a lamp shielding its flame from a harsh wind, we will endure until wisdom or fortune changes the hour.'
+2026-04-20 11:33:42,387 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your challenge with sorrow, yet with steadfast resolve. We did not seek this quarrel, but we shall not abandon our people. Like a lamp shielding its flame from a harsh wind, we will endure until wisdom or fortune changes the hour.'
+2026-04-20 11:33:42,388 INFO app.engine.playthrough: Turn 17 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:42,388 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 13 inbox messages, 9 remembered actions
+2026-04-20 11:33:43,132 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:43,134 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:43,134 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:43,135 INFO app.engine.playthrough: Turn 17 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:43,135 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:43,135 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:43,135 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:43,135 INFO app.engine.playthrough: Turn 17 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:43,139 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:44,440 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:44,441 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:44,442 INFO app.engine.openai_goals: Civ 1 → send_message({"to_civ_id":0,"kind":"threat","text":"Genghis, your bravado is as common as dust and nearly as useful. I have heard your little growl, and I am still standing. Keep your warrior away from my borders, or I will stop admiring your theater and start collecting receipts."})
+2026-04-20 11:33:44,442 INFO app.engine.playthrough: Turn 17 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:44,442 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Genghis, your bravado is as common as dust and nearly as useful. I have heard your little growl, and I am still standing. Keep your warrior away from my borders, or I will stop admiring your theater and start collecting receipts.'
+2026-04-20 11:33:44,442 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Genghis, your bravado is as common as dust and nearly as useful. I have heard your little growl, and I am still standing. Keep your warrior away from my borders, or I will stop admiring your theater and start collecting receipts.'
+2026-04-20 11:33:44,442 INFO app.engine.playthrough: Turn 17 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:44,443 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:45,877 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:45,881 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 2
+2026-04-20 11:33:45,881 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id": 2, "target_id": 4})
+2026-04-20 11:33:45,881 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id": 0, "kind": "chat", "text": "Genghis Khan, India receives your hostility with sorrow, yet with steadfast resolve. We did not seek this quarrel, but we shall defend our people. As a lamp shields its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a path where anger has closed the door."})
+2026-04-20 11:33:45,881 INFO app.engine.playthrough: Turn 17 civ 2 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:33:45,881 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:45,881 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet with steadfast resolve. We did not seek this quarrel, but we shall defend our people. As a lamp shields its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a path where anger has closed the door.'
+2026-04-20 11:33:45,882 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet with steadfast resolve. We did not seek this quarrel, but we shall defend our people. As a lamp shields its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a path where anger has closed the door.'
+2026-04-20 11:33:45,882 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:45,882 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- attacker 2 not owned by civ 2
+2026-04-20 11:33:45,884 INFO app.engine.playthrough: Turn 18 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:45,885 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 15 inbox messages, 9 remembered actions
+2026-04-20 11:33:46,911 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:46,916 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:46,916 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:46,916 INFO app.engine.playthrough: Turn 18 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:46,916 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:46,916 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:46,917 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:46,917 INFO app.engine.playthrough: Turn 18 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:46,917 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:47,985 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:47,990 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:47,991 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:47,991 INFO app.engine.playthrough: Turn 18 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:47,991 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:47,991 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:47,991 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- attacker 2 not owned by civ 1
+2026-04-20 11:33:47,991 INFO app.engine.playthrough: Turn 18 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:47,991 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 10 remembered actions
+2026-04-20 11:33:49,573 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:49,574 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:49,574 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, India receives your hostility with sorrow, yet with steadfast resolve. We did not seek this conflict, but we shall defend our people and their dignity. As a lamp shields its flame from the wind, so too must a just nation protect what is entrusted to it. May wisdom yet find a path where anger has closed the door."})
+2026-04-20 11:33:49,574 INFO app.engine.playthrough: Turn 18 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:49,574 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet with steadfast resolve. We did not seek this conflict, but we shall defend our people and their dignity. As a lamp shields its flame from the wind, so too must a just nation protect what is entrusted to it. May wisdom yet find a path where anger has closed the door.'
+2026-04-20 11:33:49,575 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your hostility with sorrow, yet with steadfast resolve. We did not seek this conflict, but we shall defend our people and their dignity. As a lamp shields its flame from the wind, so too must a just nation protect what is entrusted to it. May wisdom yet find a path where anger has closed the door.'
+2026-04-20 11:33:49,581 INFO app.engine.playthrough: Turn 19 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:49,582 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 16 inbox messages, 9 remembered actions
+2026-04-20 11:33:50,497 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:50,499 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:50,499 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:50,499 INFO app.engine.playthrough: Turn 19 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:50,499 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:50,499 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:50,499 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:50,499 INFO app.engine.playthrough: Turn 19 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:50,500 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:51,314 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:51,315 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:51,315 INFO app.engine.openai_goals: Civ 1 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:51,315 INFO app.engine.playthrough: Turn 19 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:51,315 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:51,315 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:51,316 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- attacker 2 not owned by civ 1
+2026-04-20 11:33:51,316 INFO app.engine.playthrough: Turn 19 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:51,316 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 10 remembered actions
+2026-04-20 11:33:53,091 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:53,092 INFO app.engine.openai_goals: LLM returned 2 tool calls for civ 2
+2026-04-20 11:33:53,092 INFO app.engine.openai_goals: Civ 2 → attack_unit({"attacker_id": 2, "target_id": 4})
+2026-04-20 11:33:53,092 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id": 0, "kind": "chat", "text": "Genghis Khan, India did not seek this conflict, yet we remain steadfast in defense of our people. As a lamp shelters its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a road where anger now stands."})
+2026-04-20 11:33:53,092 INFO app.engine.playthrough: Turn 19 civ 2 decided on 1 goals and 1 diplomatic actions
+2026-04-20 11:33:53,092 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:53,092 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India did not seek this conflict, yet we remain steadfast in defense of our people. As a lamp shelters its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a road where anger now stands.'
+2026-04-20 11:33:53,092 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India did not seek this conflict, yet we remain steadfast in defense of our people. As a lamp shelters its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a road where anger now stands.'
+2026-04-20 11:33:53,092 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:53,092 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- attacker 2 not owned by civ 2
+2026-04-20 11:33:53,095 INFO app.engine.playthrough: Turn 20 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 11:33:53,096 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 2 visible cities, 3 known civs, 17 inbox messages, 9 remembered actions
+2026-04-20 11:33:53,930 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:53,931 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 11:33:53,931 INFO app.engine.openai_goals: Civ 0 → attack_unit({"attacker_id":2,"target_id":4})
+2026-04-20 11:33:53,931 INFO app.engine.playthrough: Turn 20 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 11:33:53,931 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 11:33:53,932 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 11:33:53,932 WARNING app.engine.playthrough:   rejected action: AttackAction(attacker_id=2, target_id=4) -- civs 0 and 1 are not at war
+2026-04-20 11:33:53,932 INFO app.engine.playthrough: Turn 20 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 11:33:53,932 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 3 visible cities, 3 known civs, 1 inbox messages, 9 remembered actions
+2026-04-20 11:33:55,540 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:55,541 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 11:33:55,541 INFO app.engine.openai_goals: Civ 1 → send_message({"to_civ_id":0,"kind":"threat","text":"My dear Khan, if you mistake a border for a leash, Egypt will happily teach you the difference. Keep your warrior on your side of the stones, and we can both pretend this was merely a lesson in manners."})
+2026-04-20 11:33:55,541 INFO app.engine.playthrough: Turn 20 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:55,541 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='My dear Khan, if you mistake a border for a leash, Egypt will happily teach you the difference. Keep your warrior on your side of the stones, and we can both pretend this was merely a lesson in manners.'
+2026-04-20 11:33:55,541 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='My dear Khan, if you mistake a border for a leash, Egypt will happily teach you the difference. Keep your warrior on your side of the stones, and we can both pretend this was merely a lesson in manners.'
+2026-04-20 11:33:55,541 INFO app.engine.playthrough: Turn 20 civ 2 (Mahatma Gandhi of India): 1 cities, 0 units
+2026-04-20 11:33:55,542 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 3 known civs, 1 inbox messages, 11 remembered actions
+2026-04-20 11:33:56,685 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 11:33:56,688 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 11:33:56,688 INFO app.engine.openai_goals: Civ 2 → send_message({"to_civ_id":0,"kind":"chat","text":"Genghis Khan, India receives your challenge with sorrow, yet with steadfast resolve. We did not seek this conflict, but we shall defend our people and our dignity with calm determination. As a lamp shelters its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a path where anger has closed the door."})
+2026-04-20 11:33:56,688 INFO app.engine.playthrough: Turn 20 civ 2 decided on 0 goals and 1 diplomatic actions
+2026-04-20 11:33:56,688 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your challenge with sorrow, yet with steadfast resolve. We did not seek this conflict, but we shall defend our people and our dignity with calm determination. As a lamp shelters its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a path where anger has closed the door.'
+2026-04-20 11:33:56,688 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=chat text='Genghis Khan, India receives your challenge with sorrow, yet with steadfast resolve. We did not seek this conflict, but we shall defend our people and our dignity with calm determination. As a lamp shelters its flame from the wind, so must a just nation protect what is entrusted to it. May wisdom still find a path where anger has closed the door.'
+2026-04-20 13:35:43,096 INFO app.engine.playthrough: Turn 1 civ 0 (Genghis Khan of Mongolia): 0 cities, 2 units
+2026-04-20 13:35:43,096 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered intents
+2026-04-20 13:35:45,698 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:35:45,709 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:35:45,709 INFO app.engine.openai_goals: Civ 0 → expand({"target_q":0,"target_r":1})
+2026-04-20 13:35:45,710 INFO app.engine.playthrough: Turn 1 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:35:45,710 INFO app.engine.playthrough:   goal: FoundCityNear unit=1 target=(-2,1) name='City-0-1'
+2026-04-20 13:35:45,710 INFO app.engine.playthrough:   expanded FoundCityNear unit=1 target=(-2,1) name='City-0-1' into 2 actions
+2026-04-20 13:35:45,710 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=1, destination=Hex(q=-2, r=1))
+2026-04-20 13:35:45,710 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=1, name='City-0-1')
+2026-04-20 13:35:45,710 INFO app.engine.playthrough: Turn 1 civ 1 (Cleopatra of Egypt): 0 cities, 2 units
+2026-04-20 13:35:45,710 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 1 visible cities, 2 known civs, 0 inbox messages, 0 remembered intents
+2026-04-20 13:35:47,171 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:35:47,175 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:35:47,175 INFO app.engine.openai_goals: Civ 1 → expand({})
+2026-04-20 13:35:47,176 INFO app.engine.playthrough: Turn 1 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:35:47,176 INFO app.engine.playthrough:   goal: FoundCityNear unit=3 target=(-6,2) name='City-1-1'
+2026-04-20 13:35:47,176 INFO app.engine.playthrough:   expanded FoundCityNear unit=3 target=(-6,2) name='City-1-1' into 2 actions
+2026-04-20 13:35:47,176 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=3, destination=Hex(q=-6, r=2))
+2026-04-20 13:35:47,177 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=3, name='City-1-1')
+2026-04-20 13:35:47,177 INFO app.engine.playthrough: Turn 1 civ 2 (Mahatma Gandhi of India): 0 cities, 2 units
+2026-04-20 13:35:47,177 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered intents
+2026-04-20 13:35:48,666 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:35:48,667 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:35:48,668 INFO app.engine.openai_goals: Civ 2 → expand({})
+2026-04-20 13:35:48,668 INFO app.engine.playthrough: Turn 1 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:35:48,668 INFO app.engine.playthrough:   goal: FoundCityNear unit=5 target=(0,-4) name='City-2-1'
+2026-04-20 13:35:48,668 INFO app.engine.playthrough:   expanded FoundCityNear unit=5 target=(0,-4) name='City-2-1' into 2 actions
+2026-04-20 13:35:48,668 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=5, destination=Hex(q=0, r=-4))
+2026-04-20 13:35:48,669 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=5, name='City-2-1')
+2026-04-20 13:35:48,671 INFO app.engine.playthrough: Turn 2 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:35:48,674 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 1 visible cities, 2 known civs, 0 inbox messages, 1 remembered intents
+2026-04-20 13:35:50,057 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:35:50,058 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:35:50,058 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:35:50,059 INFO app.engine.playthrough: Turn 2 civ 0 decided on 1 goals and 1 diplomatic actions
+2026-04-20 13:35:50,059 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 13:35:50,060 INFO app.engine.playthrough:   diplomacy: SendMessage to=1 kind=declare_war text='We meet on the field of battle.'
+2026-04-20 13:35:50,060 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=1 kind=declare_war text='We meet on the field of battle.'
+2026-04-20 13:35:50,060 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 13:35:50,060 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=-1, r=1))
+2026-04-20 13:35:50,060 INFO app.engine.playthrough: Turn 2 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:35:50,061 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 1 remembered intents
+2026-04-20 13:35:51,430 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:35:51,432 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:35:51,432 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Genghis Khan, how punctual—arriving with war already in hand. Egypt will answer in the language your horses understand. Yet even a storm knows when to pass; if you wish peace, bring tribute, not bluster."})
+2026-04-20 13:35:51,432 INFO app.engine.playthrough: Turn 2 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:35:51,432 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Genghis Khan, how punctual—arriving with war already in hand. Egypt will answer in the language your horses understand. Yet even a storm knows when to pass; if you wish peace, bring tribute, not bluster.'
+2026-04-20 13:35:51,432 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Genghis Khan, how punctual—arriving with war already in hand. Egypt will answer in the language your horses understand. Yet even a storm knows when to pass; if you wish peace, bring tribute, not bluster.'
+2026-04-20 13:35:51,432 INFO app.engine.playthrough: Turn 2 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:35:51,433 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 1 remembered intents
+2026-04-20 13:35:52,530 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:35:52,533 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:35:52,533 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":3,"target_r":-4})
+2026-04-20 13:35:52,534 INFO app.engine.playthrough: Turn 2 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:35:52,534 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(3,-4)
+2026-04-20 13:35:52,534 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(3,-4) into 2 actions
+2026-04-20 13:35:52,535 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=2, r=-3))
+2026-04-20 13:35:52,535 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=3, r=-4))
+2026-04-20 13:35:52,537 INFO app.engine.playthrough: Turn 3 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:35:52,538 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 1 visible cities, 2 known civs, 1 inbox messages, 2 remembered intents
+2026-04-20 13:35:59,402 INFO app.engine.playthrough: Turn 1 civ 0 (Genghis Khan of Mongolia): 0 cities, 2 units
+2026-04-20 13:35:59,402 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered intents
+2026-04-20 13:36:00,370 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:00,379 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:00,379 INFO app.engine.openai_goals: Civ 0 → expand({})
+2026-04-20 13:36:00,380 INFO app.engine.playthrough: Turn 1 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:00,380 INFO app.engine.playthrough:   goal: FoundCityNear unit=1 target=(-2,1) name='City-0-1'
+2026-04-20 13:36:00,380 INFO app.engine.playthrough:   expanded FoundCityNear unit=1 target=(-2,1) name='City-0-1' into 2 actions
+2026-04-20 13:36:00,380 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=1, destination=Hex(q=-2, r=1))
+2026-04-20 13:36:00,380 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=1, name='City-0-1')
+2026-04-20 13:36:00,381 INFO app.engine.playthrough: Turn 1 civ 1 (Cleopatra of Egypt): 0 cities, 2 units
+2026-04-20 13:36:00,381 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 1 visible cities, 2 known civs, 0 inbox messages, 0 remembered intents
+2026-04-20 13:36:01,569 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:01,569 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:01,570 INFO app.engine.openai_goals: Civ 1 → expand({"target_q":-4,"target_r":1})
+2026-04-20 13:36:01,570 INFO app.engine.playthrough: Turn 1 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:01,570 INFO app.engine.playthrough:   goal: FoundCityNear unit=3 target=(-6,2) name='City-1-1'
+2026-04-20 13:36:01,570 INFO app.engine.playthrough:   expanded FoundCityNear unit=3 target=(-6,2) name='City-1-1' into 2 actions
+2026-04-20 13:36:01,570 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=3, destination=Hex(q=-6, r=2))
+2026-04-20 13:36:01,570 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=3, name='City-1-1')
+2026-04-20 13:36:01,571 INFO app.engine.playthrough: Turn 1 civ 2 (Mahatma Gandhi of India): 0 cities, 2 units
+2026-04-20 13:36:01,571 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 0 visible cities, 1 known civs, 0 inbox messages, 0 remembered intents
+2026-04-20 13:36:02,489 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:02,490 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:02,491 INFO app.engine.openai_goals: Civ 2 → expand({})
+2026-04-20 13:36:02,491 INFO app.engine.playthrough: Turn 1 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:02,491 INFO app.engine.playthrough:   goal: FoundCityNear unit=5 target=(0,-4) name='City-2-1'
+2026-04-20 13:36:02,491 INFO app.engine.playthrough:   expanded FoundCityNear unit=5 target=(0,-4) name='City-2-1' into 2 actions
+2026-04-20 13:36:02,491 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=5, destination=Hex(q=0, r=-4))
+2026-04-20 13:36:02,491 INFO app.engine.playthrough:   applied action: FoundCityAction(unit_id=5, name='City-2-1')
+2026-04-20 13:36:02,494 INFO app.engine.playthrough: Turn 2 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:36:02,494 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 1 visible cities, 2 known civs, 0 inbox messages, 1 remembered intents
+2026-04-20 13:36:04,433 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:04,434 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:04,434 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:04,434 INFO app.engine.playthrough: Turn 2 civ 0 decided on 1 goals and 1 diplomatic actions
+2026-04-20 13:36:04,435 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 13:36:04,435 INFO app.engine.playthrough:   diplomacy: SendMessage to=1 kind=declare_war text='We meet on the field of battle.'
+2026-04-20 13:36:04,435 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=1 kind=declare_war text='We meet on the field of battle.'
+2026-04-20 13:36:04,436 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 13:36:04,436 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=-1, r=1))
+2026-04-20 13:36:04,436 INFO app.engine.playthrough: Turn 2 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:04,437 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 1 remembered intents
+2026-04-20 13:36:05,768 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:05,768 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:05,769 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Mongolia has chosen the language of swords; how charmingly unoriginal. Egypt will reply in a dialect you are less likely to enjoy."})
+2026-04-20 13:36:05,769 INFO app.engine.playthrough: Turn 2 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:05,769 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Mongolia has chosen the language of swords; how charmingly unoriginal. Egypt will reply in a dialect you are less likely to enjoy.'
+2026-04-20 13:36:05,769 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Mongolia has chosen the language of swords; how charmingly unoriginal. Egypt will reply in a dialect you are less likely to enjoy.'
+2026-04-20 13:36:05,769 INFO app.engine.playthrough: Turn 2 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:05,770 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 1 remembered intents
+2026-04-20 13:36:06,633 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:06,636 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:06,636 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":2,"target_r":-3})
+2026-04-20 13:36:06,636 INFO app.engine.playthrough: Turn 2 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:06,636 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(2,-3)
+2026-04-20 13:36:06,636 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(2,-3) into 1 actions
+2026-04-20 13:36:06,636 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=2, r=-3))
+2026-04-20 13:36:06,640 INFO app.engine.playthrough: Turn 3 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:36:06,640 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 1 visible cities, 2 known civs, 1 inbox messages, 2 remembered intents
+2026-04-20 13:36:07,408 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:07,409 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:07,409 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:07,409 INFO app.engine.playthrough: Turn 3 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:07,409 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 13:36:07,409 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 13:36:07,409 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=2, destination=Hex(q=-2, r=1))
+2026-04-20 13:36:07,410 INFO app.engine.playthrough: Turn 3 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:07,410 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 2 remembered intents
+2026-04-20 13:36:08,337 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:08,339 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:08,339 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:08,339 INFO app.engine.playthrough: Turn 3 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:08,339 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 13:36:08,339 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 2 actions
+2026-04-20 13:36:08,339 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-3, r=1))
+2026-04-20 13:36:08,339 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=4, target_id=2)
+2026-04-20 13:36:08,340 INFO app.engine.playthrough: Turn 3 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:08,340 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 2 remembered intents
+2026-04-20 13:36:09,257 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:09,258 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:09,259 INFO app.engine.openai_goals: Civ 2 → scout({})
+2026-04-20 13:36:09,259 INFO app.engine.playthrough: Turn 3 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:09,259 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(-1,-1)
+2026-04-20 13:36:09,259 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(-1,-1) into 2 actions
+2026-04-20 13:36:09,259 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=1, r=-3))
+2026-04-20 13:36:09,259 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=0, r=-2))
+2026-04-20 13:36:09,261 INFO app.engine.playthrough: Turn 4 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:36:09,262 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 1 visible cities, 2 known civs, 1 inbox messages, 3 remembered intents
+2026-04-20 13:36:10,429 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:10,432 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:10,432 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:10,433 INFO app.engine.playthrough: Turn 4 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:10,433 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 13:36:10,433 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 13:36:10,433 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=4)
+2026-04-20 13:36:10,433 INFO app.engine.playthrough: Turn 4 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:10,434 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 3 remembered intents
+2026-04-20 13:36:11,145 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:11,146 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:11,146 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:11,146 INFO app.engine.playthrough: Turn 4 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:11,146 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 13:36:11,146 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 1 actions
+2026-04-20 13:36:11,146 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=4, target_id=2)
+2026-04-20 13:36:11,146 INFO app.engine.playthrough: Turn 4 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:11,147 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 3 remembered intents
+2026-04-20 13:36:12,291 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:12,292 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:12,293 INFO app.engine.openai_goals: Civ 2 → scout({})
+2026-04-20 13:36:12,293 INFO app.engine.playthrough: Turn 4 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:12,294 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(-3,-2)
+2026-04-20 13:36:12,295 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(-3,-2) into 2 actions
+2026-04-20 13:36:12,295 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=0, r=-1))
+2026-04-20 13:36:12,295 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=0, r=0))
+2026-04-20 13:36:12,299 INFO app.engine.playthrough: Turn 5 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:36:12,299 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 3 visible units, 1 visible cities, 3 known civs, 1 inbox messages, 4 remembered intents
+2026-04-20 13:36:13,174 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:13,175 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:13,175 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:13,175 INFO app.engine.playthrough: Turn 5 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:13,175 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 13:36:13,175 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 13:36:13,175 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=4)
+2026-04-20 13:36:13,175 INFO app.engine.playthrough: Turn 5 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:13,176 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 4 remembered intents
+2026-04-20 13:36:14,366 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:14,367 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:14,367 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:14,367 INFO app.engine.playthrough: Turn 5 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:14,367 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 13:36:14,367 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 1 actions
+2026-04-20 13:36:14,367 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=4, target_id=2)
+2026-04-20 13:36:14,367 INFO app.engine.playthrough: Turn 5 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:14,367 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 2 visible units, 2 visible cities, 2 known civs, 0 inbox messages, 4 remembered intents
+2026-04-20 13:36:15,698 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:15,698 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:15,698 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":1,"target_r":-3})
+2026-04-20 13:36:15,698 INFO app.engine.playthrough: Turn 5 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:15,698 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(1,-3)
+2026-04-20 13:36:15,698 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(1,-3) into 2 actions
+2026-04-20 13:36:15,698 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=1, r=-1))
+2026-04-20 13:36:15,699 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=1, r=-2))
+2026-04-20 13:36:15,699 INFO app.engine.playthrough: Turn 6 civ 0 (Genghis Khan of Mongolia): 1 cities, 1 units
+2026-04-20 13:36:15,699 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 2 visible units, 1 visible cities, 2 known civs, 1 inbox messages, 5 remembered intents
+2026-04-20 13:36:16,577 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:16,578 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:16,578 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:16,578 INFO app.engine.playthrough: Turn 6 civ 0 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:16,578 INFO app.engine.playthrough:   goal: AttackUnit attacker=2 target=4
+2026-04-20 13:36:16,578 INFO app.engine.playthrough:   expanded AttackUnit attacker=2 target=4 into 1 actions
+2026-04-20 13:36:16,578 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=2, target_id=4)
+2026-04-20 13:36:16,578 INFO app.engine.playthrough: Turn 6 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:16,579 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 2 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 5 remembered intents
+2026-04-20 13:36:17,644 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:17,644 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:17,644 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:17,645 INFO app.engine.playthrough: Turn 6 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:17,645 INFO app.engine.playthrough:   goal: AttackUnit attacker=4 target=2
+2026-04-20 13:36:17,645 INFO app.engine.playthrough:   expanded AttackUnit attacker=4 target=2 into 1 actions
+2026-04-20 13:36:17,645 INFO app.engine.playthrough:   applied action: AttackAction(attacker_id=4, target_id=2)
+2026-04-20 13:36:17,645 INFO app.engine.playthrough: Turn 6 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:17,645 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 5 remembered intents
+2026-04-20 13:36:18,463 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:18,465 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:18,465 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":3,"target_r":-2})
+2026-04-20 13:36:18,465 INFO app.engine.playthrough: Turn 6 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:18,465 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(3,-2)
+2026-04-20 13:36:18,465 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(3,-2) into 2 actions
+2026-04-20 13:36:18,465 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=2, r=-3))
+2026-04-20 13:36:18,465 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=3, r=-3))
+2026-04-20 13:36:18,466 INFO app.engine.playthrough: Turn 7 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:18,466 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 1 inbox messages, 6 remembered intents
+2026-04-20 13:36:19,338 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:19,340 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:19,340 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:19,340 INFO app.engine.playthrough: Turn 7 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:19,341 INFO app.engine.playthrough: Turn 7 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:19,341 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 6 remembered intents
+2026-04-20 13:36:20,378 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:20,384 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:20,385 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Your blades grow dull, Khan. Egypt does not panic; it calculates. Press harder, and I shall make your next triumph expensive."})
+2026-04-20 13:36:20,385 INFO app.engine.playthrough: Turn 7 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:20,385 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Your blades grow dull, Khan. Egypt does not panic; it calculates. Press harder, and I shall make your next triumph expensive.'
+2026-04-20 13:36:20,385 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Your blades grow dull, Khan. Egypt does not panic; it calculates. Press harder, and I shall make your next triumph expensive.'
+2026-04-20 13:36:20,385 INFO app.engine.playthrough: Turn 7 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:20,386 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 6 remembered intents
+2026-04-20 13:36:21,166 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:21,167 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:21,168 INFO app.engine.openai_goals: Civ 2 → scout({})
+2026-04-20 13:36:21,168 INFO app.engine.playthrough: Turn 7 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:21,168 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(0,-1)
+2026-04-20 13:36:21,168 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(0,-1) into 2 actions
+2026-04-20 13:36:21,168 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=2, r=-3))
+2026-04-20 13:36:21,169 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=1, r=-2))
+2026-04-20 13:36:21,171 INFO app.engine.playthrough: Turn 8 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:21,172 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 2 inbox messages, 7 remembered intents
+2026-04-20 13:36:24,918 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:24,920 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:24,920 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:24,921 INFO app.engine.playthrough: Turn 8 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:24,921 INFO app.engine.playthrough: Turn 8 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:24,925 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 7 remembered intents
+2026-04-20 13:36:26,562 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:26,566 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:26,566 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, your courage is admirable in the way a child’s drawing of a lion is admirable. Egypt does not quarrel for sport; we merely notice when the ambitious begin to bruise themselves on our patience."})
+2026-04-20 13:36:26,566 INFO app.engine.playthrough: Turn 8 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:26,566 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, your courage is admirable in the way a child’s drawing of a lion is admirable. Egypt does not quarrel for sport; we merely notice when the ambitious begin to bruise themselves on our patience.'
+2026-04-20 13:36:26,567 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, your courage is admirable in the way a child’s drawing of a lion is admirable. Egypt does not quarrel for sport; we merely notice when the ambitious begin to bruise themselves on our patience.'
+2026-04-20 13:36:26,567 INFO app.engine.playthrough: Turn 8 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:26,567 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 7 remembered intents
+2026-04-20 13:36:27,676 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:27,677 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:27,677 INFO app.engine.openai_goals: Civ 2 → scout({})
+2026-04-20 13:36:27,678 INFO app.engine.playthrough: Turn 8 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:27,678 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(-2,-1)
+2026-04-20 13:36:27,683 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(-2,-1) into 0 actions
+2026-04-20 13:36:27,683 WARNING app.engine.playthrough:   rejected goal: MoveTo unit=6 target=(-2,-1) -- target (-2,-1) is impassable
+2026-04-20 13:36:27,684 INFO app.engine.playthrough: Turn 9 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:27,684 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 3 inbox messages, 8 remembered intents
+2026-04-20 13:36:28,498 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:28,499 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:28,500 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:28,500 INFO app.engine.playthrough: Turn 9 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:28,500 INFO app.engine.playthrough: Turn 9 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:28,501 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 1 inbox messages, 8 remembered intents
+2026-04-20 13:36:29,656 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:29,656 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:29,657 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, you have the temperament of a hammer and the manners of a siege engine. Egypt remains unbowed, and every charge you make merely teaches me where your ambitions bruise most easily."})
+2026-04-20 13:36:29,657 INFO app.engine.playthrough: Turn 9 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:29,657 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, you have the temperament of a hammer and the manners of a siege engine. Egypt remains unbowed, and every charge you make merely teaches me where your ambitions bruise most easily.'
+2026-04-20 13:36:29,657 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, you have the temperament of a hammer and the manners of a siege engine. Egypt remains unbowed, and every charge you make merely teaches me where your ambitions bruise most easily.'
+2026-04-20 13:36:29,657 INFO app.engine.playthrough: Turn 9 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:29,657 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:30,495 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:30,498 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:30,498 INFO app.engine.openai_goals: Civ 2 → scout({})
+2026-04-20 13:36:30,499 INFO app.engine.playthrough: Turn 9 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:30,499 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(-2,-1)
+2026-04-20 13:36:30,501 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(-2,-1) into 0 actions
+2026-04-20 13:36:30,501 WARNING app.engine.playthrough:   rejected goal: MoveTo unit=6 target=(-2,-1) -- target (-2,-1) is impassable
+2026-04-20 13:36:30,503 INFO app.engine.playthrough: Turn 10 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:30,503 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 4 inbox messages, 8 remembered intents
+2026-04-20 13:36:31,775 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:31,778 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:31,778 INFO app.engine.openai_goals: Civ 0 → speak({"to_civ_id":1,"kind":"threat","text":"You bark bravely for a corpse. Egypt bleeds. The horse follows. Your end is near."})
+2026-04-20 13:36:31,778 INFO app.engine.playthrough: Turn 10 civ 0 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:31,778 INFO app.engine.playthrough:   diplomacy: SendMessage to=1 kind=threat text='You bark bravely for a corpse. Egypt bleeds. The horse follows. Your end is near.'
+2026-04-20 13:36:31,779 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=1 kind=threat text='You bark bravely for a corpse. Egypt bleeds. The horse follows. Your end is near.'
+2026-04-20 13:36:31,781 INFO app.engine.playthrough: Turn 10 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:31,781 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:32,655 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:32,656 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:32,656 INFO app.engine.openai_goals: Civ 1 → adjust_stance({"target_civ_id":0,"stance":"war"})
+2026-04-20 13:36:32,656 INFO app.engine.playthrough: Turn 10 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:32,656 INFO app.engine.playthrough:   diplomacy: SetStance target=0 stance=war
+2026-04-20 13:36:32,656 INFO app.engine.playthrough:   applied diplomacy: SetStance target=0 stance=war
+2026-04-20 13:36:32,656 INFO app.engine.playthrough: Turn 10 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:32,656 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:33,409 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:33,409 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:33,409 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":3,"target_r":-2})
+2026-04-20 13:36:33,409 INFO app.engine.playthrough: Turn 10 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:33,409 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(3,-2)
+2026-04-20 13:36:33,409 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(3,-2) into 2 actions
+2026-04-20 13:36:33,409 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=2, r=-3))
+2026-04-20 13:36:33,409 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=3, r=-3))
+2026-04-20 13:36:33,410 INFO app.engine.playthrough: Turn 11 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:33,410 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 4 inbox messages, 8 remembered intents
+2026-04-20 13:36:34,233 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:34,234 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:34,234 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:34,235 INFO app.engine.playthrough: Turn 11 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:34,235 INFO app.engine.playthrough: Turn 11 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:34,236 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:35,461 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:35,466 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:35,467 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, you mistake noise for triumph. Egypt remembers every boast, and I promise yours will age poorly. Enjoy your bravado while it still has a pulse."})
+2026-04-20 13:36:35,467 INFO app.engine.playthrough: Turn 11 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:35,467 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, you mistake noise for triumph. Egypt remembers every boast, and I promise yours will age poorly. Enjoy your bravado while it still has a pulse.'
+2026-04-20 13:36:35,467 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, you mistake noise for triumph. Egypt remembers every boast, and I promise yours will age poorly. Enjoy your bravado while it still has a pulse.'
+2026-04-20 13:36:35,467 INFO app.engine.playthrough: Turn 11 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:35,467 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:36,283 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:36,283 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:36,284 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":5,"target_r":-3})
+2026-04-20 13:36:36,284 INFO app.engine.playthrough: Turn 11 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:36,284 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(5,-3)
+2026-04-20 13:36:36,284 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(5,-3) into 2 actions
+2026-04-20 13:36:36,284 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=4, r=-3))
+2026-04-20 13:36:36,284 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=5, r=-3))
+2026-04-20 13:36:36,286 INFO app.engine.playthrough: Turn 12 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:36,286 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 5 inbox messages, 8 remembered intents
+2026-04-20 13:36:37,200 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:37,202 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:37,202 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:37,202 INFO app.engine.playthrough: Turn 12 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:37,202 INFO app.engine.playthrough: Turn 12 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:37,203 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:38,075 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:38,076 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:38,077 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:38,077 INFO app.engine.playthrough: Turn 12 civ 1 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:38,077 INFO app.engine.playthrough: Turn 12 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:38,078 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:38,929 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:38,932 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:38,932 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":5,"target_r":-2})
+2026-04-20 13:36:38,933 INFO app.engine.playthrough: Turn 12 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:38,933 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(5,-2)
+2026-04-20 13:36:38,933 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(5,-2) into 1 actions
+2026-04-20 13:36:38,933 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=5, r=-2))
+2026-04-20 13:36:38,935 INFO app.engine.playthrough: Turn 13 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:38,936 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 5 inbox messages, 8 remembered intents
+2026-04-20 13:36:39,733 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:39,735 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:39,735 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:39,735 INFO app.engine.playthrough: Turn 13 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:39,735 INFO app.engine.playthrough: Turn 13 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:39,736 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:41,220 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:41,225 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:41,226 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Mongolia mistakes bleeding for victory and noise for destiny. Egypt is still here, still elegant, and still counting the ways your horsemen may regret their enthusiasm. Come closer, Khan—if you insist on being memorable, at least be expensive."})
+2026-04-20 13:36:41,226 INFO app.engine.playthrough: Turn 13 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:41,226 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Mongolia mistakes bleeding for victory and noise for destiny. Egypt is still here, still elegant, and still counting the ways your horsemen may regret their enthusiasm. Come closer, Khan—if you insist on being memorable, at least be expensive.'
+2026-04-20 13:36:41,226 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Mongolia mistakes bleeding for victory and noise for destiny. Egypt is still here, still elegant, and still counting the ways your horsemen may regret their enthusiasm. Come closer, Khan—if you insist on being memorable, at least be expensive.'
+2026-04-20 13:36:41,226 INFO app.engine.playthrough: Turn 13 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:41,227 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:42,116 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:42,117 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:42,117 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":7,"target_r":-3})
+2026-04-20 13:36:42,117 INFO app.engine.playthrough: Turn 13 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:42,117 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(7,-3)
+2026-04-20 13:36:42,118 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(7,-3) into 2 actions
+2026-04-20 13:36:42,118 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=6, r=-2))
+2026-04-20 13:36:42,118 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=7, r=-3))
+2026-04-20 13:36:42,120 INFO app.engine.playthrough: Turn 14 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:42,121 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 6 inbox messages, 8 remembered intents
+2026-04-20 13:36:42,880 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:42,881 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:42,881 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:42,881 INFO app.engine.playthrough: Turn 14 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:42,881 INFO app.engine.playthrough: Turn 14 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:42,881 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:44,109 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:44,110 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:44,110 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, you keep mistaking ferocity for foresight. Egypt has heard better threats from bandits with damp footwear. Press on if you like — I do adore watching overconfidence arrive at its appointment with regret."})
+2026-04-20 13:36:44,110 INFO app.engine.playthrough: Turn 14 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:44,110 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, you keep mistaking ferocity for foresight. Egypt has heard better threats from bandits with damp footwear. Press on if you like — I do adore watching overconfidence arrive at its appointment with regret.'
+2026-04-20 13:36:44,110 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, you keep mistaking ferocity for foresight. Egypt has heard better threats from bandits with damp footwear. Press on if you like — I do adore watching overconfidence arrive at its appointment with regret.'
+2026-04-20 13:36:44,110 INFO app.engine.playthrough: Turn 14 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:44,110 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:44,834 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:44,835 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:44,835 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":7,"target_r":-2})
+2026-04-20 13:36:44,835 INFO app.engine.playthrough: Turn 14 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:44,835 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(7,-2)
+2026-04-20 13:36:44,835 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(7,-2) into 1 actions
+2026-04-20 13:36:44,835 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=7, r=-2))
+2026-04-20 13:36:44,836 INFO app.engine.playthrough: Turn 15 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:44,836 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 7 inbox messages, 8 remembered intents
+2026-04-20 13:36:45,699 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:45,699 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:45,699 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:45,700 INFO app.engine.playthrough: Turn 15 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:45,700 INFO app.engine.playthrough: Turn 15 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:45,700 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:46,479 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:46,480 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:46,480 INFO app.engine.openai_goals: Civ 1 → reinforce({"target_city_id":2})
+2026-04-20 13:36:46,480 INFO app.engine.playthrough: Turn 15 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:46,480 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-6,2)
+2026-04-20 13:36:46,480 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-6,2) into 2 actions
+2026-04-20 13:36:46,480 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-3, r=1))
+2026-04-20 13:36:46,480 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-4, r=1))
+2026-04-20 13:36:46,480 INFO app.engine.playthrough: Turn 15 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:46,480 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:47,218 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:47,218 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:47,218 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":7,"target_r":-3})
+2026-04-20 13:36:47,218 INFO app.engine.playthrough: Turn 15 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:47,219 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(7,-3)
+2026-04-20 13:36:47,219 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(7,-3) into 1 actions
+2026-04-20 13:36:47,219 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=7, r=-3))
+2026-04-20 13:36:47,219 INFO app.engine.playthrough: Turn 16 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:47,219 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 7 inbox messages, 8 remembered intents
+2026-04-20 13:36:48,365 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:48,366 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:48,366 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:48,367 INFO app.engine.playthrough: Turn 16 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:48,367 INFO app.engine.playthrough: Turn 16 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:48,367 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:49,797 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:49,797 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:49,797 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, your horse still snorts; how quaint. Egypt remains elegant, intact, and just irritating enough to survive your enthusiasm. Keep circling if you wish — I do enjoy watching a boast arrive late to its own funeral."})
+2026-04-20 13:36:49,797 INFO app.engine.playthrough: Turn 16 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:49,797 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, your horse still snorts; how quaint. Egypt remains elegant, intact, and just irritating enough to survive your enthusiasm. Keep circling if you wish — I do enjoy watching a boast arrive late to its own funeral.'
+2026-04-20 13:36:49,798 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, your horse still snorts; how quaint. Egypt remains elegant, intact, and just irritating enough to survive your enthusiasm. Keep circling if you wish — I do enjoy watching a boast arrive late to its own funeral.'
+2026-04-20 13:36:49,798 INFO app.engine.playthrough: Turn 16 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:49,798 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:51,126 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:51,127 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:51,127 INFO app.engine.openai_goals: Civ 2 → expand({})
+2026-04-20 13:36:51,127 INFO app.engine.playthrough: Turn 16 civ 2 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:51,127 INFO app.engine.playthrough: Turn 17 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:51,128 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 8 inbox messages, 8 remembered intents
+2026-04-20 13:36:51,882 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:51,883 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:51,883 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:51,883 INFO app.engine.playthrough: Turn 17 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:51,883 INFO app.engine.playthrough: Turn 17 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:51,883 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:52,734 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:52,735 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:52,735 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:52,735 INFO app.engine.playthrough: Turn 17 civ 1 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:52,735 INFO app.engine.playthrough:   goal: MoveTo unit=4 target=(-2,1)
+2026-04-20 13:36:52,735 INFO app.engine.playthrough:   expanded MoveTo unit=4 target=(-2,1) into 2 actions
+2026-04-20 13:36:52,735 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-3, r=1))
+2026-04-20 13:36:52,735 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=4, destination=Hex(q=-2, r=1))
+2026-04-20 13:36:52,735 INFO app.engine.playthrough: Turn 17 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:52,735 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:53,482 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:53,482 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:53,482 INFO app.engine.openai_goals: Civ 2 → scout({})
+2026-04-20 13:36:53,483 INFO app.engine.playthrough: Turn 17 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:36:53,483 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(4,-3)
+2026-04-20 13:36:53,483 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(4,-3) into 2 actions
+2026-04-20 13:36:53,483 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=6, r=-3))
+2026-04-20 13:36:53,483 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=5, r=-3))
+2026-04-20 13:36:53,484 INFO app.engine.playthrough: Turn 18 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:53,485 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 8 inbox messages, 8 remembered intents
+2026-04-20 13:36:54,199 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:54,199 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:54,199 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:54,199 INFO app.engine.playthrough: Turn 18 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:54,199 INFO app.engine.playthrough: Turn 18 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:54,199 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:55,124 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:55,124 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:55,124 INFO app.engine.openai_goals: Civ 1 → engage({"target_civ_id":0})
+2026-04-20 13:36:55,124 INFO app.engine.playthrough: Turn 18 civ 1 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:55,124 INFO app.engine.playthrough: Turn 18 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:55,124 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:56,456 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:56,456 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:56,456 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":5,"target_r":-3})
+2026-04-20 13:36:56,456 INFO app.engine.playthrough: Turn 18 civ 2 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:56,457 INFO app.engine.playthrough: Turn 19 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:56,457 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 8 inbox messages, 8 remembered intents
+2026-04-20 13:36:57,374 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:57,375 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:36:57,375 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:36:57,375 INFO app.engine.playthrough: Turn 19 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:57,375 INFO app.engine.playthrough: Turn 19 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:36:57,375 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:36:58,833 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:58,834 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:36:58,834 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, your thunder has grown familiar, and familiarity is often the prelude to disappointment. Egypt remains polished, patient, and unpleasantly difficult to bury. Keep shouting if it pleases you; I find it reveals more about the speaker than the victim."})
+2026-04-20 13:36:58,835 INFO app.engine.playthrough: Turn 19 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:36:58,835 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, your thunder has grown familiar, and familiarity is often the prelude to disappointment. Egypt remains polished, patient, and unpleasantly difficult to bury. Keep shouting if it pleases you; I find it reveals more about the speaker than the victim.'
+2026-04-20 13:36:58,835 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, your thunder has grown familiar, and familiarity is often the prelude to disappointment. Egypt remains polished, patient, and unpleasantly difficult to bury. Keep shouting if it pleases you; I find it reveals more about the speaker than the victim.'
+2026-04-20 13:36:58,835 INFO app.engine.playthrough: Turn 19 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:36:58,836 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:36:59,544 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:36:59,549 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:36:59,549 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":5,"target_r":-3})
+2026-04-20 13:36:59,550 INFO app.engine.playthrough: Turn 19 civ 2 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:36:59,551 INFO app.engine.playthrough: Turn 20 civ 0 (Genghis Khan of Mongolia): 1 cities, 0 units
+2026-04-20 13:36:59,552 INFO app.engine.openai_goals: Requesting LLM turn for civ 0: 1 visible units, 1 visible cities, 2 known civs, 9 inbox messages, 8 remembered intents
+2026-04-20 13:37:00,343 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:37:00,344 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 0
+2026-04-20 13:37:00,344 INFO app.engine.openai_goals: Civ 0 → engage({"target_civ_id":1})
+2026-04-20 13:37:00,344 INFO app.engine.playthrough: Turn 20 civ 0 decided on 0 goals and 0 diplomatic actions
+2026-04-20 13:37:00,344 INFO app.engine.playthrough: Turn 20 civ 1 (Cleopatra of Egypt): 1 cities, 1 units
+2026-04-20 13:37:00,344 INFO app.engine.openai_goals: Requesting LLM turn for civ 1: 1 visible units, 2 visible cities, 2 known civs, 2 inbox messages, 8 remembered intents
+2026-04-20 13:37:01,879 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:37:01,879 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 1
+2026-04-20 13:37:01,879 INFO app.engine.openai_goals: Civ 1 → speak({"to_civ_id":0,"kind":"threat","text":"Khan, you keep rattling your saber as if noise were sovereignty. Egypt remains standing, and I have a particular talent for making bullies look expensive. Come any closer, and I may be forced to become uncooperative in a very polished way."})
+2026-04-20 13:37:01,879 INFO app.engine.playthrough: Turn 20 civ 1 decided on 0 goals and 1 diplomatic actions
+2026-04-20 13:37:01,879 INFO app.engine.playthrough:   diplomacy: SendMessage to=0 kind=threat text='Khan, you keep rattling your saber as if noise were sovereignty. Egypt remains standing, and I have a particular talent for making bullies look expensive. Come any closer, and I may be forced to become uncooperative in a very polished way.'
+2026-04-20 13:37:01,879 INFO app.engine.playthrough:   applied diplomacy: SendMessage to=0 kind=threat text='Khan, you keep rattling your saber as if noise were sovereignty. Egypt remains standing, and I have a particular talent for making bullies look expensive. Come any closer, and I may be forced to become uncooperative in a very polished way.'
+2026-04-20 13:37:01,879 INFO app.engine.playthrough: Turn 20 civ 2 (Mahatma Gandhi of India): 1 cities, 1 units
+2026-04-20 13:37:01,880 INFO app.engine.openai_goals: Requesting LLM turn for civ 2: 1 visible units, 1 visible cities, 1 known civs, 0 inbox messages, 8 remembered intents
+2026-04-20 13:37:02,638 INFO httpx: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-20 13:37:02,640 INFO app.engine.openai_goals: LLM returned 1 tool calls for civ 2
+2026-04-20 13:37:02,640 INFO app.engine.openai_goals: Civ 2 → scout({"target_q":7,"target_r":-3})
+2026-04-20 13:37:02,640 INFO app.engine.playthrough: Turn 20 civ 2 decided on 1 goals and 0 diplomatic actions
+2026-04-20 13:37:02,640 INFO app.engine.playthrough:   goal: MoveTo unit=6 target=(7,-3)
+2026-04-20 13:37:02,640 INFO app.engine.playthrough:   expanded MoveTo unit=6 target=(7,-3) into 2 actions
+2026-04-20 13:37:02,640 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=6, r=-3))
+2026-04-20 13:37:02,640 INFO app.engine.playthrough:   applied action: MoveAction(unit_id=6, destination=Hex(q=7, r=-3))

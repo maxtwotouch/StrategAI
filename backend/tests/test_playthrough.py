@@ -243,16 +243,20 @@ def test_playthrough_includes_feedback_and_calls_turn_observer():
 
         def decide(self, view: dict, civ_id: int):
             if civ_id != 0:
-                return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+                return type("DecisionsProxy", (), {"goals": (), "diplomacy": (), "directives": ()})()
             feedback = view.get("last_turn_feedback", [])
             self.feedback_seen[self.turn] = list(feedback)
             if self.turn == 1:
                 return type(
                     "DecisionsProxy",
                     (),
-                    {"goals": (MoveTo(unit_id=2, target=Hex(-2, 0)),), "diplomacy": ()},
+                    {
+                        "goals": (MoveTo(unit_id=2, target=Hex(-2, 0)),),
+                        "diplomacy": (),
+                        "directives": (),
+                    },
                 )()
-            return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+            return type("DecisionsProxy", (), {"goals": (), "diplomacy": (), "directives": ()})()
 
     state = _two_civ_state()
     source = FeedbackSource()
@@ -279,7 +283,7 @@ def test_playthrough_rejects_found_city_goal_for_non_settler_and_feeds_back_reas
 
         def decide(self, view: dict, civ_id: int):
             if civ_id != 0:
-                return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+                return type("DecisionsProxy", (), {"goals": (), "diplomacy": (), "directives": ()})()
             self.feedback_seen[self.turn] = list(view.get("last_turn_feedback", []))
             if self.turn == 1:
                 return type(
@@ -290,6 +294,7 @@ def test_playthrough_rejects_found_city_goal_for_non_settler_and_feeds_back_reas
                             FoundCityNear(unit_id=1, target=Hex(-2, 0), name="Alpha-1"),
                         ),
                         "diplomacy": (),
+                        "directives": (),
                     },
                 )()
             if self.turn == 2:
@@ -301,9 +306,10 @@ def test_playthrough_rejects_found_city_goal_for_non_settler_and_feeds_back_reas
                             FoundCityNear(unit_id=2, target=Hex(-1, 0), name="Alpha-2"),
                         ),
                         "diplomacy": (),
+                        "directives": (),
                     },
                 )()
-            return type("DecisionsProxy", (), {"goals": (), "diplomacy": ()})()
+            return type("DecisionsProxy", (), {"goals": (), "diplomacy": (), "directives": ()})()
 
     state = _two_civ_state()
     source = BadFoundingSource()
@@ -362,6 +368,7 @@ def test_playthrough_with_generated_map():
 def test_new_game_assigns_spread_out_starting_positions():
     from app.api.game_factory import new_game
     from app.engine.hex import hex_distance
+    from app.engine.terrain import Terrain
 
     state = new_game(seed=42, num_civs=4, include_human=False)
     starts = [civ.starting_position for civ in state.civs]
@@ -371,3 +378,6 @@ def test_new_game_assigns_spread_out_starting_positions():
         assert start in state.map
         for other in starts[i + 1:]:
             assert hex_distance(start, other) >= MIN_START_DISTANCE
+    for unit in state.units:
+        terrain = state.map.tiles[unit.location].terrain
+        assert terrain not in {Terrain.OCEAN, Terrain.COAST}

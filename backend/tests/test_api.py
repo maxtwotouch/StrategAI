@@ -2,6 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.store import store
+from app.engine.human_source import QueueHumanSource
+from app.engine.playthrough import Decisions
 from app.main import app
 
 
@@ -35,6 +37,14 @@ def test_create_game_returns_state(client: TestClient):
     assert body["cities"] == []
 
 
+def test_create_game_accepts_custom_human_name(client: TestClient):
+    r = client.post("/games", json={"radius": 4, "seed": 1, "human_name": "Nova Roma"})
+    assert r.status_code == 200
+    body = r.json()
+    human = next(c for c in body["civs"] if c["is_human"])
+    assert human["name"] == "Nova Roma"
+
+
 def test_get_game_returns_same_state(client: TestClient):
     created = client.post("/games", json={"radius": 3, "seed": 2}).json()
     r = client.get(f"/games/{created['id']}")
@@ -52,6 +62,28 @@ def test_advance_turn_increments_counter(client: TestClient):
     r = client.post(f"/games/{created['id']}/turn")
     assert r.status_code == 200
     assert r.json()["turn"] == 2
+
+
+def test_resolve_turn_advances_ai_and_returns_to_human(client: TestClient):
+    created = client.post("/games", json={"radius": 3, "seed": 2}).json()
+    game_id = created["id"]
+
+    class PassiveSource:
+        def decide(self, view: dict, civ_id: int) -> Decisions:
+            return Decisions()
+
+    human = next(c for c in created["civs"] if c["is_human"])
+    sources = {human["id"]: QueueHumanSource()}
+    for civ in created["civs"]:
+        if civ["id"] != human["id"]:
+            sources[civ["id"]] = PassiveSource()
+    store.put_goal_sources(game_id, sources)
+
+    r = client.post(f"/games/{game_id}/turn/resolve")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["turn"] == 2
+    assert body["current_civ_id"] == human["id"]
 
 
 def test_move_unit_and_error_path(client: TestClient):

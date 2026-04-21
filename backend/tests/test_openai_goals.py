@@ -13,9 +13,11 @@ from app.engine.executor import AttackUnit, FoundCityNear, MoveTo
 from app.engine.hex import Hex
 from app.engine.intents import (
     AdjustStance,
+    Build,
     Engage,
     Expand,
     Reinforce,
+    Research,
     Scout,
     Speak,
 )
@@ -97,6 +99,38 @@ def test_parse_adjust_stance():
 
 
 @pytest.mark.unit
+def test_parse_build_with_city_id():
+    intent = _parse_tool_call("build", {"unit_type": "warrior", "city_id": 7})
+    assert isinstance(intent, Build)
+    assert intent.unit_type is UnitType.WARRIOR
+    assert intent.city_id == 7
+
+
+@pytest.mark.unit
+def test_parse_build_without_city_id():
+    intent = _parse_tool_call("build", {"unit_type": "scout"})
+    assert isinstance(intent, Build)
+    assert intent.city_id is None
+
+
+@pytest.mark.unit
+def test_parse_build_invalid_unit_type_returns_none():
+    assert _parse_tool_call("build", {"unit_type": "tank"}) is None
+
+
+@pytest.mark.unit
+def test_parse_research():
+    intent = _parse_tool_call("research", {"tech_id": "agriculture"})
+    assert isinstance(intent, Research)
+    assert intent.tech_id == "agriculture"
+
+
+@pytest.mark.unit
+def test_parse_research_missing_tech_id_returns_none():
+    assert _parse_tool_call("research", {}) is None
+
+
+@pytest.mark.unit
 def test_parse_invalid_message_kind_returns_none():
     assert _parse_tool_call(
         "speak", {"to_civ_id": 1, "kind": "grovel", "text": "please"}
@@ -128,7 +162,16 @@ def test_tool_definitions_have_required_fields():
 @pytest.mark.unit
 def test_intent_tools_present():
     names = {t["function"]["name"] for t in TOOLS}
-    expected = {"expand", "scout", "engage", "reinforce", "speak", "adjust_stance"}
+    expected = {
+        "expand",
+        "scout",
+        "engage",
+        "reinforce",
+        "speak",
+        "adjust_stance",
+        "build",
+        "research",
+    }
     assert expected.issubset(names)
 
 

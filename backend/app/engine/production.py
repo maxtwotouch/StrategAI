@@ -20,6 +20,10 @@ CITY_BASE_FOOD = 2
 CITY_BASE_PRODUCTION = 1
 # Food consumed per population unit per turn.
 FOOD_UPKEEP_PER_POP = 1
+# Population threshold a city must reach before defaults will queue a settler.
+SETTLER_POP_THRESHOLD = 2
+# Number of cities a civ may build via auto-defaults before settler stops queueing.
+DEFAULT_SETTLER_CITY_CAP = 3
 
 
 def _next_unit_id(state: GameState) -> int:
@@ -59,6 +63,33 @@ def _grow(city: City) -> City:
     return city
 
 
+def default_unit_for(state: GameState, city: City) -> UnitType:
+    """Pick a sensible auto-build for an idle city.
+
+    The order encodes a soft strategy:
+    1. Need a scout for sight before anything else.
+    2. Maintain at least one warrior per city for basic defense.
+    3. Once population is healthy and we are still in expansion phase, queue a
+       settler so the civ keeps growing.
+    4. Otherwise build more warriors.
+    """
+    units = state.units_for(city.owner)
+    cities = state.cities_for(city.owner)
+    has_scout = any(u.type is UnitType.SCOUT for u in units)
+    warrior_count = sum(1 for u in units if u.type is UnitType.WARRIOR)
+
+    if not has_scout:
+        return UnitType.SCOUT
+    if warrior_count < len(cities):
+        return UnitType.WARRIOR
+    if (
+        city.population >= SETTLER_POP_THRESHOLD
+        and len(cities) < DEFAULT_SETTLER_CITY_CAP
+    ):
+        return UnitType.SETTLER
+    return UnitType.WARRIOR
+
+
 def _tick_city(state: GameState, city: City) -> tuple[GameState, City]:
     food_yield, prod_yield = _city_tile_yields(state, city)
     net_food = food_yield - FOOD_UPKEEP_PER_POP * city.population
@@ -66,6 +97,8 @@ def _tick_city(state: GameState, city: City) -> tuple[GameState, City]:
     new_prod = city.production_stored + prod_yield
 
     new_queue = city.production_queue
+    if not new_queue:
+        new_queue = (default_unit_for(state, city),)
     working_state = state
 
     if new_queue:

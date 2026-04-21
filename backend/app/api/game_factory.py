@@ -1,4 +1,4 @@
-"""Build the initial GameState for a new game.
+"""Build the initial GameState and default goal sources for a new game.
 
 The default lineup is one human seat (Athens) plus three flavorful AI civs
 with persona prompts that drive their LLM behavior.
@@ -7,7 +7,9 @@ with persona prompts that drive their LLM behavior.
 from __future__ import annotations
 
 from dataclasses import replace
+import logging
 
+from app.engine.human_source import QueueHumanSource
 from app.engine.hex import Hex
 from app.engine.map_generator import generate_map
 from app.engine.models import (
@@ -17,8 +19,12 @@ from app.engine.models import (
     Unit,
     UnitType,
 )
+from app.engine.openai_goals import OpenAIGoalSource
+from app.engine.playthrough import GoalSource, RandomGoalSource
 from app.engine.starting_positions import starting_positions
-from app.engine.terrain import is_passable
+from app.engine.terrain import Terrain, is_passable
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -106,13 +112,13 @@ def _fallback_starting_tiles(state_map, count: int) -> list[Hex]:
     chosen: list[Hex] = []
     for coord in candidates:
         tile = state_map.tiles.get(coord)
-        if tile and is_passable(tile.terrain):
+        if tile and _is_dry_land(tile.terrain):
             chosen.append(coord)
         if len(chosen) == count:
             return chosen
 
     for coord, tile in state_map.tiles.items():
-        if coord in chosen or not is_passable(tile.terrain):
+        if coord in chosen or not _is_dry_land(tile.terrain):
             continue
         chosen.append(coord)
         if len(chosen) == count:
@@ -136,11 +142,28 @@ def _build_civ(idx: int, spec: tuple) -> Civilization:
     )
 
 
+def _human_spec(name: str) -> tuple[str, str, bool, str, tuple[str, ...], str]:
+    trimmed = name.strip() or _HUMAN[0]
+    return (
+        trimmed,
+        "The Player",
+        True,
+        "#1f77b4",
+        ("scientific",),
+        "",
+    )
+
+
+def _is_dry_land(terrain: Terrain) -> bool:
+    return is_passable(terrain) and terrain is not Terrain.COAST
+
+
 def new_game(
     radius: int = 8,
     seed: int = 0,
     num_civs: int = 4,
     include_human: bool = True,
+    human_name: str = _HUMAN[0],
 ) -> GameState:
     """Create a new game.
 
@@ -152,7 +175,7 @@ def new_game(
 
     specs: list[tuple] = []
     if include_human:
-        specs.append(_HUMAN)
+        specs.append(_human_spec(human_name))
     specs.extend(_AI_ROSTER)
     specs = specs[:num_civs]
 
@@ -170,6 +193,9 @@ def new_game(
     units: list[Unit] = []
     uid = 1
     for civ, loc in zip(civs, starts):
+        start_tile = game_map.tiles.get(loc)
+        if start_tile is None or not _is_dry_land(start_tile.terrain):
+            raise ValueError(f"invalid starting tile at {loc} ({start_tile.terrain if start_tile else 'missing'})")
         units.append(Unit(
             id=uid, owner=civ.id, type=UnitType.SETTLER, location=loc,
             health=settler_stats.max_health, moves_remaining=settler_stats.moves,
@@ -182,7 +208,7 @@ def new_game(
             Hex(loc.q - 1, loc.r + 1),
         ):
             tile = game_map.tiles.get(neighbor)
-            if tile and is_passable(tile.terrain):
+            if tile and _is_dry_land(tile.terrain):
                 escort_loc = neighbor
                 break
         units.append(Unit(
@@ -194,3 +220,21 @@ def new_game(
     return GameState(
         turn=1, map=game_map, civs=civs, cities=(), units=tuple(units), seed=seed,
     )
+
+
+def build_goal_sources(state: GameState) -> dict[int, GoalSource]:
+    """Create the default human/AI sources for a new web game session."""
+    sources: dict[int, GoalSource] = {}
+    for civ in state.civs:
+        if civ.is_human:
+            sources[civ.id] = QueueHumanSource()
+            continue
+        try:
+            sources[civ.id] = OpenAIGoalSource(persona=civ.persona)
+        except ValueError:
+            logger.warning(
+                "OPENAI_API_KEY missing; falling back to RandomGoalSource for civ %d",
+                civ.id,
+            )
+            sources[civ.id] = RandomGoalSource(seed=state.seed + civ.id)
+    return sources

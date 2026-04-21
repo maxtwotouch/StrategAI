@@ -26,16 +26,42 @@ from app.engine.terrain import (
 )
 
 
-_ELEVATION_FREQ = 0.35
-_MOISTURE_FREQ = 0.45
-_SEA_LEVEL = -0.05
-_COAST_LEVEL = 0.05
-_HILL_LEVEL = 0.45
-_MOUNTAIN_LEVEL = 0.70
+_CONTINENT_FREQ = 0.14
+_ELEVATION_FREQ = 0.36
+_RIDGE_FREQ = 0.22
+_MOISTURE_FREQ = 0.24
+_TEMPERATURE_FREQ = 0.18
+_SEA_LEVEL = -0.10
+_COAST_LEVEL = 0.03
+_HILL_LEVEL = 0.46
+_MOUNTAIN_LEVEL = 0.74
 
 
 def _noise(gen: OpenSimplex, q: int, r: int, freq: float) -> float:
     return float(gen.noise2(q * freq, r * freq))
+
+
+def _continent_elevation(
+    continent_gen: OpenSimplex,
+    detail_gen: OpenSimplex,
+    ridge_gen: OpenSimplex,
+    coord: Hex,
+    radius: int,
+) -> float:
+    dist_norm = hex_distance(Hex(0, 0), coord) / max(radius, 1)
+    radial = 1.0 - dist_norm**1.65
+    continent = _noise(continent_gen, coord.q, coord.r, _CONTINENT_FREQ)
+    detail = _noise(detail_gen, coord.q, coord.r, _ELEVATION_FREQ)
+    ridge_raw = _noise(ridge_gen, coord.q, coord.r, _RIDGE_FREQ)
+    ridge = 1.0 - abs(ridge_raw)
+
+    return (
+        radial * 0.58
+        + continent * 0.34
+        + detail * 0.20
+        + ridge * 0.10
+        - 0.36
+    )
 
 
 def _base_terrain_from_elevation(elevation: float, temperature: float) -> Terrain:
@@ -138,13 +164,32 @@ def _carve_rivers(
     return out
 
 
+def _smooth_coasts(tiles: dict[Hex, Tile]) -> dict[Hex, Tile]:
+    out = dict(tiles)
+    for coord, tile in tiles.items():
+        if tile.terrain in {Terrain.OCEAN, Terrain.COAST, Terrain.MOUNTAIN}:
+            continue
+        adjacent_ocean = sum(
+            1
+            for neighbor in hex_neighbors(coord)
+            if tiles.get(neighbor) is not None
+            and tiles[neighbor].terrain in {Terrain.OCEAN, Terrain.COAST}
+        )
+        if adjacent_ocean >= 3 and tile.elevation < _HILL_LEVEL:
+            out[coord] = replace(tile, terrain=Terrain.COAST, feature=None)
+    return out
+
+
 def generate_map(radius: int, seed: int = 0) -> GameMap:
     if radius < 0:
         raise ValueError("radius must be non-negative")
 
     rng = random.Random(seed)
-    elev_gen = OpenSimplex(seed=seed)
+    continent_gen = OpenSimplex(seed=seed)
+    elev_gen = OpenSimplex(seed=seed + 101)
+    ridge_gen = OpenSimplex(seed=seed + 211)
     moist_gen = OpenSimplex(seed=seed + 1_000_003)
+    temp_gen = OpenSimplex(seed=seed + 2_000_003)
 
     coords = hex_range(Hex(0, 0), radius)
     tiles: dict[Hex, Tile] = {}
@@ -161,13 +206,22 @@ def generate_map(radius: int, seed: int = 0) -> GameMap:
             )
             continue
 
-        raw_elev = _noise(elev_gen, coord.q, coord.r, _ELEVATION_FREQ)
-        # Bias the center upward so the map has a landmass.
-        dist_norm = hex_distance(Hex(0, 0), coord) / max(radius, 1)
-        elevation = raw_elev + (0.35 * (1 - dist_norm)) - 0.05
+        elevation = _continent_elevation(
+            continent_gen, elev_gen, ridge_gen, coord, radius
+        )
 
         latitude = abs(coord.r) / max(radius, 1)
-        temperature = max(0.0, 1.0 - latitude - max(0.0, elevation) * 0.25)
+        temperature_noise = _noise(temp_gen, coord.q, coord.r, _TEMPERATURE_FREQ)
+        temperature = max(
+            0.0,
+            min(
+                1.0,
+                1.0
+                - latitude * 0.88
+                - max(0.0, elevation) * 0.24
+                + temperature_noise * 0.08,
+            ),
+        )
 
         moisture = _noise(moist_gen, coord.q, coord.r, _MOISTURE_FREQ)
 
@@ -185,6 +239,7 @@ def generate_map(radius: int, seed: int = 0) -> GameMap:
             feature=feature,
         )
 
+    tiles = _smooth_coasts(tiles)
     tiles = _place_resources(tiles, rng)
     tiles = _carve_rivers(tiles, rng)
 

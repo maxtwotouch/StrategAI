@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from app.engine.diplomacy import DiplomaticMessage, MessageKind, met_civs
+from app.engine.fog_of_war import visible_tiles
+from app.engine.models import DiplomaticStance
 from app.engine.models import (
     City,
     Civilization,
@@ -11,6 +14,7 @@ from app.engine.models import (
     Tile,
     Unit,
 )
+from app.engine.terrain import tile_yields
 
 
 class HexOut(BaseModel):
@@ -22,6 +26,12 @@ class TileOut(BaseModel):
     q: int
     r: int
     terrain: str
+    resource: str | None = None
+    feature: str | None = None
+    river: bool = False
+    food: int = 0
+    production: int = 0
+    gold: int = 0
 
 
 class UnitOut(BaseModel):
@@ -58,18 +68,48 @@ class CivOut(BaseModel):
     researching: str | None
 
 
+class MessageOut(BaseModel):
+    from_civ_id: int
+    to_civ_id: int
+    turn: int
+    kind: str
+    text: str
+
+
+class StanceOut(BaseModel):
+    other_civ_id: int
+    stance: str
+
+
 class GameStateOut(BaseModel):
     id: int
     turn: int
+    current_civ_id: int
     map_radius: int
     tiles: list[TileOut]
     civs: list[CivOut]
     cities: list[CityOut]
     units: list[UnitOut]
+    known_civ_ids: list[int]
+    messages: list[MessageOut]
+    inbox: list[MessageOut]
+    stances: list[StanceOut]
+    visible_tile_keys: list[str] = Field(default_factory=list)
 
 
 def tile_to_out(t: Tile) -> TileOut:
-    return TileOut(q=t.coord.q, r=t.coord.r, terrain=t.terrain.value)
+    y = tile_yields(t)
+    return TileOut(
+        q=t.coord.q,
+        r=t.coord.r,
+        terrain=t.terrain.value,
+        resource=t.resource.value if t.resource else None,
+        feature=t.feature.value if t.feature else None,
+        river=t.river,
+        food=y.food,
+        production=y.production,
+        gold=y.gold,
+    )
 
 
 def unit_to_out(u: Unit) -> UnitOut:
@@ -112,21 +152,62 @@ def civ_to_out(civ: Civilization) -> CivOut:
     )
 
 
+def message_to_out(message: DiplomaticMessage) -> MessageOut:
+    return MessageOut(
+        from_civ_id=message.from_civ_id,
+        to_civ_id=message.to_civ_id,
+        turn=message.turn,
+        kind=message.kind.value,
+        text=message.text,
+    )
+
+
 def state_to_out(game_id: int, state: GameState) -> GameStateOut:
+    human_civ = next((c for c in state.civs if c.is_human), None)
+    known_ids = sorted(met_civs(state, human_civ.id) - {human_civ.id}) if human_civ is not None else []
+    inbox = [
+        message_to_out(message)
+        for message in state.messages
+        if human_civ is not None and message.to_civ_id == human_civ.id
+    ]
+    stances: list[StanceOut] = []
+    if human_civ is not None:
+        for civ in state.civs:
+            if civ.id == human_civ.id or civ.id not in known_ids:
+                continue
+            stances.append(
+                StanceOut(
+                    other_civ_id=civ.id,
+                    stance=state.stance_between(human_civ.id, civ.id).value,
+                )
+            )
+    if human_civ is not None:
+        visible_keys = sorted(
+            f"{c.q},{c.r}" for c in visible_tiles(state, human_civ.id)
+        )
+    else:
+        visible_keys = []
     return GameStateOut(
         id=game_id,
         turn=state.turn,
+        current_civ_id=state.current_civ().id,
         map_radius=state.map.radius,
         tiles=[tile_to_out(t) for t in state.map.tiles.values()],
         civs=[civ_to_out(c) for c in state.civs],
         cities=[city_to_out(c) for c in state.cities],
         units=[unit_to_out(u) for u in state.units],
+        known_civ_ids=known_ids,
+        messages=[message_to_out(message) for message in state.messages],
+        inbox=inbox,
+        stances=stances,
+        visible_tile_keys=visible_keys,
     )
 
 
 class CreateGameRequest(BaseModel):
-    radius: int = Field(default=8, ge=1, le=12)
+    radius: int = Field(default=8, ge=1, le=18)
     seed: int = 0
+    human_name: str = Field(default="Athens", min_length=1, max_length=40)
 
 
 class MoveRequest(BaseModel):
@@ -148,3 +229,16 @@ class FoundCityRequest(BaseModel):
 class ResearchRequest(BaseModel):
     civ_id: int
     tech_id: str
+
+
+class BuildRequest(BaseModel):
+    civ_id: int
+    city_id: int
+    unit_type: str
+
+
+class MessageRequest(BaseModel):
+    from_civ_id: int
+    to_civ_id: int
+    kind: str = Field(default=MessageKind.CHAT.value)
+    text: str

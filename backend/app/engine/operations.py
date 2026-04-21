@@ -22,15 +22,18 @@ from app.engine.diplomacy import (
     SetStance,
     met_civs,
 )
+from app.engine.directives import Directive, QueueProduction, StartResearch
 from app.engine.executor import AttackUnit, FoundCityNear, Goal, MoveTo
 from app.engine.fog_of_war import visible_tiles
 from app.engine.hex import Hex, hex_distance, hex_neighbors, hex_range
 from app.engine.intents import (
     AdjustStance,
+    Build,
     Engage,
     Expand,
     Intent,
     Reinforce,
+    Research,
     Scout,
     Speak,
 )
@@ -41,6 +44,7 @@ from app.engine.models import (
     Unit,
     UnitType,
 )
+from app.engine.research import TECHS
 from app.engine.terrain import is_passable
 
 
@@ -129,15 +133,17 @@ def _frontier_target(state: GameState, civ_id: int, scout: Unit) -> Hex | None:
 # ---------------------------------------------------------------------------
 
 class _Out:
-    __slots__ = ("goals", "diplomacy")
+    __slots__ = ("goals", "diplomacy", "directives")
 
     def __init__(self) -> None:
         self.goals: list[Goal] = []
         self.diplomacy: list[DiplomaticAction] = []
+        self.directives: list[Directive] = []
 
     def extend(self, other: "_Out") -> None:
         self.goals.extend(other.goals)
         self.diplomacy.extend(other.diplomacy)
+        self.directives.extend(other.directives)
 
 
 # ---------------------------------------------------------------------------
@@ -305,14 +311,48 @@ def _do_adjust_stance(state: GameState, civ_id: int, intent: AdjustStance) -> _O
     return out
 
 
+def _do_build(state: GameState, civ_id: int, intent: Build) -> _Out:
+    out = _Out()
+    cities = state.cities_for(civ_id)
+    if not cities:
+        return out
+    if intent.city_id is not None:
+        city = next((c for c in cities if c.id == intent.city_id), None)
+        if city is None:
+            # City unknown or not owned — drop silently.
+            return out
+    else:
+        city = cities[0]
+    out.directives.append(
+        QueueProduction(city_id=city.id, unit_type=intent.unit_type)
+    )
+    return out
+
+
+def _do_research(state: GameState, civ_id: int, intent: Research) -> _Out:
+    out = _Out()
+    tech = TECHS.get(intent.tech_id)
+    if tech is None:
+        return out
+    civ = next((c for c in state.civs if c.id == civ_id), None)
+    if civ is None:
+        return out
+    if intent.tech_id in civ.known_techs:
+        return out
+    if not all(p in civ.known_techs for p in tech.prerequisites):
+        return out
+    out.directives.append(StartResearch(tech_id=intent.tech_id))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
 def resolve_intent(
     state: GameState, civ_id: int, intent: Intent
-) -> tuple[list[Goal], list[DiplomaticAction]]:
-    """Translate one intent into concrete goals and diplomatic actions."""
+) -> tuple[list[Goal], list[DiplomaticAction], list[Directive]]:
+    """Translate one intent into goals, diplomatic actions, and directives."""
     if isinstance(intent, Expand):
         out = _do_expand(state, civ_id, intent)
     elif isinstance(intent, Scout):
@@ -325,20 +365,26 @@ def resolve_intent(
         out = _do_speak(state, civ_id, intent)
     elif isinstance(intent, AdjustStance):
         out = _do_adjust_stance(state, civ_id, intent)
+    elif isinstance(intent, Build):
+        out = _do_build(state, civ_id, intent)
+    elif isinstance(intent, Research):
+        out = _do_research(state, civ_id, intent)
     else:
         out = _Out()
-    return out.goals, out.diplomacy
+    return out.goals, out.diplomacy, out.directives
 
 
 def resolve_intents(
     state: GameState, civ_id: int, intents: Iterable[Intent]
-) -> tuple[list[Goal], list[DiplomaticAction]]:
+) -> tuple[list[Goal], list[DiplomaticAction], list[Directive]]:
     """Resolve a batch of intents. State is NOT advanced between intents —
     callers should keep ordering small (one logical turn per LLM call)."""
     all_goals: list[Goal] = []
     all_dipl: list[DiplomaticAction] = []
+    all_dirs: list[Directive] = []
     for intent in intents:
-        goals, dipl = resolve_intent(state, civ_id, intent)
+        goals, dipl, dirs = resolve_intent(state, civ_id, intent)
         all_goals.extend(goals)
         all_dipl.extend(dipl)
-    return all_goals, all_dipl
+        all_dirs.extend(dirs)
+    return all_goals, all_dipl, all_dirs

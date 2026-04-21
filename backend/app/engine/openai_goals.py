@@ -41,14 +41,16 @@ from app.engine.executor import AttackUnit, FoundCityNear, Goal, MoveTo
 from app.engine.hex import Hex
 from app.engine.intents import (
     AdjustStance,
+    Build,
     Engage,
     Expand,
     Intent,
     Reinforce,
+    Research,
     Scout,
     Speak,
 )
-from app.engine.models import DiplomaticStance, GameState
+from app.engine.models import DiplomaticStance, GameState, UnitType
 from app.engine.operations import resolve_intents
 from app.engine.playthrough import Decisions
 
@@ -185,6 +187,49 @@ TOOLS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "build",
+            "description": (
+                "Append a unit to a city's production queue. The engine "
+                "accumulates production each turn until the unit is built and "
+                "spawned. Defaults to your first city if city_id is omitted. "
+                "See `unit_build_costs` and your cities' `production_queue`."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "unit_type": {
+                        "type": "string",
+                        "enum": [u.value for u in UnitType],
+                    },
+                    "city_id": {"type": "integer"},
+                },
+                "required": ["unit_type"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "research",
+            "description": (
+                "Set the tech your civ is currently researching. Must be in "
+                "`available_techs` (prereqs met, not yet known). The engine "
+                "auto-picks the cheapest available tech if you ignore this."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tech_id": {"type": "string"},
+                },
+                "required": ["tech_id"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -222,6 +267,8 @@ Tool guide:
 - reinforce     : march a military unit toward a friendly position
 - speak         : send a diplomatic message in your voice
 - adjust_stance : peace/war/alliance with another civ
+- build         : queue a unit at one of your cities
+- research      : pick the tech your civ is studying
 
 Respond to messages in character. React to insults, threats, and offers
 according to your persona. Be decisive — issue at least one tool call.\
@@ -238,8 +285,17 @@ Hard gameplay priorities:
   declaration and unit selection in one step.
 - Only message or change stance with civilizations in `known_civs`.
 - Do not target your own civ_id with any tool.
+- Use `build` to keep your cities producing the right mix of units (scouts
+  for vision, warriors for defense, settlers for growth). Inspect each
+  city's `production_queue` and pick units only when the queue is short.
+- Use `research` early to start a tech path (cheap Tier 1 techs unlock
+  Tier 2/3). Look at `available_techs` and your `known_techs`.
 - Read `last_turn_feedback`, `recent_actions`, and `recent_messages` to avoid
   repeating failed plans turn after turn.
+- If `inbox` contains a fresh diplomatic message, reply this turn with
+  `speak` unless immediate survival clearly requires otherwise.
+- When replying, react to the sender's actual message rather than producing
+  a generic diplomatic line.
 - Do not spend whole turns only chatting unless you have no useful action.
 """
     if not persona:
@@ -295,6 +351,19 @@ def _parse_tool_call(name: str, args: dict[str, Any]) -> Intent | None:
             target_civ_id=args["target_civ_id"],
             stance=stance,
         )
+    if name == "build":
+        try:
+            unit_type = UnitType(args["unit_type"])
+        except ValueError:
+            logger.warning("Invalid unit type: %s", args.get("unit_type"))
+            return None
+        return Build(unit_type=unit_type, city_id=args.get("city_id"))
+    if name == "research":
+        tech_id = args.get("tech_id")
+        if not isinstance(tech_id, str):
+            logger.warning("Invalid tech id: %r", tech_id)
+            return None
+        return Research(tech_id=tech_id)
     logger.warning("Unknown tool call: %s", name)
     return None
 
@@ -438,8 +507,12 @@ class OpenAIGoalSource:
             )
             return Decisions()
 
-        goals, diplomacy = resolve_intents(self._state, civ_id, intents)
-        return Decisions(goals=tuple(goals), diplomacy=tuple(diplomacy))
+        goals, diplomacy, directives = resolve_intents(self._state, civ_id, intents)
+        return Decisions(
+            goals=tuple(goals),
+            diplomacy=tuple(diplomacy),
+            directives=tuple(directives),
+        )
 
 
 def _summarize(intent: Intent) -> dict[str, Any]:
@@ -477,4 +550,11 @@ def _summarize(intent: Intent) -> dict[str, Any]:
             "target_civ_id": intent.target_civ_id,
             "stance": intent.stance.value,
         }
+    if isinstance(intent, Build):
+        out = {"unit_type": intent.unit_type.value}
+        if intent.city_id is not None:
+            out["city_id"] = intent.city_id
+        return out
+    if isinstance(intent, Research):
+        return {"tech_id": intent.tech_id}
     return {}

@@ -30,6 +30,13 @@ from app.engine.diplomacy import (
     DiplomaticAction,
     apply_diplomatic_action,
 )
+from app.engine.directives import (
+    Directive,
+    DirectiveError,
+    QueueProduction,
+    StartResearch,
+    apply_directive,
+)
 from app.engine.executor import (
     AttackUnit,
     FoundCityNear,
@@ -54,9 +61,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class Decisions:
-    """A civ's intent for a single turn: unit goals + diplomatic actions."""
+    """A civ's intent for a single turn: unit goals, diplomatic actions, and
+    city/civ directives (production queueing, research selection)."""
     goals: tuple[Goal, ...] = ()
     diplomacy: tuple[DiplomaticAction, ...] = ()
+    directives: tuple[Directive, ...] = ()
 
 
 class GoalSource(Protocol):
@@ -91,6 +100,17 @@ def _describe_diplomatic_action(action: DiplomaticAction) -> str:
             f"stance={action.stance.value}"
         )
     return repr(action)
+
+
+def _describe_directive(directive: Directive) -> str:
+    if isinstance(directive, QueueProduction):
+        return (
+            f"QueueProduction city={directive.city_id} "
+            f"unit={directive.unit_type.value}"
+        )
+    if isinstance(directive, StartResearch):
+        return f"StartResearch tech={directive.tech_id!r}"
+    return repr(directive)
 
 
 def _goal_rejection_reason(state: GameState, civ_id: int, goal: Goal) -> str | None:
@@ -298,7 +318,174 @@ class PlaythroughResult:
     actions_rejected: int
 
 
+@dataclass(frozen=True, slots=True)
+class TurnCycleResult:
+    final_state: GameState
+    victory: VictoryResult | None
+    civ_turns_processed: int
+    actions_applied: int
+    actions_rejected: int
+
+
 Observer = Callable[[GameState], None]
+
+
+def _execute_current_civ_turn(
+    state: GameState,
+    goal_sources: GoalSource | dict[int, GoalSource],
+    feedback_by_civ: dict[int, list[str]],
+) -> tuple[GameState, int, int]:
+    civ = state.current_civ()
+    civ_id = civ.id
+    source = _resolve_source(goal_sources, civ_id)
+
+    logger.info(
+        "Turn %d civ %d (%s of %s): %d cities, %d units",
+        state.turn,
+        civ_id,
+        civ.leader_name,
+        civ.name,
+        len(state.cities_for(civ_id)),
+        len(state.units_for(civ_id)),
+    )
+
+    if is_eliminated(state, civ):
+        return state, 0, 0
+
+    if hasattr(source, "turn"):
+        source.turn = state.turn  # type: ignore[attr-defined]
+
+    if hasattr(source, "bind_state"):
+        source.bind_state(state)  # type: ignore[attr-defined]
+
+    view = local_view(state, civ_id)
+    if feedback_by_civ.get(civ_id):
+        view["last_turn_feedback"] = list(feedback_by_civ[civ_id])
+    decisions = source.decide(view, civ_id)
+    feedback_for_civ: list[str] = []
+    applied = 0
+    rejected = 0
+
+    logger.info(
+        "Turn %d civ %d decided on %d goals, %d diplomatic actions, %d directives",
+        state.turn,
+        civ_id,
+        len(decisions.goals),
+        len(decisions.diplomacy),
+        len(decisions.directives),
+    )
+    for goal in decisions.goals:
+        logger.info("  goal: %s", _describe_goal(goal))
+    for dipl_action in decisions.diplomacy:
+        logger.info("  diplomacy: %s", _describe_diplomatic_action(dipl_action))
+    for directive in decisions.directives:
+        logger.info("  directive: %s", _describe_directive(directive))
+
+    for dipl_action in decisions.diplomacy:
+        try:
+            state = apply_diplomatic_action(state, civ_id, dipl_action)
+            applied += 1
+            logger.info("  applied diplomacy: %s", _describe_diplomatic_action(dipl_action))
+        except DiplomacyError as e:
+            rejected += 1
+            feedback_for_civ.append(
+                f"Diplomatic action rejected: {_describe_diplomatic_action(dipl_action)} -- {e}"
+            )
+            logger.warning(
+                "  rejected diplomacy: %s -- %s",
+                _describe_diplomatic_action(dipl_action),
+                e,
+            )
+
+    for directive in decisions.directives:
+        try:
+            state = apply_directive(state, civ_id, directive)
+            applied += 1
+            logger.info("  applied directive: %s", _describe_directive(directive))
+        except DirectiveError as e:
+            rejected += 1
+            feedback_for_civ.append(
+                f"Directive rejected: {_describe_directive(directive)} -- {e}"
+            )
+            logger.warning(
+                "  rejected directive: %s -- %s",
+                _describe_directive(directive),
+                e,
+            )
+
+    for goal in decisions.goals:
+        actions = execute_goal(state, civ_id, goal)
+        logger.info("  expanded %s into %d actions", _describe_goal(goal), len(actions))
+        if not actions:
+            reason = _goal_rejection_reason(state, civ_id, goal)
+            if reason is not None:
+                rejected += 1
+                feedback_for_civ.append(
+                    f"Goal rejected: {_describe_goal(goal)} -- {reason}"
+                )
+                logger.warning("  rejected goal: %s -- %s", _describe_goal(goal), reason)
+        for action in actions:
+            result = validate(action, state, civ_id)
+            if isinstance(result, ValidationOk):
+                state = apply_action(state, action, civ_id)
+                applied += 1
+                logger.info("  applied action: %s", action)
+            elif isinstance(result, ValidationError):
+                rejected += 1
+                feedback_for_civ.append(
+                    f"Action rejected: {action} -- {result.reason}"
+                )
+                logger.warning("  rejected action: %s -- %s", action, result.reason)
+
+    feedback_by_civ[civ_id] = feedback_for_civ[-8:]
+    return state, applied, rejected
+
+
+def advance_until_human_turn(
+    initial_state: GameState,
+    goal_source: GoalSource | dict[int, GoalSource],
+    human_civ_id: int,
+    max_civ_turns: int = 32,
+) -> TurnCycleResult:
+    """Advance AI turns until control returns to the human player."""
+    state = initial_state
+    applied = 0
+    rejected = 0
+    processed = 0
+    feedback_by_civ: dict[int, list[str]] = {}
+
+    if state.current_civ().id == human_civ_id:
+        state = _advance_civ(state)
+
+    while processed < max_civ_turns:
+        victory = check_victory(state)
+        if victory is not None:
+            return TurnCycleResult(
+                final_state=state,
+                victory=victory,
+                civ_turns_processed=processed,
+                actions_applied=applied,
+                actions_rejected=rejected,
+            )
+
+        if state.current_civ().id == human_civ_id:
+            break
+
+        state, delta_applied, delta_rejected = _execute_current_civ_turn(
+            state, goal_source, feedback_by_civ
+        )
+        applied += delta_applied
+        rejected += delta_rejected
+        processed += 1
+        state = _advance_civ(state)
+
+    return TurnCycleResult(
+        final_state=state,
+        victory=check_victory(state),
+        civ_turns_processed=processed,
+        actions_applied=applied,
+        actions_rejected=rejected,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -336,92 +523,11 @@ def run_playthrough(
                 actions_rejected=rejected,
             )
 
-        civ = state.current_civ()
-        civ_id = civ.id
-        source = _resolve_source(goal_sources, civ_id)
-
-        logger.info(
-            "Turn %d civ %d (%s of %s): %d cities, %d units",
-            state.turn,
-            civ_id,
-            civ.leader_name,
-            civ.name,
-            len(state.cities_for(civ_id)),
-            len(state.units_for(civ_id)),
+        state, delta_applied, delta_rejected = _execute_current_civ_turn(
+            state, goal_sources, feedback_by_civ
         )
-
-        if is_eliminated(state, civ):
-            state = _advance_civ(state)
-            continue
-
-        # Sync turn for scripted sources.
-        if hasattr(source, "turn"):
-            source.turn = state.turn  # type: ignore[attr-defined]
-
-        # Bind live state for sources that need it (intent resolvers, etc.).
-        if hasattr(source, "bind_state"):
-            source.bind_state(state)  # type: ignore[attr-defined]
-
-        view = local_view(state, civ_id)
-        if feedback_by_civ.get(civ_id):
-            view["last_turn_feedback"] = list(feedback_by_civ[civ_id])
-        decisions = source.decide(view, civ_id)
-        feedback_for_civ: list[str] = []
-        logger.info(
-            "Turn %d civ %d decided on %d goals and %d diplomatic actions",
-            state.turn,
-            civ_id,
-            len(decisions.goals),
-            len(decisions.diplomacy),
-        )
-        for goal in decisions.goals:
-            logger.info("  goal: %s", _describe_goal(goal))
-        for dipl_action in decisions.diplomacy:
-            logger.info("  diplomacy: %s", _describe_diplomatic_action(dipl_action))
-
-        # Diplomatic actions first — they may legalize/illegalize subsequent
-        # combat actions in the same turn (e.g. a fresh war declaration).
-        for dipl_action in decisions.diplomacy:
-            try:
-                state = apply_diplomatic_action(state, civ_id, dipl_action)
-                applied += 1
-                logger.info("  applied diplomacy: %s", _describe_diplomatic_action(dipl_action))
-            except DiplomacyError as e:
-                rejected += 1
-                feedback_for_civ.append(
-                    f"Diplomatic action rejected: {_describe_diplomatic_action(dipl_action)} -- {e}"
-                )
-                logger.warning(
-                    "  rejected diplomacy: %s -- %s",
-                    _describe_diplomatic_action(dipl_action),
-                    e,
-                )
-
-        for goal in decisions.goals:
-            actions = execute_goal(state, civ_id, goal)
-            logger.info("  expanded %s into %d actions", _describe_goal(goal), len(actions))
-            if not actions:
-                reason = _goal_rejection_reason(state, civ_id, goal)
-                if reason is not None:
-                    rejected += 1
-                    feedback_for_civ.append(
-                        f"Goal rejected: {_describe_goal(goal)} -- {reason}"
-                    )
-                    logger.warning("  rejected goal: %s -- %s", _describe_goal(goal), reason)
-            for action in actions:
-                result = validate(action, state, civ_id)
-                if isinstance(result, ValidationOk):
-                    state = apply_action(state, action, civ_id)
-                    applied += 1
-                    logger.info("  applied action: %s", action)
-                elif isinstance(result, ValidationError):
-                    rejected += 1
-                    feedback_for_civ.append(
-                        f"Action rejected: {action} -- {result.reason}"
-                    )
-                    logger.warning("  rejected action: %s -- %s", action, result.reason)
-
-        feedback_by_civ[civ_id] = feedback_for_civ[-8:]
+        applied += delta_applied
+        rejected += delta_rejected
         prev_turn = state.turn
         state = _advance_civ(state)
         if turn_observer is not None and state.turn != prev_turn:

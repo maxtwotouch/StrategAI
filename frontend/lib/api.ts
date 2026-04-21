@@ -1,4 +1,14 @@
-export type TileDTO = { q: number; r: number; terrain: string };
+export type TileDTO = {
+  q: number;
+  r: number;
+  terrain: string;
+  resource: string | null;
+  feature: string | null;
+  river: boolean;
+  food: number;
+  production: number;
+  gold: number;
+};
 export type UnitDTO = {
   id: number;
   owner: number;
@@ -30,14 +40,31 @@ export type CivDTO = {
   known_techs: string[];
   researching: string | null;
 };
+export type MessageDTO = {
+  from_civ_id: number;
+  to_civ_id: number;
+  turn: number;
+  kind: string;
+  text: string;
+};
+export type StanceDTO = {
+  other_civ_id: number;
+  stance: string;
+};
 export type GameStateDTO = {
   id: number;
   turn: number;
+  current_civ_id: number;
   map_radius: number;
   tiles: TileDTO[];
   civs: CivDTO[];
   cities: CityDTO[];
   units: UnitDTO[];
+  known_civ_ids: number[];
+  messages: MessageDTO[];
+  inbox: MessageDTO[];
+  stances: StanceDTO[];
+  visible_tile_keys: string[];
 };
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -56,14 +83,16 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  createGame: (radius = 5, seed = 0) =>
+  createGame: (radius = 5, seed = 0, human_name = "Athens") =>
     req<GameStateDTO>("/games", {
       method: "POST",
-      body: JSON.stringify({ radius, seed }),
+      body: JSON.stringify({ radius, seed, human_name }),
     }),
   getGame: (id: number) => req<GameStateDTO>(`/games/${id}`),
   endTurn: (id: number) =>
     req<GameStateDTO>(`/games/${id}/turn`, { method: "POST" }),
+  resolveTurn: (id: number) =>
+    req<GameStateDTO>(`/games/${id}/turn/resolve`, { method: "POST" }),
   move: (id: number, unit_id: number, q: number, r: number) =>
     req<GameStateDTO>(`/games/${id}/actions/move`, {
       method: "POST",
@@ -83,5 +112,21 @@ export const api = {
     req<GameStateDTO>(`/games/${id}/actions/research`, {
       method: "POST",
       body: JSON.stringify({ civ_id, tech_id }),
+    }),
+  build: (id: number, civ_id: number, city_id: number, unit_type: string) =>
+    req<GameStateDTO>(`/games/${id}/actions/build`, {
+      method: "POST",
+      body: JSON.stringify({ civ_id, city_id, unit_type }),
+    }),
+  sendMessage: (
+    id: number,
+    from_civ_id: number,
+    to_civ_id: number,
+    kind: string,
+    text: string,
+  ) =>
+    req<GameStateDTO>(`/games/${id}/actions/message`, {
+      method: "POST",
+      body: JSON.stringify({ from_civ_id, to_civ_id, kind, text }),
     }),
 };

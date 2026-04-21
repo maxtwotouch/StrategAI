@@ -4,16 +4,21 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.schemas import (
     AttackRequest,
+    BuildRequest,
     FoundCityRequest,
     GameStateOut,
+    MessageRequest,
     MoveRequest,
     ResearchRequest,
     state_to_out,
 )
 from app.api.store import store
+from app.engine.diplomacy import DiplomacyError, MessageKind, SendMessage, apply_diplomatic_action
+from app.engine.directives import DirectiveError, QueueProduction, apply_directive
 from app.engine.city_founding import FoundError, found_city
 from app.engine.combat import CombatError, attack
 from app.engine.hex import Hex
+from app.engine.models import UnitType
 from app.engine.movement import MoveError, move_unit
 from app.engine.research import ResearchError, set_research
 
@@ -66,6 +71,38 @@ def action_research(game_id: int, req: ResearchRequest) -> GameStateOut:
     try:
         new_state = set_research(state, req.civ_id, req.tech_id)
     except ResearchError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    store.put(game_id, new_state)
+    return state_to_out(game_id, new_state)
+
+
+@router.post("/build", response_model=GameStateOut)
+def action_build(game_id: int, req: BuildRequest) -> GameStateOut:
+    state = _load(game_id)
+    try:
+        unit_type = UnitType(req.unit_type)
+        new_state = apply_directive(
+            state,
+            req.civ_id,
+            QueueProduction(city_id=req.city_id, unit_type=unit_type),
+        )
+    except (DirectiveError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    store.put(game_id, new_state)
+    return state_to_out(game_id, new_state)
+
+
+@router.post("/message", response_model=GameStateOut)
+def action_message(game_id: int, req: MessageRequest) -> GameStateOut:
+    state = _load(game_id)
+    try:
+        kind = MessageKind(req.kind)
+        new_state = apply_diplomatic_action(
+            state,
+            req.from_civ_id,
+            SendMessage(to_civ_id=req.to_civ_id, kind=kind, text=req.text),
+        )
+    except (DiplomacyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     store.put(game_id, new_state)
     return state_to_out(game_id, new_state)

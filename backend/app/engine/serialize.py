@@ -12,7 +12,15 @@ from typing import Any
 from app.engine.diplomacy import DiplomaticMessage, inbox_for, met_civs
 from app.engine.fog_of_war import visible_tiles
 from app.engine.hex import Hex
-from app.engine.models import City, Civilization, GameState, Tile, Unit
+from app.engine.models import (
+    UNIT_BUILD_COST,
+    City,
+    Civilization,
+    GameState,
+    Tile,
+    Unit,
+)
+from app.engine.research import TECHS
 
 
 def _serialize_tile(tile: Tile) -> dict[str, Any]:
@@ -45,8 +53,8 @@ def _serialize_unit(unit: Unit) -> dict[str, Any]:
     }
 
 
-def _serialize_city(city: City) -> dict[str, Any]:
-    return {
+def _serialize_city(city: City, *, owned: bool = False) -> dict[str, Any]:
+    out: dict[str, Any] = {
         "id": city.id,
         "owner": city.owner,
         "name": city.name,
@@ -56,6 +64,9 @@ def _serialize_city(city: City) -> dict[str, Any]:
         "food_stored": city.food_stored,
         "production_stored": city.production_stored,
     }
+    if owned:
+        out["production_queue"] = [u.value for u in city.production_queue]
+    return out
 
 
 def _serialize_civ_summary(civ: Civilization) -> dict[str, Any]:
@@ -116,7 +127,7 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
         (c for c in state.cities if c.location in visible),
         key=lambda c: c.id,
     )
-    cities_out = [_serialize_city(c) for c in visible_cities]
+    cities_out = [_serialize_city(c, owned=(c.owner == civ_id)) for c in visible_cities]
 
     met_ids = met_civs(state, civ_id)
 
@@ -134,6 +145,23 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
             "stance": state.stance_between(civ_id, other_id).value,
         })
 
+    available_techs = sorted(
+        (
+            {
+                "id": t.id,
+                "name": t.name,
+                "cost": t.cost,
+                "prerequisites": list(t.prerequisites),
+            }
+            for t in TECHS.values()
+            if t.id not in civ.known_techs
+            and all(p in civ.known_techs for p in t.prerequisites)
+        ),
+        key=lambda d: (d["cost"], d["id"]),
+    )
+
+    unit_costs = {ut.value: cost for ut, cost in UNIT_BUILD_COST.items()}
+
     return {
         "turn": state.turn,
         "seed": state.seed,
@@ -146,4 +174,6 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
         "visible_cities": cities_out,
         "inbox": inbox,
         "diplomatic_stances": stances,
+        "available_techs": available_techs,
+        "unit_build_costs": unit_costs,
     }

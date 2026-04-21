@@ -17,7 +17,7 @@ from typing import Union
 
 from app.engine.diplomacy import MessageKind
 from app.engine.hex import Hex
-from app.engine.models import DiplomaticStance
+from app.engine.models import DiplomaticStance, UnitType
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +70,22 @@ class AdjustStance:
     stance: DiplomaticStance
 
 
-Intent = Union[Expand, Scout, Engage, Reinforce, Speak, AdjustStance]
+@dataclass(frozen=True, slots=True)
+class Build:
+    """Queue a unit at a city. Defaults to first owned city if not specified."""
+
+    unit_type: UnitType
+    city_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Research:
+    """Set the civ's currently-researching tech."""
+
+    tech_id: str
+
+
+Intent = Union[Expand, Scout, Engage, Reinforce, Speak, AdjustStance, Build, Research]
 
 
 class IntentKind(str, Enum):
@@ -80,3 +95,5 @@ class IntentKind(str, Enum):
     REINFORCE = "reinforce"
     SPEAK = "speak"
     ADJUST_STANCE = "adjust_stance"
+    BUILD = "build"
+    RESEARCH = "research"

@@ -85,13 +85,34 @@ def _science_income(state: GameState, civ_id: int) -> int:
     return SCIENCE_PER_CITY * len(state.cities_for(civ_id))
 
 
+def default_tech_for(civ: Civilization) -> str | None:
+    """Pick the cheapest unresearched tech whose prereqs are met.
+
+    Ties broken by tech id for determinism. Returns None when nothing is
+    available (everything known, or prereqs unsatisfiable).
+    """
+    candidates = [
+        t
+        for t in TECHS.values()
+        if t.id not in civ.known_techs and _prereqs_met(civ, t)
+    ]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda t: (t.cost, t.id))
+    return candidates[0].id
+
+
 def tick_research(state: GameState) -> GameState:
     new_civs: list[Civilization] = []
     for civ in state.civs:
-        if civ.researching is None:
-            new_civs.append(civ)
-            continue
-        tech = TECHS.get(civ.researching)
+        researching = civ.researching
+        if researching is None:
+            researching = default_tech_for(civ)
+            if researching is None:
+                new_civs.append(civ)
+                continue
+            civ = replace(civ, researching=researching)
+        tech = TECHS.get(researching)
         if tech is None:
             new_civs.append(replace(civ, researching=None))
             continue

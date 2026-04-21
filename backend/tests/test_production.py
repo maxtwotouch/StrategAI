@@ -11,7 +11,13 @@ from app.engine.models import (
     UNIT_BUILD_COST,
     UnitType,
 )
-from app.engine.production import process_cities
+from app.engine.models import Unit, UNIT_STATS
+from app.engine.production import (
+    DEFAULT_SETTLER_CITY_CAP,
+    SETTLER_POP_THRESHOLD,
+    default_unit_for,
+    process_cities,
+)
 from app.engine.terrain import Terrain
 
 
@@ -87,3 +93,90 @@ def test_process_cities_is_immutable():
     process_cities(state)
     assert state.cities[0].food_stored == 0
     assert state.cities[0].production_stored == 0
+
+
+def _multi_state(
+    cities: tuple[City, ...] = (),
+    units: tuple[Unit, ...] = (),
+) -> GameState:
+    game_map = generate_map(3, seed=0)
+    civ = Civilization(id=0, name="A", leader_name="L", is_human=False)
+    return GameState(
+        turn=1,
+        map=game_map,
+        civs=(civ,),
+        cities=cities,
+        units=units,
+    )
+
+
+def _unit(uid: int, owner: int, utype: UnitType, loc: Hex) -> Unit:
+    stats = UNIT_STATS[utype]
+    return Unit(
+        id=uid,
+        owner=owner,
+        type=utype,
+        location=loc,
+        health=stats.max_health,
+        moves_remaining=stats.moves,
+    )
+
+
+def test_default_unit_for_picks_scout_when_none_exist():
+    city = City(id=1, owner=0, name="X", location=Hex(0, 0))
+    state = _multi_state(cities=(city,))
+    assert default_unit_for(state, city) is UnitType.SCOUT
+
+
+def test_default_unit_for_picks_warrior_when_below_city_count():
+    city = City(id=1, owner=0, name="X", location=Hex(0, 0))
+    scout = _unit(1, 0, UnitType.SCOUT, Hex(2, 0))
+    state = _multi_state(cities=(city,), units=(scout,))
+    # has scout, 0 warriors, 1 city → wants warrior
+    assert default_unit_for(state, city) is UnitType.WARRIOR
+
+
+def test_default_unit_for_queues_settler_when_pop_and_cap_allow():
+    city = City(
+        id=1,
+        owner=0,
+        name="X",
+        location=Hex(0, 0),
+        population=SETTLER_POP_THRESHOLD,
+    )
+    scout = _unit(1, 0, UnitType.SCOUT, Hex(2, 0))
+    warrior = _unit(2, 0, UnitType.WARRIOR, Hex(1, 0))
+    state = _multi_state(cities=(city,), units=(scout, warrior))
+    assert default_unit_for(state, city) is UnitType.SETTLER
+
+
+def test_default_unit_for_falls_back_to_warrior_at_city_cap():
+    cities = tuple(
+        City(
+            id=i + 1,
+            owner=0,
+            name=f"C{i}",
+            location=Hex(i * 2, 0),
+            population=SETTLER_POP_THRESHOLD,
+        )
+        for i in range(DEFAULT_SETTLER_CITY_CAP)
+    )
+    units = (
+        _unit(100, 0, UnitType.SCOUT, Hex(10, 0)),
+        # one warrior per city to clear the warrior gate
+        *(
+            _unit(200 + i, 0, UnitType.WARRIOR, Hex(0, i + 1))
+            for i in range(DEFAULT_SETTLER_CITY_CAP)
+        ),
+    )
+    state = _multi_state(cities=cities, units=units)
+    # city cap reached → don't queue settler, just more warriors
+    assert default_unit_for(state, cities[0]) is UnitType.WARRIOR
+
+
+def test_idle_city_auto_queues_default_unit():
+    city = City(id=1, owner=0, name="X", location=Hex(0, 0))
+    state = _base_state(city)
+    new_state = process_cities(state)
+    # No scout existed → queue should now hold a SCOUT.
+    assert new_state.cities[0].production_queue == (UnitType.SCOUT,)
