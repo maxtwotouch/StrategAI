@@ -358,6 +358,10 @@ def run_playthrough(
         if hasattr(source, "turn"):
             source.turn = state.turn  # type: ignore[attr-defined]
 
+        # Bind live state for sources that need it (intent resolvers, etc.).
+        if hasattr(source, "bind_state"):
+            source.bind_state(state)  # type: ignore[attr-defined]
+
         view = local_view(state, civ_id)
         if feedback_by_civ.get(civ_id):
             view["last_turn_feedback"] = list(feedback_by_civ[civ_id])

@@ -1,12 +1,20 @@
-"""OpenAI tool-use GoalSource — lets an LLM play the game via tool calls.
+"""OpenAI tool-use GoalSource — lets an LLM play the game via INTENT tools.
 
 Each civ gets its own `OpenAIGoalSource` instance carrying a persona prompt
 (leader name, personality, victory style).  The LLM receives the fog-filtered
-local_view JSON plus its inbox and current stances, then calls tools to:
+local_view JSON plus its inbox and current stances, then calls intent tools:
 
-* issue unit goals    (move_to, found_city_near, attack_unit)
-* send diplomatic messages (send_message)
-* change stances (set_stance)
+* expand          — found a city (settler & site picked deterministically)
+* scout           — explore unknown territory
+* engage          — wage war on a target civ (auto-declares war if needed)
+* reinforce       — march a military unit toward a friendly position
+* speak           — diplomatic message (cannot target self)
+* adjust_stance   — set stance with another civ (cannot target self)
+
+The intent layer fans out into Goals + DiplomaticActions via operations.py
+before the playthrough loop sees anything. The LLM never picks unit ids,
+never has to remember to declare war before attacking, and cannot accidentally
+target itself.
 
 Returns a `Decisions` object — both goals and diplomacy in a single API call.
 
@@ -31,7 +39,17 @@ from app.engine.diplomacy import (
 )
 from app.engine.executor import AttackUnit, FoundCityNear, Goal, MoveTo
 from app.engine.hex import Hex
-from app.engine.models import DiplomaticStance
+from app.engine.intents import (
+    AdjustStance,
+    Engage,
+    Expand,
+    Intent,
+    Reinforce,
+    Scout,
+    Speak,
+)
+from app.engine.models import DiplomaticStance, GameState
+from app.engine.operations import resolve_intents
 from app.engine.playthrough import Decisions
 
 logger = logging.getLogger(__name__)
@@ -39,26 +57,25 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# Tool definitions (OpenAI function-calling schema)
+# Tool definitions (intent-level — no unit ids)
 # ---------------------------------------------------------------------------
 
 TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "move_to",
+            "name": "expand",
             "description": (
-                "Move a unit toward a target hex.  The tactical layer handles "
-                "pathfinding and move-budget automatically."
+                "Found a new city. The engine picks one of your settlers and "
+                "the best legal site. Optionally hint a target hex."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "unit_id": {"type": "integer"},
                     "target_q": {"type": "integer"},
                     "target_r": {"type": "integer"},
                 },
-                "required": ["unit_id", "target_q", "target_r"],
+                "required": [],
                 "additionalProperties": False,
             },
         },
@@ -66,20 +83,18 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "found_city_near",
+            "name": "scout",
             "description": (
-                "Send a settler to a target hex and found a city there. "
-                "The unit must be a settler."
+                "Send a unit (preferring scouts) toward unexplored territory. "
+                "Optionally hint a direction with target_q/r."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "unit_id": {"type": "integer"},
                     "target_q": {"type": "integer"},
                     "target_r": {"type": "integer"},
-                    "name": {"type": "string"},
                 },
-                "required": ["unit_id", "target_q", "target_r", "name"],
+                "required": [],
                 "additionalProperties": False,
             },
         },
@@ -87,18 +102,19 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "attack_unit",
+            "name": "engage",
             "description": (
-                "Attack an enemy unit with one of your units.  You must be at "
-                "war with the target's civilization."
+                "Wage war on another civilization. The engine auto-declares "
+                "war if you are not already at war, then sends your closest "
+                "military unit against the closest visible enemy unit or "
+                "city. Cannot target yourself."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "attacker_id": {"type": "integer"},
-                    "target_id": {"type": "integer"},
+                    "target_civ_id": {"type": "integer"},
                 },
-                "required": ["attacker_id", "target_id"],
+                "required": ["target_civ_id"],
                 "additionalProperties": False,
             },
         },
@@ -106,11 +122,30 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "send_message",
+            "name": "reinforce",
             "description": (
-                "Send a diplomatic message to another leader.  Speak in your "
-                "leader's voice.  declare_war and accept_alliance also change "
-                "stance automatically."
+                "Move your closest military unit toward a friendly position. "
+                "Defaults to your first city if no target is given."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_q": {"type": "integer"},
+                    "target_r": {"type": "integer"},
+                    "target_city_id": {"type": "integer"},
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "speak",
+            "description": (
+                "Send a diplomatic message to another leader. Speak in your "
+                "leader's voice. Cannot target yourself."
             ),
             "parameters": {
                 "type": "object",
@@ -130,11 +165,11 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "set_stance",
+            "name": "adjust_stance",
             "description": (
-                "Directly set diplomatic stance with another civilization.  "
-                "Prefer send_message for narrative flavor; use this only for "
-                "unilateral changes."
+                "Directly set diplomatic stance with another civilization. "
+                "Prefer `speak` for narrative; use this for unilateral changes. "
+                "Cannot target yourself."
             ),
             "parameters": {
                 "type": "object",
@@ -161,13 +196,11 @@ BASE_SYSTEM_PROMPT = """\
 You are an AI civilization leader playing a strategy game on a hex grid.
 
 Each turn you receive a JSON object describing what you can see (fog of war),
-plus an inbox of recent diplomatic messages and your current stances with
-known civilizations.  Issue your turn by calling tools.  You may call several
-tools per turn — both unit goals and diplomatic actions.
+your inbox, current stances, and what you and others did recently.  Issue
+your turn by calling INTENT tools.  You may call several tools per turn.
 
 Key view fields:
-- "your_civ_id": YOUR civilization id.  Never use it as a message recipient
-  or stance target — that is yourself.
+- "your_civ_id": YOUR civilization id. Never use it as a tool target.
 - "self": your civilization (gold, science, culture, techs)
 - "visible_units" / "visible_cities": entities you can see
 - "visible_tiles": currently-visible terrain
@@ -175,14 +208,23 @@ Key view fields:
 - "inbox": diplomatic messages addressed to you
 - "diplomatic_stances": current stance (peace/war/alliance) per known civ
 - "last_turn_feedback": engine rejection reasons from your previous turn
+- "recent_actions" / "recent_messages": what you and others recently did
 - "turn": current turn number
 
-ID namespaces are separate.  unit_id and civ_id are unrelated — a unit with
-unit_id 2 has nothing to do with civ_id 2.  When attacking, attacker_id and
-target_id both refer to UNIT ids, never civ ids.
+You do NOT pick unit ids, hex coordinates, or war preconditions.  The engine
+handles tactics deterministically.  Your job is to decide WHAT to do this
+turn — the engine decides HOW.
 
-Respond to messages in character.  React to insults, threats, and offers
-according to your persona.  Be decisive — issue at least one tool call.\
+Tool guide:
+- expand        : found a new city (only if you have a settler)
+- scout         : explore unknown territory
+- engage        : wage war on a target civ — auto-declares war for you
+- reinforce     : march a military unit toward a friendly position
+- speak         : send a diplomatic message in your voice
+- adjust_stance : peace/war/alliance with another civ
+
+Respond to messages in character. React to insults, threats, and offers
+according to your persona. Be decisive — issue at least one tool call.\
 """
 
 
@@ -191,19 +233,14 @@ def build_system_prompt(persona: str | None = None) -> str:
     tactical_rules = """\
 
 Hard gameplay priorities:
-- If you have a settler and no city yet, your top priority is to found your first city immediately.
-- If you do not control any settler, do not call `found_city_near`.
-- Only settlers can found cities. Warriors and scouts cannot found cities.
-- Prefer `found_city_near` over `move_to` for settlers when you intend to establish a city.
-- Do not repeatedly target occupied or unreachable tiles. Read `last_turn_feedback` and change plan if an action was rejected.
+- If you have a settler and no city yet, your top priority is `expand`.
+- Use `engage` (not `speak` with kind=declare_war) to fight — it handles war
+  declaration and unit selection in one step.
 - Only message or change stance with civilizations in `known_civs`.
-- Never address a message or stance change to your own civ_id (`your_civ_id`).
-- If your `diplomatic_stances` already shows `war` with a target, do NOT call
-  `send_message` with kind=`declare_war` again — attack their units instead.
-  Re-declaring war is wasted; act on it.
-- Read `recent_actions` and `recent_messages` to remember what you and others
-  have already done. Avoid repeating the same failed plan two turns in a row.
-- Do not spend whole turns only chatting unless you have no useful legal game action available.
+- Do not target your own civ_id with any tool.
+- Read `last_turn_feedback`, `recent_actions`, and `recent_messages` to avoid
+  repeating failed plans turn after turn.
+- Do not spend whole turns only chatting unless you have no useful action.
 """
     if not persona:
         return BASE_SYSTEM_PROMPT + tactical_rules
@@ -216,44 +253,45 @@ Hard gameplay priorities:
 
 
 # ---------------------------------------------------------------------------
-# Parse tool calls → Goals / DiplomaticActions
+# Parse tool calls → Intents
 # ---------------------------------------------------------------------------
 
-def _parse_tool_call(name: str, args: dict[str, Any]) -> Goal | DiplomaticAction | None:
-    if name == "move_to":
-        return MoveTo(
-            unit_id=args["unit_id"],
-            target=Hex(args["target_q"], args["target_r"]),
+def _optional_hex(args: dict[str, Any]) -> Hex | None:
+    if "target_q" in args and "target_r" in args:
+        return Hex(args["target_q"], args["target_r"])
+    return None
+
+
+def _parse_tool_call(name: str, args: dict[str, Any]) -> Intent | None:
+    if name == "expand":
+        return Expand(target=_optional_hex(args))
+    if name == "scout":
+        return Scout(target=_optional_hex(args))
+    if name == "engage":
+        return Engage(target_civ_id=args["target_civ_id"])
+    if name == "reinforce":
+        return Reinforce(
+            target=_optional_hex(args),
+            target_city_id=args.get("target_city_id"),
         )
-    if name == "found_city_near":
-        return FoundCityNear(
-            unit_id=args["unit_id"],
-            target=Hex(args["target_q"], args["target_r"]),
-            name=args["name"],
-        )
-    if name == "attack_unit":
-        return AttackUnit(
-            attacker_id=args["attacker_id"],
-            target_id=args["target_id"],
-        )
-    if name == "send_message":
+    if name == "speak":
         try:
             kind = MessageKind(args["kind"])
         except ValueError:
             logger.warning("Invalid message kind: %s", args.get("kind"))
             return None
-        return SendMessage(
+        return Speak(
             to_civ_id=args["to_civ_id"],
             kind=kind,
             text=args["text"],
         )
-    if name == "set_stance":
+    if name == "adjust_stance":
         try:
             stance = DiplomaticStance(args["stance"])
         except ValueError:
             logger.warning("Invalid stance: %s", args.get("stance"))
             return None
-        return SetStance(
+        return AdjustStance(
             target_civ_id=args["target_civ_id"],
             stance=stance,
         )
@@ -270,13 +308,16 @@ _MEMORY_ACTIONS = 32
 
 
 class OpenAIGoalSource:
-    """GoalSource backed by an OpenAI chat-completions model with tool use.
+    """GoalSource backed by an OpenAI chat-completions model with intent tools.
 
-    Maintains a small per-civ rolling memory of (a) what actions this leader
-    issued in recent turns and (b) what diplomatic messages this leader has
-    seen.  The memory is injected into the user view as `recent_actions` and
+    Maintains a small per-civ rolling memory of (a) intents this leader issued
+    in recent turns and (b) diplomatic messages this leader has seen.  The
+    memory is injected into the user view as `recent_actions` and
     `recent_messages` so the model has continuity across turns without
     blowing up the prompt.
+
+    The source needs the live GameState to resolve intents into goals — the
+    playthrough loop wires this in via `bind_state`.
     """
 
     def __init__(
@@ -297,22 +338,22 @@ class OpenAIGoalSource:
         self._temperature = temperature
         self._system_prompt = build_system_prompt(persona)
         self._memory_turns = memory_turns
-        self._action_log: list[dict[str, Any]] = []
+        self._intent_log: list[dict[str, Any]] = []
         self._message_log: list[dict[str, Any]] = []
         self._last_seen_message_turn: int = -1
+        self._state: GameState | None = None
 
-    def _record_actions(
-        self,
-        turn: int,
-        goals: list[Goal],
-        diplomacy: list[DiplomaticAction],
-    ) -> None:
-        for g in goals:
-            self._action_log.append({"turn": turn, "type": type(g).__name__, "data": _summarize(g)})
-        for d in diplomacy:
-            self._action_log.append({"turn": turn, "type": type(d).__name__, "data": _summarize(d)})
-        if len(self._action_log) > _MEMORY_ACTIONS:
-            del self._action_log[: len(self._action_log) - _MEMORY_ACTIONS]
+    def bind_state(self, state: GameState) -> None:
+        """Playthrough loop calls this each turn so resolve_intents has fresh state."""
+        self._state = state
+
+    def _record_intents(self, turn: int, intents: list[Intent]) -> None:
+        for intent in intents:
+            self._intent_log.append(
+                {"turn": turn, "type": type(intent).__name__, "data": _summarize(intent)}
+            )
+        if len(self._intent_log) > _MEMORY_ACTIONS:
+            del self._intent_log[: len(self._intent_log) - _MEMORY_ACTIONS]
 
     def _ingest_inbox(self, view: dict) -> None:
         for m in view.get("inbox", []):
@@ -330,7 +371,7 @@ class OpenAIGoalSource:
 
         current_turn = view.get("turn", 0)
         cutoff = current_turn - self._memory_turns
-        recent_actions = [a for a in self._action_log if a["turn"] >= cutoff]
+        recent_actions = [a for a in self._intent_log if a["turn"] >= cutoff]
         recent_messages = [m for m in self._message_log if m.get("turn", -1) >= cutoff]
 
         payload = dict(view)
@@ -339,7 +380,7 @@ class OpenAIGoalSource:
         payload["recent_messages"] = recent_messages
         user_msg = json.dumps(payload, sort_keys=True, default=str)
         logger.info(
-            "Requesting LLM turn for civ %d: %d visible units, %d visible cities, %d known civs, %d inbox messages, %d remembered actions",
+            "Requesting LLM turn for civ %d: %d visible units, %d visible cities, %d known civs, %d inbox messages, %d remembered intents",
             civ_id,
             len(view.get("visible_units", [])),
             len(view.get("visible_cities", [])),
@@ -373,8 +414,7 @@ class OpenAIGoalSource:
             return Decisions()
 
         logger.info("LLM returned %d tool calls for civ %d", len(message.tool_calls), civ_id)
-        goals: list[Goal] = []
-        diplomacy: list[DiplomaticAction] = []
+        intents: list[Intent] = []
         for tc in message.tool_calls:
             try:
                 args = json.loads(tc.function.arguments)
@@ -384,33 +424,57 @@ class OpenAIGoalSource:
             parsed = _parse_tool_call(tc.function.name, args)
             if parsed is None:
                 continue
-            if isinstance(parsed, (MoveTo, FoundCityNear, AttackUnit)):
-                goals.append(parsed)
-            else:
-                diplomacy.append(parsed)
+            intents.append(parsed)
             logger.info(
                 "Civ %d → %s(%s)", civ_id, tc.function.name, tc.function.arguments
             )
 
-        self._record_actions(current_turn, goals, diplomacy)
+        self._record_intents(current_turn, intents)
+
+        if self._state is None:
+            logger.warning(
+                "OpenAIGoalSource for civ %d has no bound state — returning empty Decisions",
+                civ_id,
+            )
+            return Decisions()
+
+        goals, diplomacy = resolve_intents(self._state, civ_id, intents)
         return Decisions(goals=tuple(goals), diplomacy=tuple(diplomacy))
 
 
-def _summarize(action: Goal | DiplomaticAction) -> dict[str, Any]:
-    """Compact JSON-friendly representation of an issued action for memory."""
-    if isinstance(action, MoveTo):
-        return {"unit_id": action.unit_id, "target_q": action.target.q, "target_r": action.target.r}
-    if isinstance(action, FoundCityNear):
+def _summarize(intent: Intent) -> dict[str, Any]:
+    """Compact JSON-friendly representation of an intent for memory."""
+    if isinstance(intent, Expand):
+        out: dict[str, Any] = {}
+        if intent.target is not None:
+            out["target_q"] = intent.target.q
+            out["target_r"] = intent.target.r
+        return out
+    if isinstance(intent, Scout):
+        out = {}
+        if intent.target is not None:
+            out["target_q"] = intent.target.q
+            out["target_r"] = intent.target.r
+        return out
+    if isinstance(intent, Engage):
+        return {"target_civ_id": intent.target_civ_id}
+    if isinstance(intent, Reinforce):
+        out = {}
+        if intent.target is not None:
+            out["target_q"] = intent.target.q
+            out["target_r"] = intent.target.r
+        if intent.target_city_id is not None:
+            out["target_city_id"] = intent.target_city_id
+        return out
+    if isinstance(intent, Speak):
         return {
-            "unit_id": action.unit_id,
-            "target_q": action.target.q,
-            "target_r": action.target.r,
-            "name": action.name,
+            "to_civ_id": intent.to_civ_id,
+            "kind": intent.kind.value,
+            "text": intent.text,
         }
-    if isinstance(action, AttackUnit):
-        return {"attacker_id": action.attacker_id, "target_id": action.target_id}
-    if isinstance(action, SendMessage):
-        return {"to_civ_id": action.to_civ_id, "kind": action.kind.value, "text": action.text}
-    if isinstance(action, SetStance):
-        return {"target_civ_id": action.target_civ_id, "stance": action.stance.value}
+    if isinstance(intent, AdjustStance):
+        return {
+            "target_civ_id": intent.target_civ_id,
+            "stance": intent.stance.value,
+        }
     return {}
