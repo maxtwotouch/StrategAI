@@ -42,7 +42,7 @@ def _flat_map(radius: int = 4) -> GameMap:
 
     tiles: dict[Hex, Tile] = {}
     for coord in hex_range(Hex(0, 0), radius):
-        on_edge = max(abs(coord.q), abs(coord.r), abs(coord.s)) == radius
+        on_edge = max(abs(coord.q), abs(coord.r)) == radius
         tiles[coord] = Tile(
             coord=coord,
             terrain=Terrain.OCEAN if on_edge else Terrain.GRASSLAND,

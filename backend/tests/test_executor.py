@@ -31,7 +31,7 @@ def _open_map(radius: int = 5):
     game_map = generate_map(radius, seed=1)
     tiles: dict[Hex, Tile] = {}
     for coord in game_map.tiles:
-        on_edge = max(abs(coord.q), abs(coord.r), abs(coord.s)) == radius
+        on_edge = max(abs(coord.q), abs(coord.r)) == radius
         terrain = Terrain.OCEAN if on_edge else Terrain.GRASSLAND
         tiles[coord] = Tile(coord=coord, terrain=terrain)
     return replace(game_map, tiles=tiles)

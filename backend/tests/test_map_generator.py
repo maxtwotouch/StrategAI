@@ -28,7 +28,7 @@ def test_outer_ring_is_ocean():
     radius = 3
     game_map = generate_map(radius, seed=7)
     for coord, tile in game_map.tiles.items():
-        on_edge = max(abs(coord.q), abs(coord.r), abs(coord.s)) == radius
+        on_edge = max(abs(coord.q), abs(coord.r)) == radius
         if on_edge:
             assert tile.terrain == Terrain.OCEAN
 

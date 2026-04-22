@@ -16,6 +16,8 @@ from dataclasses import replace
 
 from opensimplex import OpenSimplex
 
+from math import hypot
+
 from app.engine.hex import Hex, hex_distance, hex_neighbors, hex_range
 from app.engine.models import GameMap, Tile
 from app.engine.terrain import (
@@ -48,19 +50,19 @@ def _continent_elevation(
     coord: Hex,
     radius: int,
 ) -> float:
-    dist_norm = hex_distance(Hex(0, 0), coord) / max(radius, 1)
-    radial = 1.0 - dist_norm**1.65
+    dist_norm = hypot(coord.q, coord.r) / max(radius, 1)
+    radial = max(0.0, 1.0 - dist_norm**1.65)
     continent = _noise(continent_gen, coord.q, coord.r, _CONTINENT_FREQ)
     detail = _noise(detail_gen, coord.q, coord.r, _ELEVATION_FREQ)
     ridge_raw = _noise(ridge_gen, coord.q, coord.r, _RIDGE_FREQ)
     ridge = 1.0 - abs(ridge_raw)
 
     return (
-        radial * 0.58
+        radial * 0.62
         + continent * 0.34
         + detail * 0.20
         + ridge * 0.10
-        - 0.36
+        - 0.20
     )
 
 
@@ -195,7 +197,7 @@ def generate_map(radius: int, seed: int = 0) -> GameMap:
     tiles: dict[Hex, Tile] = {}
 
     for coord in coords:
-        on_edge = max(abs(coord.q), abs(coord.r), abs(coord.s)) == radius
+        on_edge = max(abs(coord.q), abs(coord.r)) == radius
         if on_edge:
             tiles[coord] = Tile(
                 coord=coord,

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { HexMap } from "@/components/HexMap";
+import { SquareMap } from "@/components/SquareMap";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
 import {
   CIV_COLORS,
@@ -16,6 +16,7 @@ import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 type PendingAction = { kind: "found"; unit: UnitDTO } | null;
 type Setup = { radius: number; seed: number; humanName: string };
 type BottomTab = "diplomacy" | "log";
+type MapViewMode = "global" | "local";
 
 type TechDef = {
   id: string;
@@ -23,6 +24,10 @@ type TechDef = {
   cost: number;
   prerequisites: string[];
 };
+
+function randomSeed(): number {
+  return Math.floor(Math.random() * 1_000_000_000);
+}
 
 const TECHS: TechDef[] = [
   { id: "agriculture", name: "Agriculture", cost: 20, prerequisites: [] },
@@ -71,13 +76,18 @@ export default function HomePage() {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
   const [cityName, setCityName] = useState("");
-  const [setup, setSetup] = useState<Setup>({ radius: 8, seed: 1, humanName: "Athens" });
+  const [setup, setSetup] = useState<Setup>(() => ({
+    radius: 20,
+    seed: randomSeed(),
+    humanName: "Athens",
+  }));
   const [messageTargetId, setMessageTargetId] = useState<number | null>(null);
   const [messageKind, setMessageKind] = useState("chat");
   const [messageText, setMessageText] = useState("");
   const [activeConversationCivId, setActiveConversationCivId] = useState<number | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
-  const [bottomTab, setBottomTab] = useState<BottomTab>("diplomacy");
+  const [bottomTab, setBottomTab] = useState<BottomTab>("log");
+  const [mapViewMode, setMapViewMode] = useState<MapViewMode>("global");
   const [bannerEvents, setBannerEvents] = useState<TurnEvent[] | null>(null);
   const [eventLog, setEventLog] = useState<TurnEvent[]>([]);
   const prevStateRef = useRef<GameStateDTO | null>(null);
@@ -102,6 +112,7 @@ export default function HomePage() {
       setMessageText("");
       setActiveConversationCivId(null);
       setHasStarted(true);
+      setMapViewMode("global");
       setBannerEvents(null);
       setEventLog([]);
       prevStateRef.current = next;
@@ -110,6 +121,12 @@ export default function HomePage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const beginGame = () => {
+    const nextSetup = { ...setup, seed: randomSeed() };
+    setSetup(nextSetup);
+    void loadGame(nextSetup);
   };
 
   useEffect(() => {
@@ -159,6 +176,11 @@ export default function HomePage() {
     [state?.visible_tile_keys],
   );
 
+  const activeVisibleTiles = useMemo(
+    () => (mapViewMode === "global" ? new Set<string>() : visibleTiles),
+    [mapViewMode, visibleTiles],
+  );
+
   useEffect(() => {
     if (messageTargetId !== null) return;
     if (otherCivs.length === 0) return;
@@ -178,9 +200,11 @@ export default function HomePage() {
 
   const selectedCity = useMemo(() => {
     if (!state || !selectedUnit) return null;
-    return state.cities.find(
-      (city) => city.q === selectedUnit.q && city.r === selectedUnit.r,
-    ) ?? null;
+    return (
+      state.cities.find(
+        (city) => city.q === selectedUnit.q && city.r === selectedUnit.r,
+      ) ?? null
+    );
   }, [state, selectedUnit]);
 
   const reachable = useMemo<Set<string>>(() => {
@@ -368,21 +392,42 @@ export default function HomePage() {
     setSelectedUnit(u);
   };
 
-  const canFound = selectedUnit?.type === "settler";
+  const humanColor = humanCiv ? CIV_COLORS[humanCiv.id % CIV_COLORS.length] : "#b08a44";
   const highlightedTileKey = hoveredTile ? tileKey(hoveredTile.q, hoveredTile.r) : null;
+  const needsResearch = humanCiv !== null && !currentResearch && availableTechs.length > 0;
+  const needsProduction =
+    humanCities.length > 0 && selectedProductionCity?.production_queue.length === 0;
+  const needsSelection = humanUnits.length > 0 && !selectedUnit && isHumanTurn;
+  const nextObjective = !humanCities.length
+    ? "Settle your first city on secure terrain."
+    : needsResearch
+      ? "Select the next technology before the next turn."
+      : needsProduction
+        ? `Queue production in ${selectedProductionCity?.name ?? "your city"}.`
+        : totalInbox > 0
+          ? "Review diplomatic replies from rival leaders."
+          : needsSelection
+            ? "Select a unit and issue a field order."
+            : "Expand your borders and pressure rival factions.";
+  const researchProgress = currentResearch
+    ? Math.min(humanCiv?.science ?? 0, currentResearch.cost)
+    : 0;
 
   if (!hasStarted) {
     return (
-      <main className="start-shell">
-        <div className="start-card">
-          <p className="eyebrow">Inf-3600 Strategy Sandbox</p>
-          <h1 className="display-title">AI Civilization</h1>
-          <p className="muted" style={{ marginBottom: "1.4rem" }}>
-            Build a city, scout the world, and outwit AI-led civilizations.
+      <main className="start-screen">
+        <div className="start-screen__veil" />
+        <section className="start-screen__panel">
+          <div className="plate-label">Inf-3600 Strategy Sandbox</div>
+          <h1>Forge a Civilization.</h1>
+          <p className="start-screen__copy">
+            Command a modern 4X campaign with a map-first interface built for fast tactical
+            reading, deliberate expansion, and tense turn-to-turn decisions.
           </p>
-          <div className="setup-grid">
+
+          <div className="start-screen__grid">
             <label className="field">
-              <span className="field-label">Your Civilization</span>
+              <span className="field-label">Civilization Name</span>
               <input
                 type="text"
                 maxLength={40}
@@ -401,7 +446,7 @@ export default function HomePage() {
               <input
                 type="number"
                 min={2}
-                max={18}
+                max={32}
                 value={setup.radius}
                 onChange={(e) =>
                   setSetup((prev) => ({
@@ -411,26 +456,20 @@ export default function HomePage() {
                 }
               />
             </label>
-            <label className="field">
-              <span className="field-label">Seed</span>
-              <input
-                type="number"
-                value={setup.seed}
-                onChange={(e) =>
-                  setSetup((prev) => ({
-                    ...prev,
-                    seed: Number(e.target.value) || 0,
-                  }))
-                }
-              />
-            </label>
           </div>
-          <div className="button-row">
-            <button className="primary" onClick={() => loadGame(setup)} disabled={busy}>
-              {busy ? "Carving the world..." : "Begin"}
+
+          <div className="start-screen__meta">
+            <span>Fresh seed each session</span>
+            <span>Single-screen command table</span>
+            <span>Mouse-first tactical play</span>
+          </div>
+
+          <div className="start-screen__actions">
+            <button className="button-primary" onClick={beginGame} disabled={busy}>
+              {busy ? "Generating World..." : "Begin Campaign"}
             </button>
           </div>
-        </div>
+        </section>
         {error && <div className="toast">{error}</div>}
       </main>
     );
@@ -438,455 +477,453 @@ export default function HomePage() {
 
   if (!state) {
     return (
-      <main className="start-shell">
-        <div className="spinner" />
-        <p className="muted">Preparing the map and summoning the first civilizations.</p>
+      <main className="start-screen">
+        <div className="start-screen__veil" />
+        <section className="start-screen__panel start-screen__panel--loading">
+          <div className="spinner" />
+          <p className="start-screen__copy">
+            Surveying the land, placing the first capitals, and opening the campaign map.
+          </p>
+        </section>
         {error && <div className="toast">{error}</div>}
       </main>
     );
   }
 
-  const humanColor = humanCiv ? CIV_COLORS[humanCiv.id % CIV_COLORS.length] : "#888";
-  const researchProgress = currentResearch
-    ? Math.min(humanCiv?.science ?? 0, currentResearch.cost)
-    : 0;
-
   return (
-    <main className="game-shell">
-      <header className="game-topbar">
-        <div className="topbar-left">
-          <span
-            className="civ-medallion"
-            style={{ background: humanColor }}
-            aria-hidden
-          />
-          <div>
-            <div className="topbar-civ">{humanCiv?.name ?? "Civilization"}</div>
-            <div className="topbar-leader">{humanCiv?.leader_name ?? ""}</div>
+    <main className="war-room">
+      <header className="war-room__topbar">
+        <div className="empire-badge">
+          <div className="empire-badge__seal" style={{ background: humanColor }}>
+            {humanCiv?.name?.slice(0, 1) ?? "A"}
+          </div>
+          <div className="empire-badge__copy">
+            <div className="empire-badge__name">{humanCiv?.name ?? "Civilization"}</div>
+            <div className="empire-badge__sub">
+              {humanCiv?.leader_name ?? "Unknown Leader"} · Classical Era
+            </div>
           </div>
         </div>
-        <div className="topbar-center">
-          <ResourcePill icon="✦" label="Science" value={humanCiv?.science ?? 0} />
-          <ResourcePill icon="◈" label="Gold" value={humanCiv?.gold ?? 0} />
-          <ResourcePill icon="❀" label="Culture" value={humanCiv?.culture ?? 0} />
-          <ResourcePill icon="⛬" label="Cities" value={humanCities.length} />
-          <ResourcePill icon="⚔" label="Units" value={humanUnits.length} />
+
+        <div className="war-room__metrics">
+          <TopMetric label="Science" value={humanCiv?.science ?? 0} delta="+6 / t" />
+          <TopMetric label="Gold" value={humanCiv?.gold ?? 0} delta="+8 / t" />
+          <TopMetric label="Culture" value={humanCiv?.culture ?? 0} delta="+2 / t" />
+          <TopMetric label="Cities" value={humanCities.length} />
+          <TopMetric label="Units" value={humanUnits.length} />
         </div>
-        <div className="topbar-right">
-          <div className="turn-block">
-            <span className="turn-label">Turn</span>
-            <span className="turn-value">{state.turn}</span>
+
+        <div className="war-room__turnbox">
+          <div className="map-mode-toggle" role="tablist" aria-label="Map view mode">
+            <button
+              type="button"
+              className={`map-mode-toggle__button${mapViewMode === "global" ? " is-active" : ""}`}
+              onClick={() => setMapViewMode("global")}
+            >
+              Global
+            </button>
+            <button
+              type="button"
+              className={`map-mode-toggle__button${mapViewMode === "local" ? " is-active" : ""}`}
+              onClick={() => setMapViewMode("local")}
+            >
+              Local
+            </button>
           </div>
-          <div className="turn-status">
-            {isHumanTurn ? (
-              <span className="status-dot status-go">Your turn</span>
-            ) : (
-              <span className="status-dot status-wait">
-                {state.civs.find((c) => c.id === state.current_civ_id)?.name ?? "AI"} thinking…
-              </span>
-            )}
+          <div className="turn-box__meta">
+            <span className="plate-label">Turn</span>
+            <strong>{state.turn}</strong>
+            <span className={`turn-state${isHumanTurn ? " is-live" : ""}`}>
+              {isHumanTurn
+                ? "Your Move"
+                : `${state.civs.find((c) => c.id === state.current_civ_id)?.name ?? "AI"} Acting`}
+            </span>
           </div>
-          <button className="primary end-turn" onClick={endTurn} disabled={busy || !isHumanTurn}>
-            {busy ? "Resolving…" : "End Turn"}
+          <button className="button-primary end-turn" onClick={endTurn} disabled={busy || !isHumanTurn}>
+            {busy ? "Resolving..." : "End Turn"}
           </button>
         </div>
       </header>
 
-      <section className="game-body">
-        <div className="map-stage-full">
-          <HexMap
-            state={state}
-            selectedUnitId={selectedUnit?.id ?? null}
-            reachable={reachable}
-            highlightedTileKey={highlightedTileKey}
-            focusHex={mapFocusHex}
-            humanCivId={humanCiv?.id ?? null}
-            visibleTiles={visibleTiles}
-            onTileClick={onTileClick}
-            onTileHover={(q, r) =>
-              setHoveredTile(state.tiles.find((t) => t.q === q && t.r === r) ?? null)
-            }
-            onUnitClick={onUnitClick}
-          />
+      <section className="war-room__layout">
+        <aside className="war-room__rail war-room__rail--left">
+          <Panel label="Minimap" title={`Turn ${state.turn}`}>
+            <MiniMap tiles={state.tiles} visibleTiles={activeVisibleTiles} focusHex={mapFocusHex} />
+          </Panel>
 
-          {bannerEvents && bannerEvents.length > 0 && (
-            <div className="turn-banner">
-              <div className="turn-banner-head">
-                <span className="eyebrow">Turn {state.turn} resolved</span>
-              </div>
-              <ul>
-                {bannerEvents.slice(0, 6).map((event) => (
-                  <li key={event.id} className={`event-row event-${event.kind}`}>
-                    <span className="event-bullet" />
-                    <span>{event.text}</span>
-                  </li>
-                ))}
-                {bannerEvents.length > 6 && (
-                  <li className="event-row event-more">
-                    +{bannerEvents.length - 6} more — see Event Log
-                  </li>
-                )}
-              </ul>
-            </div>
-          )}
-
-          {hoveredTile && (
-            <div className="tile-hover-card">
-              <div className="hover-title">
-                {capitalize(hoveredTile.terrain)}
-                {hoveredTile.feature && (
-                  <span className="hover-sub">
-                    · {FEATURE_LABEL[hoveredTile.feature] ?? hoveredTile.feature}
-                  </span>
-                )}
-              </div>
-              <div className="hover-row">
-                <YieldChip icon="🌾" label="Food" value={hoveredTile.food} />
-                <YieldChip icon="⚒" label="Prod" value={hoveredTile.production} />
-                <YieldChip icon="◈" label="Gold" value={hoveredTile.gold} />
-                {hoveredTile.river && <YieldChip icon="≈" label="River" value="+" />}
-              </div>
-              {hoveredTile.resource && (
-                <div className="hover-resource">
-                  ◇ {RESOURCE_LABEL[hoveredTile.resource] ?? hoveredTile.resource}
-                </div>
-              )}
-              {hoveredUnit && (
-                <div className="hover-entity">
-                  <span
-                    className="civ-badge"
-                    style={{ background: CIV_COLORS[hoveredUnit.owner % CIV_COLORS.length] }}
-                  />
-                  {capitalize(hoveredUnit.type)} · {state.civs[hoveredUnit.owner]?.name ?? "?"}
-                  {" · "}
-                  HP {hoveredUnit.health}
-                </div>
-              )}
-              {hoveredCity && (
-                <div className="hover-entity">
-                  <span
-                    className="civ-badge"
-                    style={{ background: CIV_COLORS[hoveredCity.owner % CIV_COLORS.length] }}
-                  />
-                  {hoveredCity.name} · pop {hoveredCity.population}
-                </div>
-              )}
-              <div className="hover-coord">
-                ({hoveredTile.q}, {hoveredTile.r})
-              </div>
-            </div>
-          )}
-        </div>
-
-        <aside className="game-sidebar">
-          <div className="card selection-card">
-            <h2>Selection</h2>
+          <Panel
+            label={selectedUnit ? `Selected · ${capitalize(selectedUnit.type)}` : "Selection"}
+            title={selectedUnit ? `${capitalize(selectedUnit.type)} #${selectedUnit.id}` : "No Unit Selected"}
+          >
             {selectedUnit ? (
-              <div className="stack">
-                <div className="entity-head">
-                  <span
-                    className="civ-badge"
+              <div className="selection-stack">
+                <div className="selection-hero">
+                  <div
+                    className="selection-hero__glyph"
                     style={{ background: CIV_COLORS[selectedUnit.owner % CIV_COLORS.length] }}
-                  />
-                  <strong style={{ textTransform: "capitalize" }}>
-                    {selectedUnit.type} #{selectedUnit.id}
-                  </strong>
-                </div>
-                <StatRow label="Owner" value={state.civs[selectedUnit.owner]?.name ?? "Unknown"} />
-                <StatRow label="Health" value={selectedUnit.health} />
-                <StatRow label="Moves" value={selectedUnit.moves_remaining} />
-                <StatRow label="Position" value={`(${selectedUnit.q}, ${selectedUnit.r})`} />
-                {selectedCity && (
-                  <div className="note-box">
-                    Standing inside <strong>{selectedCity.name}</strong>.
+                  >
+                    {selectedUnit.type.slice(0, 1).toUpperCase()}
                   </div>
-                )}
-                <div className="button-row">
+                  <div>
+                    <div className="selection-hero__tile">
+                      Tile {selectedUnit.q}, {selectedUnit.r}
+                    </div>
+                    <div className="selection-hero__sub">
+                      {selectedCity ? `Garrisoned in ${selectedCity.name}` : "Field formation"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="stat-grid">
+                  <MetricStat label="Health" value={`${selectedUnit.health}/20`} />
+                  <MetricStat label="Moves" value={selectedUnit.moves_remaining} />
+                  <MetricStat label="Owner" value={state.civs[selectedUnit.owner]?.name ?? "Unknown"} />
+                </div>
+
+                <div className="selection-actions">
                   <button onClick={() => setSelectedUnit(null)}>Clear</button>
                   <button
-                    className="primary"
+                    className="button-danger"
+                    disabled={!isHumanTurn || selectedUnit.moves_remaining <= 0}
+                  >
+                    Attack
+                  </button>
+                </div>
+
+                <div className="selection-actions">
+                  <button disabled={!isHumanTurn || selectedUnit.moves_remaining <= 0}>Move</button>
+                  <button disabled={!isHumanTurn}>Fortify</button>
+                </div>
+
+                {selectedUnit.type === "settler" && (
+                  <button
+                    className="button-primary"
                     onClick={openFoundCity}
-                    disabled={busy || !canFound || !isHumanTurn}
+                    disabled={busy || !isHumanTurn}
                   >
                     Found City
                   </button>
-                </div>
+                )}
               </div>
             ) : (
-              <p className="faint" style={{ margin: 0 }}>
-                Click a unit on the map to issue commands.
-              </p>
+              <EmptyCopy>
+                Select a unit on the map to reveal field orders, movement options, and city actions.
+              </EmptyCopy>
+            )}
+          </Panel>
+        </aside>
+
+        <section className="war-room__mapstage">
+          <div className="map-frame">
+            <SquareMap
+              state={state}
+              selectedUnitId={selectedUnit?.id ?? null}
+              reachable={reachable}
+              highlightedTileKey={highlightedTileKey}
+              focusHex={mapFocusHex}
+              humanCivId={humanCiv?.id ?? null}
+              visibleTiles={activeVisibleTiles}
+              onTileClick={onTileClick}
+              onTileHover={(q, r) =>
+                setHoveredTile(state.tiles.find((t) => t.q === q && t.r === r) ?? null)
+              }
+              onUnitClick={onUnitClick}
+            />
+
+            {bannerEvents && bannerEvents.length > 0 && (
+              <div className="map-banner">
+                <div className="plate-label">Turn Chronicle</div>
+                <ul>
+                  {bannerEvents.slice(0, 4).map((event) => (
+                    <li key={event.id}>
+                      <span className={`log-kind log-kind--${event.kind}`}>{event.kind}</span>
+                      <span>{event.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {hoveredTile && (
+              <div className="terrain-readout">
+                <div className="terrain-readout__title">
+                  {capitalize(hoveredTile.terrain)}
+                  {hoveredTile.feature && (
+                    <span> · {FEATURE_LABEL[hoveredTile.feature] ?? hoveredTile.feature}</span>
+                  )}
+                </div>
+                <div className="terrain-readout__yields">
+                  <YieldLine label="Food" value={hoveredTile.food} />
+                  <YieldLine label="Prod" value={hoveredTile.production} />
+                  <YieldLine label="Gold" value={hoveredTile.gold} />
+                </div>
+                {hoveredTile.resource && (
+                  <div className="terrain-readout__sub">
+                    Resource · {RESOURCE_LABEL[hoveredTile.resource] ?? hoveredTile.resource}
+                  </div>
+                )}
+                {(hoveredUnit || hoveredCity) && (
+                  <div className="terrain-readout__sub">
+                    {hoveredUnit
+                      ? `${capitalize(hoveredUnit.type)} · ${state.civs[hoveredUnit.owner]?.name ?? "Unknown"} · HP ${hoveredUnit.health}`
+                      : `${hoveredCity?.name ?? "City"} · pop ${hoveredCity?.population ?? 0}`}
+                  </div>
+                )}
+              </div>
             )}
           </div>
+        </section>
 
-          <div className="card">
-            <h2>Research</h2>
-            {currentResearch ? (
-              <div className="progress-block">
-                <div className="progress-label">
-                  <strong>{currentResearch.name}</strong>
-                  <span className="faint">
-                    {researchProgress}/{currentResearch.cost}
-                  </span>
-                </div>
-                <div className="progress-track">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${Math.min(100, (researchProgress / currentResearch.cost) * 100)}%`,
-                    }}
-                  />
-                </div>
+        <aside className="war-room__rail war-room__rail--right">
+          <Panel label="Turn Objective" title={nextObjective}>
+            <p className="panel-copy">
+              {needsResearch
+                ? "Your scholars await direction. Lock the next advance before ending the round."
+                : needsProduction
+                  ? "A city queue is idle. Use your industrial output before rival expansion accelerates."
+                  : totalInbox > 0
+                    ? "A foreign court has answered. Messages can shift the tempo of the frontier."
+                    : "The current board favors expansion. Keep pressure on the map while your lead holds."}
+            </p>
+          </Panel>
+
+          <Panel
+            label={`Research · ${currentResearch ? currentResearch.name : "Awaiting Order"}`}
+            title={currentResearch ? `${researchProgress} / ${currentResearch.cost}` : "Choose Technology"}
+          >
+            {currentResearch && (
+              <div className="progress-shell">
+                <div
+                  className="progress-shell__fill"
+                  style={{
+                    width: `${Math.min(100, (researchProgress / currentResearch.cost) * 100)}%`,
+                  }}
+                />
               </div>
-            ) : (
-              <p className="faint" style={{ margin: 0, marginBottom: "0.6rem" }}>
-                Pick a tech to begin research.
-              </p>
             )}
-            <div className="tech-list">
+            <div className="list-stack">
               {availableTechs.length === 0 ? (
-                <p className="faint" style={{ margin: 0 }}>
-                  No available techs — meet prereqs first.
-                </p>
+                <EmptyCopy>No available technologies. Expand prerequisites or finish the current research.</EmptyCopy>
               ) : (
-                availableTechs.slice(0, 6).map((tech) => (
+                availableTechs.slice(0, 4).map((tech) => (
                   <button
                     key={tech.id}
-                    className="tech-button"
+                    className="list-row"
                     onClick={() => chooseResearch(tech.id)}
                     disabled={busy || !isHumanTurn || humanCiv?.researching === tech.id}
                   >
                     <span>{tech.name}</span>
-                    <span className="faint">{tech.cost} sci</span>
+                    <span>{tech.cost}</span>
                   </button>
                 ))
               )}
             </div>
-          </div>
+          </Panel>
 
-          <div className="card">
-            <h2>Production</h2>
+          <Panel
+            label={`City · ${selectedProductionCity?.name ?? "No City"}`}
+            title={
+              selectedProductionCity
+                ? `${selectedProductionCity.production_stored} stored production`
+                : "Found a city first"
+            }
+          >
             {selectedProductionCity ? (
-              <div className="stack">
-                <div className="note-box">
-                  Queue for <strong>{selectedProductionCity.name}</strong> ·{" "}
-                  {selectedProductionCity.production_stored} stored
+              <>
+                <div className="city-brief">
+                  <MetricStat label="Population" value={selectedProductionCity.population} />
+                  <MetricStat label="Queue" value={selectedProductionCity.production_queue[0] ?? "Idle"} />
                 </div>
-                {selectedProductionCity.production_queue.length > 0 && (
-                  <div className="faint">
-                    Queued: {selectedProductionCity.production_queue.join(" → ")}
-                  </div>
-                )}
-                <div className="tech-list">
+                <div className="list-stack">
                   {BUILDABLE_UNITS.map((unit) => (
                     <button
                       key={unit.id}
-                      className="tech-button"
+                      className="list-row"
                       onClick={() => queueProduction(selectedProductionCity.id, unit.id)}
                       disabled={busy || !isHumanTurn}
                     >
                       <span>{unit.label}</span>
-                      <span className="faint">{unit.cost} prod</span>
+                      <span>{unit.cost} prod</span>
                     </button>
                   ))}
                 </div>
-              </div>
+              </>
             ) : (
-              <p className="faint" style={{ margin: 0 }}>
-                Found a city to start queueing production.
-              </p>
+              <EmptyCopy>Your first settlement unlocks production orders and population growth.</EmptyCopy>
             )}
-          </div>
+          </Panel>
 
-          <div className="card">
-            <h2>Cities</h2>
-            {humanCities.length === 0 ? (
-              <p className="faint" style={{ margin: 0 }}>
-                No cities yet — your settler is the first priority.
-              </p>
-            ) : (
-              <div className="stack">
-                {humanCities.map((city) => (
-                  <CityCard key={city.id} city={city} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h2>Civilizations</h2>
-            <div className="stack">
-              {state.civs.map((c) => (
-                <div key={c.id} className="empire-row">
-                  <div className="entity-head">
-                    <span
-                      className="civ-badge"
-                      style={{ background: CIV_COLORS[c.id % CIV_COLORS.length] }}
-                    />
-                    <strong>{c.name}</strong>
-                    {c.is_human && <span className="tag">YOU</span>}
-                  </div>
-                  <div className="faint">
-                    {c.leader_name} · sci {c.science} · techs {c.known_techs.length}
-                  </div>
-                  {!c.is_human && (
-                    <div className="faint">
-                      {state.known_civ_ids.includes(c.id) ? "Met" : "Unmet"}
-                    </div>
-                  )}
-                </div>
-              ))}
+          <Panel label="Other Leaders" title={`${otherCivs.length} met`}>
+            <div className="leader-stack">
+              {otherCivs.length === 0 ? (
+                <EmptyCopy>No rival leaders discovered yet.</EmptyCopy>
+              ) : (
+                otherCivs.map((civ) => {
+                  const stance =
+                    state.stances.find((item) => item.other_civ_id === civ.id)?.stance ?? "peace";
+                  const inboxCount = inboxCounts.get(civ.id) ?? 0;
+                  return (
+                    <button
+                      key={civ.id}
+                      type="button"
+                      className={`leader-row${activeConversationCivId === civ.id ? " is-active" : ""}`}
+                      onClick={() => {
+                        setActiveConversationCivId(civ.id);
+                        setBottomTab("diplomacy");
+                      }}
+                    >
+                      <span
+                        className="leader-row__portrait"
+                        style={{ background: CIV_COLORS[civ.id % CIV_COLORS.length] }}
+                      >
+                        {civ.name.slice(0, 1)}
+                      </span>
+                      <span className="leader-row__body">
+                        <strong>{civ.name}</strong>
+                        <span>
+                          {civ.leader_name} · {capitalize(stance)}
+                          {inboxCount > 0 ? ` · ${inboxCount} new` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
-          </div>
+          </Panel>
         </aside>
       </section>
 
-      <section className="bottom-drawer card">
-        <div className="drawer-tabs">
+      <section className="war-room__chronicle">
+        <div className="chronicle-tabs">
           <button
             type="button"
-            className={`drawer-tab${bottomTab === "diplomacy" ? " is-active" : ""}`}
-            onClick={() => setBottomTab("diplomacy")}
-          >
-            Diplomacy {totalInbox > 0 && <span className="tag">{totalInbox}</span>}
-          </button>
-          <button
-            type="button"
-            className={`drawer-tab${bottomTab === "log" ? " is-active" : ""}`}
+            className={`chronicle-tab${bottomTab === "log" ? " is-active" : ""}`}
             onClick={() => setBottomTab("log")}
           >
-            Event Log {eventLog.length > 0 && <span className="tag">{eventLog.length}</span>}
+            Events
+          </button>
+          <button
+            type="button"
+            className={`chronicle-tab${bottomTab === "diplomacy" ? " is-active" : ""}`}
+            onClick={() => setBottomTab("diplomacy")}
+          >
+            Diplomacy {totalInbox > 0 ? `(${totalInbox})` : ""}
           </button>
         </div>
-        {bottomTab === "diplomacy" ? (
-          <div className="diplomacy-panel">
-            {otherCivs.length === 0 ? (
-              <p className="faint" style={{ margin: 0 }}>
-                Meet another civilization to open a diplomatic conversation.
-              </p>
+
+        {bottomTab === "log" ? (
+          <div className="chronicle-grid">
+            {eventLog.length === 0 ? (
+              <EmptyCopy>No events recorded yet. Resolve a turn to populate the chronicle.</EmptyCopy>
             ) : (
-              <div className="diplomacy-layout">
-                <div className="conversation-list">
-                  {otherCivs.map((civ) => {
-                    const stance = state.stances.find(
-                      (item) => item.other_civ_id === civ.id,
-                    );
-                    return (
-                      <button
-                        key={civ.id}
-                        type="button"
-                        className={`conversation-row${activeConversationCivId === civ.id ? " is-active" : ""}`}
-                        onClick={() => setActiveConversationCivId(civ.id)}
-                      >
-                        <div className="entity-head">
-                          <span
-                            className="civ-badge"
-                            style={{ background: CIV_COLORS[civ.id % CIV_COLORS.length] }}
-                          />
-                          <strong>{civ.name}</strong>
-                          {(inboxCounts.get(civ.id) ?? 0) > 0 && (
-                            <span className="tag">{inboxCounts.get(civ.id)}</span>
-                          )}
-                        </div>
-                        <div className="faint">
-                          {civ.leader_name} · {capitalize(stance?.stance ?? "peace")}
-                        </div>
-                      </button>
-                    );
-                  })}
+              eventLog.slice(0, 9).map((event) => (
+                <div key={event.id} className="log-row">
+                  <span className={`log-kind log-kind--${event.kind}`}>{event.kind}</span>
+                  <p>{event.text}</p>
+                  <span className="log-turn">T-{event.turn}</span>
                 </div>
-                <div className="conversation-pane">
-                  <div className="conversation-header">
-                    <div>
-                      <strong>{activeConversationCiv?.name ?? "No conversation selected"}</strong>
-                      {activeConversationCiv && (
-                        <div className="faint">{activeConversationCiv.leader_name}</div>
-                      )}
-                    </div>
-                    {activeConversationCiv && (
-                      <span className="tag">
-                        {capitalize(
-                          state.stances.find(
-                            (item) => item.other_civ_id === activeConversationCiv.id,
-                          )?.stance ?? "peace",
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="conversation-thread">
-                    {activeConversation.length === 0 ? (
-                      <p className="faint" style={{ margin: 0 }}>
-                        No messages yet. Send the first one.
-                      </p>
-                    ) : (
-                      [...activeConversation].reverse().map((message, index) => (
-                        <MessageCard
-                          key={`${message.turn}-${message.from_civ_id}-${message.to_civ_id}-${index}`}
-                          message={message}
-                          civs={state.civs}
-                          humanCivId={humanCiv?.id ?? null}
-                        />
-                      ))
-                    )}
-                  </div>
-                  <div className="conversation-composer">
-                    <label className="field">
-                      <span className="field-label">Tone</span>
-                      <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
-                        {MESSAGE_KINDS.map((kind) => (
-                          <option key={kind.id} value={kind.id}>
-                            {kind.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      <span className="field-label">Reply</span>
-                      <input
-                        type="text"
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                        placeholder={
-                          activeConversationCiv
-                            ? `Reply to ${activeConversationCiv.name}`
-                            : "Choose a civilization to begin"
-                        }
-                      />
-                    </label>
-                    <div className="button-row" style={{ marginTop: 0 }}>
-                      <button
-                        onClick={sendMessage}
-                        disabled={
-                          busy ||
-                          !isHumanTurn ||
-                          !messageText.trim() ||
-                          activeConversationCivId === null
-                        }
-                      >
-                        Send Reply
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              ))
             )}
           </div>
         ) : (
-          <div className="event-log">
-            {eventLog.length === 0 ? (
-              <p className="faint" style={{ margin: 0 }}>
-                No events yet. End a turn to see what happens.
-              </p>
-            ) : (
-              <ul>
-                {eventLog.map((event) => (
-                  <li key={event.id} className={`event-row event-${event.kind}`}>
-                    <span className="tag">T{event.turn}</span>
-                    <span>{event.text}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="diplomacy-layout">
+            <div className="diplomacy-list">
+              {otherCivs.length === 0 ? (
+                <EmptyCopy>Meet another civilization to open the diplomatic ledger.</EmptyCopy>
+              ) : (
+                otherCivs.map((civ) => (
+                  <button
+                    key={civ.id}
+                    type="button"
+                    className={`diplomacy-contact${activeConversationCivId === civ.id ? " is-active" : ""}`}
+                    onClick={() => setActiveConversationCivId(civ.id)}
+                  >
+                    <span
+                      className="leader-row__portrait"
+                      style={{ background: CIV_COLORS[civ.id % CIV_COLORS.length] }}
+                    >
+                      {civ.name.slice(0, 1)}
+                    </span>
+                    <span className="leader-row__body">
+                      <strong>{civ.name}</strong>
+                      <span>{civ.leader_name}</span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="diplomacy-thread">
+              <div className="diplomacy-thread__header">
+                <div>
+                  <div className="plate-label">Open Channel</div>
+                  <strong>{activeConversationCiv?.name ?? "No Contact Selected"}</strong>
+                </div>
+                {activeConversationCiv && (
+                  <span className="thread-stance">
+                    {capitalize(
+                      state.stances.find(
+                        (item) => item.other_civ_id === activeConversationCiv.id,
+                      )?.stance ?? "peace",
+                    )}
+                  </span>
+                )}
+              </div>
+
+              <div className="diplomacy-thread__messages">
+                {activeConversation.length === 0 ? (
+                  <EmptyCopy>No messages exchanged. Send the first diplomatic signal.</EmptyCopy>
+                ) : (
+                  [...activeConversation].reverse().map((message, index) => (
+                    <MessageCard
+                      key={`${message.turn}-${message.from_civ_id}-${message.to_civ_id}-${index}`}
+                      message={message}
+                      civs={state.civs}
+                      humanCivId={humanCiv?.id ?? null}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="diplomacy-thread__composer">
+                <label className="field">
+                  <span className="field-label">Tone</span>
+                  <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
+                    {MESSAGE_KINDS.map((kind) => (
+                      <option key={kind.id} value={kind.id}>
+                        {kind.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field field--wide">
+                  <span className="field-label">Message</span>
+                  <input
+                    type="text"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder={
+                      activeConversationCiv
+                        ? `Reply to ${activeConversationCiv.name}`
+                        : "Choose a civilization to begin"
+                    }
+                  />
+                </label>
+                <button
+                  className="button-primary"
+                  onClick={sendMessage}
+                  disabled={
+                    busy ||
+                    !isHumanTurn ||
+                    !messageText.trim() ||
+                    activeConversationCivId === null
+                  }
+                >
+                  Send
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -900,6 +937,7 @@ export default function HomePage() {
           }}
         >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="plate-label">New Settlement</div>
             <h2>Name Your City</h2>
             <input
               type="text"
@@ -907,7 +945,10 @@ export default function HomePage() {
               onChange={(e) => setCityName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") submitFoundCity();
-                if (e.key === "Escape") setPending(null);
+                if (e.key === "Escape") {
+                  setPending(null);
+                  setCityName("");
+                }
               }}
               placeholder="e.g. Athens"
               autoFocus
@@ -921,8 +962,8 @@ export default function HomePage() {
               >
                 Cancel
               </button>
-              <button className="primary" onClick={submitFoundCity} disabled={!cityName.trim()}>
-                Found
+              <button className="button-primary" onClick={submitFoundCity} disabled={!cityName.trim()}>
+                Found City
               </button>
             </div>
           </div>
@@ -934,47 +975,109 @@ export default function HomePage() {
   );
 }
 
-function ResourcePill({ icon, label, value }: { icon: string; label: string; value: number }) {
+function Panel({
+  label,
+  title,
+  children,
+}: {
+  label: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="resource-pill" title={label}>
-      <span className="resource-icon">{icon}</span>
-      <span className="resource-value">{value}</span>
-      <span className="resource-label">{label}</span>
+    <section className="panel">
+      <div className="panel__head">
+        <span className="plate-label">{label}</span>
+        <span className="panel__title">{title}</span>
+      </div>
+      <div className="panel__body">{children}</div>
+    </section>
+  );
+}
+
+function TopMetric({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: number;
+  delta?: string;
+}) {
+  return (
+    <div className="top-metric">
+      <strong>{value}</strong>
+      <span>{label}</span>
+      {delta && <em>{delta}</em>}
     </div>
   );
 }
 
-function YieldChip({ icon, label, value }: { icon: string; label: string; value: number | string }) {
+function MetricStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <span className="yield-chip" title={label}>
-      <span>{icon}</span>
+    <div className="metric-stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function YieldLine({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="yield-line">
+      <small>{label}</small>
       <strong>{value}</strong>
     </span>
   );
 }
 
-function StatRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="stat-row">
-      <span className="muted">{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+function EmptyCopy({ children }: { children: React.ReactNode }) {
+  return <p className="empty-copy">{children}</p>;
 }
 
-function CityCard({ city }: { city: CityDTO }) {
+function MiniMap({
+  tiles,
+  visibleTiles,
+  focusHex,
+}: {
+  tiles: GameStateDTO["tiles"];
+  visibleTiles: Set<string>;
+  focusHex: { q: number; r: number } | null;
+}) {
+  if (tiles.length === 0) return <div className="minimap" />;
+
+  const qs = tiles.map((tile) => tile.q);
+  const rs = tiles.map((tile) => tile.r);
+  const minQ = Math.min(...qs);
+  const maxQ = Math.max(...qs);
+  const minR = Math.min(...rs);
+  const maxR = Math.max(...rs);
+  const width = maxQ - minQ + 1;
+  const height = maxR - minR + 1;
+  const tileMap = new Map(tiles.map((tile) => [tileKey(tile.q, tile.r), tile]));
+
   return (
-    <div className="city-card">
-      <div className="entity-head">
-        <strong>{city.name}</strong>
-        <span className="tag">Pop {city.population}</span>
-      </div>
-      <div className="faint">
-        Food {city.food_stored} · Production {city.production_stored}
-      </div>
-      <div className="faint">
-        Queue {city.production_queue.length > 0 ? city.production_queue.join(", ") : "empty"}
-      </div>
+    <div
+      className="minimap"
+      style={{
+        gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`,
+      }}
+    >
+      {Array.from({ length: width * height }, (_, index) => {
+        const q = minQ + (index % width);
+        const r = minR + Math.floor(index / width);
+        const key = tileKey(q, r);
+        const tile = tileMap.get(key);
+        const visible = visibleTiles.size === 0 || visibleTiles.has(key);
+        const focused = focusHex?.q === q && focusHex?.r === r;
+        return (
+          <span
+            key={key}
+            className={`minimap__cell${tile ? "" : " is-empty"}${visible ? " is-visible" : ""}${focused ? " is-focused" : ""}`}
+            data-terrain={tile?.terrain ?? "void"}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -997,19 +1100,19 @@ function MessageCard({
         : "Received"
       : null;
   return (
-    <div className={`message-card${direction === "Sent" ? " is-sent" : " is-received"}`}>
-      <div className="entity-head">
+    <article className={`message-card${direction === "Sent" ? " is-sent" : ""}`}>
+      <div className="message-card__meta">
         <strong>
           {from?.name ?? `Civ ${message.from_civ_id}`} to {to?.name ?? `Civ ${message.to_civ_id}`}
         </strong>
-        <span className="tag">T{message.turn}</span>
-        {direction && <span className="tag">{direction}</span>}
+        <span>
+          T{message.turn}
+          {direction ? ` · ${direction}` : ""}
+        </span>
       </div>
-      <div className="faint" style={{ marginBottom: "0.35rem" }}>
-        {capitalize(message.kind)}
-      </div>
-      <div>{message.text}</div>
-    </div>
+      <div className="message-card__kind">{capitalize(message.kind)}</div>
+      <p>{message.text}</p>
+    </article>
   );
 }
 

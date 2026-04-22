@@ -1,82 +1,79 @@
+// Grid coordinate math for an 8-directional square grid.
+// The module name is retained for historical reasons; `q` is x and `r` is y.
+
 export type Hex = { q: number; r: number };
 
-export const HEX_SIZE = 34;
+export const TILE_SIZE = 28;
+// Alias retained so other files can import either name.
+export const HEX_SIZE = TILE_SIZE;
 
-export function hexToPixel(h: Hex, size = HEX_SIZE): { x: number; y: number } {
-  const x = size * Math.sqrt(3) * (h.q + h.r / 2);
-  const y = size * (3 / 2) * h.r;
-  return { x, y };
+export function hexToPixel(
+  h: Hex,
+  size = TILE_SIZE,
+): { x: number; y: number } {
+  return { x: h.q * size, y: h.r * size };
 }
 
-export function hexCorners(
+export function tileCorners(
   cx: number,
   cy: number,
-  size = HEX_SIZE,
+  size = TILE_SIZE,
 ): { x: number; y: number }[] {
-  const corners: { x: number; y: number }[] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 180) * (60 * i - 30); // pointy-top
-    corners.push({
-      x: cx + size * Math.cos(angle),
-      y: cy + size * Math.sin(angle),
-    });
-  }
-  return corners;
+  const half = size / 2;
+  return [
+    { x: cx - half, y: cy - half },
+    { x: cx + half, y: cy - half },
+    { x: cx + half, y: cy + half },
+    { x: cx - half, y: cy + half },
+  ];
 }
 
-export function hexPolygonPoints(cx: number, cy: number, size = HEX_SIZE): string {
-  return hexCorners(cx, cy, size)
-    .map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`)
-    .join(" ");
-}
+// Kept for any stale callers; forwards to tileCorners.
+export const hexCorners = tileCorners;
 
 export function hexDistance(a: Hex, b: Hex): number {
-  const dq = a.q - b.q;
-  const dr = a.r - b.r;
-  const ds = -dq - dr;
-  return (Math.abs(dq) + Math.abs(dr) + Math.abs(ds)) / 2;
+  return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r));
 }
 
 export function tileKey(q: number, r: number): string {
   return `${q},${r}`;
 }
 
-// Painterly atlas palette — more saturated, more contrast between terrains.
 export const TERRAIN_COLORS: Record<string, string> = {
-  ocean: "#1b3a5b",
-  coast: "#3f7aa8",
-  grassland: "#6fa539",
-  plains: "#d2b463",
-  forest: "#2f5a2b",
-  hills: "#8a7147",
-  mountain: "#564a3a",
-  desert: "#e8c879",
-  tundra: "#bfc4b8",
-  snow: "#ecf2f5",
-  lake: "#4a87b9",
-  savanna: "#c9a946",
-  taiga: "#3d5a4a",
+  ocean: "#13243a",
+  coast: "#2f5678",
+  grassland: "#4f7a2a",
+  plains: "#b59750",
+  forest: "#274820",
+  hills: "#7a6338",
+  mountain: "#3f372c",
+  desert: "#d0b061",
+  tundra: "#9ba196",
+  snow: "#d7dee1",
+  lake: "#3b6f97",
+  savanna: "#a88a2f",
+  taiga: "#334d3d",
 };
 
 export const TERRAIN_STROKE: Record<string, string> = {
-  ocean: "#0f243d",
-  coast: "#1f4a72",
-  grassland: "#456a23",
-  plains: "#9a7f3a",
-  forest: "#1d3c1b",
-  hills: "#5e4d30",
-  mountain: "#39312a",
-  desert: "#b29548",
-  tundra: "#8d9385",
-  snow: "#bcc7cc",
-  lake: "#2a5d83",
-  savanna: "#967d2c",
-  taiga: "#28403a",
+  ocean: "#0c1a2d",
+  coast: "#224363",
+  grassland: "#355c16",
+  plains: "#846632",
+  forest: "#152d13",
+  hills: "#5a4324",
+  mountain: "#2b2620",
+  desert: "#9f8136",
+  tundra: "#7b8276",
+  snow: "#a9b3b9",
+  lake: "#274e6e",
+  savanna: "#7a621a",
+  taiga: "#223328",
 };
 
-export const CIV_COLORS = ["#e05a4a", "#4a90e2", "#a855f7", "#f59e0b"];
+// Warm gold + muted faction tones to match the dark, painterly mockup.
+export const CIV_COLORS = ["#d4a443", "#5a8cc4", "#b05a4a", "#7e6ac4"];
 
-// Text-glyph fallbacks until proper sprite assets land.
 export const UNIT_GLYPH: Record<string, string> = {
   warrior: "⚔",
   settler: "⌂",
