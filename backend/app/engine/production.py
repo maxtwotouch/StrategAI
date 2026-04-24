@@ -4,8 +4,18 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from app.engine.buildings import (
+    BUILDINGS,
+    city_culture_bonus,
+    city_food_bonus,
+    city_production_bonus,
+    trained_unit_health_bonus,
+)
 from app.engine.hex import hex_neighbors
 from app.engine.models import (
+    BuildItem,
+    BuildKind,
+    BuildingType,
     City,
     GameState,
     UNIT_BUILD_COST,
@@ -49,9 +59,15 @@ def _spawn_location(state: GameState, city: City):  # type: ignore[no-untyped-de
 def _city_tile_yields(state: GameState, city: City) -> tuple[int, int]:
     tile = state.map.get(city.location)
     if tile is None:
-        return (CITY_BASE_FOOD, CITY_BASE_PRODUCTION)
+        return (
+            CITY_BASE_FOOD + city_food_bonus(city),
+            CITY_BASE_PRODUCTION + city_production_bonus(city),
+        )
     y = yields_for(tile.terrain)
-    return (CITY_BASE_FOOD + y.food, CITY_BASE_PRODUCTION + y.production)
+    return (
+        CITY_BASE_FOOD + y.food + city_food_bonus(city),
+        CITY_BASE_PRODUCTION + y.production + city_production_bonus(city),
+    )
 
 
 def _grow(city: City) -> City:
@@ -98,27 +114,39 @@ def _tick_city(state: GameState, city: City) -> tuple[GameState, City]:
 
     new_queue = city.production_queue
     if not new_queue:
-        new_queue = (default_unit_for(state, city),)
+        new_queue = (BuildItem.unit(default_unit_for(state, city)),)
     working_state = state
 
     if new_queue:
         head = new_queue[0]
-        cost = UNIT_BUILD_COST[head]
+        if head.kind is BuildKind.UNIT:
+            unit_type = UnitType(head.id)
+            cost = UNIT_BUILD_COST[unit_type]
+        else:
+            building_type = BuildingType(head.id)
+            cost = BUILDINGS[building_type].cost
+
         if new_prod >= cost:
             spawn = _spawn_location(working_state, city)
-            if spawn is not None:
-                stats = UNIT_STATS[head]
-                unit = Unit(
-                    id=_next_unit_id(working_state),
-                    owner=city.owner,
-                    type=head,
-                    location=spawn,
-                    health=stats.max_health,
-                    moves_remaining=stats.moves,
-                )
-                working_state = replace(
-                    working_state, units=working_state.units + (unit,)
-                )
+            if head.kind is BuildKind.UNIT:
+                if spawn is not None:
+                    stats = UNIT_STATS[unit_type]
+                    unit = Unit(
+                        id=_next_unit_id(working_state),
+                        owner=city.owner,
+                        type=unit_type,
+                        location=spawn,
+                        health=stats.max_health + trained_unit_health_bonus(city),
+                        moves_remaining=stats.moves,
+                    )
+                    working_state = replace(
+                        working_state, units=working_state.units + (unit,)
+                    )
+                    new_prod -= cost
+                    new_queue = new_queue[1:]
+            else:
+                if building_type not in city.buildings:
+                    city = replace(city, buildings=city.buildings | {building_type})
                 new_prod -= cost
                 new_queue = new_queue[1:]
 
@@ -135,7 +163,16 @@ def _tick_city(state: GameState, city: City) -> tuple[GameState, City]:
 def process_cities(state: GameState) -> GameState:
     new_cities: list[City] = []
     working = state
+    culture_by_owner: dict[int, int] = {}
     for city in state.cities:
         working, updated = _tick_city(working, city)
         new_cities.append(updated)
-    return replace(working, cities=tuple(new_cities))
+        culture_by_owner[updated.owner] = (
+            culture_by_owner.get(updated.owner, 0) + city_culture_bonus(updated)
+        )
+
+    new_civs = []
+    for civ in working.civs:
+        bonus = culture_by_owner.get(civ.id, 0)
+        new_civs.append(replace(civ, culture=civ.culture + bonus))
+    return replace(working, cities=tuple(new_cities), civs=tuple(new_civs))

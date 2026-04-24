@@ -11,8 +11,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Union
 
-from app.engine.models import City, GameState, UnitType
-from app.engine.research import ResearchError, set_research
+from app.engine.models import BuildItem, BuildKind, BuildingType, City, GameState, UnitType
+from app.engine.research import (
+    ResearchError,
+    can_build_building,
+    can_build_unit,
+    set_research,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +25,7 @@ class QueueProduction:
     """Append a unit to a city's production queue."""
 
     city_id: int
-    unit_type: UnitType
+    item: BuildItem
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +57,27 @@ def _queue_production(
         raise DirectiveError(
             f"city {directive.city_id} is not owned by civ {civ_id}"
         )
-    new_queue = city.production_queue + (directive.unit_type,)
+    civ = next((c for c in state.civs if c.id == civ_id), None)
+    if civ is None:
+        raise DirectiveError(f"unknown civ id {civ_id}")
+
+    if directive.item.kind is BuildKind.UNIT:
+        unit_type = UnitType(directive.item.id)
+        if not can_build_unit(civ, unit_type):
+            raise DirectiveError(f"unit {unit_type.value} is not unlocked")
+    else:
+        building_type = BuildingType(directive.item.id)
+        if building_type in city.buildings:
+            raise DirectiveError(f"building {building_type.value} already built")
+        if any(
+            item.kind is BuildKind.BUILDING and item.id == building_type.value
+            for item in city.production_queue
+        ):
+            raise DirectiveError(f"building {building_type.value} already queued")
+        if not can_build_building(civ, building_type):
+            raise DirectiveError(f"building {building_type.value} is not unlocked")
+
+    new_queue = city.production_queue + (directive.item,)
     new_city = replace(city, production_queue=new_queue)
     new_cities = tuple(
         new_city if i == idx else c for i, c in enumerate(state.cities)

@@ -63,9 +63,13 @@ def _serialize_city(city: City, *, owned: bool = False) -> dict[str, Any]:
         "population": city.population,
         "food_stored": city.food_stored,
         "production_stored": city.production_stored,
+        "health": city.health,
+        "max_health": city.max_health,
+        "is_capital": city.is_capital,
+        "buildings": sorted(b.value for b in city.buildings),
     }
     if owned:
-        out["production_queue"] = [u.value for u in city.production_queue]
+        out["production_queue"] = [item.id for item in city.production_queue]
     return out
 
 

@@ -4,10 +4,11 @@ import pytest
 
 from app.engine.hex import Hex
 from app.engine.map_generator import generate_map
-from app.engine.models import City, Civilization, GameState
+from app.engine.models import BuildingType, City, Civilization, GameState
 from app.engine.research import (
     ResearchError,
     TECHS,
+    can_build_building,
     default_tech_for,
     set_research,
     tick_research,
@@ -133,3 +134,10 @@ def test_tick_research_no_techs_left_keeps_civ_idle():
     new_state = tick_research(state)
     assert new_state.civs[0].researching is None
     assert new_state.civs[0].science == 3
+
+
+def test_building_unlock_depends_on_known_techs():
+    civ = _civ()
+    assert not can_build_building(civ, BuildingType.GRANARY)
+    unlocked = _civ(known=frozenset({"pottery"}))
+    assert can_build_building(unlocked, BuildingType.GRANARY)

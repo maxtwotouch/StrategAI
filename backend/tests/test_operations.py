@@ -20,6 +20,7 @@ from app.engine.intents import (
 )
 from app.engine.map_generator import generate_map
 from app.engine.models import (
+    BuildItem,
     Civilization,
     City,
     DiplomaticStance,
@@ -265,7 +266,7 @@ def test_build_emits_queue_production_for_owned_city():
     assert len(dirs) == 1
     assert isinstance(dirs[0], QueueProduction)
     assert dirs[0].city_id == 7
-    assert dirs[0].unit_type is UnitType.WARRIOR
+    assert dirs[0].item == BuildItem.unit(UnitType.WARRIOR)
 
 
 @pytest.mark.unit
@@ -276,7 +277,7 @@ def test_build_defaults_to_first_owned_city():
     _, _, dirs = resolve_intent(state, 0, Build(unit_type=UnitType.SCOUT))
     assert len(dirs) == 1
     assert dirs[0].city_id == 1
-    assert dirs[0].unit_type is UnitType.SCOUT
+    assert dirs[0].item == BuildItem.unit(UnitType.SCOUT)
 
 
 @pytest.mark.unit

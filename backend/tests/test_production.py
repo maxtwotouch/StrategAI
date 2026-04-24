@@ -2,7 +2,10 @@ from dataclasses import replace
 
 from app.engine.hex import Hex
 from app.engine.map_generator import generate_map
+from app.engine.buildings import BUILDINGS
 from app.engine.models import (
+    BuildItem,
+    BuildingType,
     City,
     Civilization,
     GameMap,
@@ -59,7 +62,7 @@ def test_city_completes_unit_production_and_spawns_adjacent_or_on_tile():
         name="X",
         location=Hex(0, 0),
         production_stored=cost - 1,
-        production_queue=(UnitType.WARRIOR,),
+        production_queue=(BuildItem.unit(UnitType.WARRIOR),),
     )
     state = _base_state(city)
     new_state = process_cities(state)
@@ -79,12 +82,12 @@ def test_city_does_not_spawn_if_production_insufficient():
         name="X",
         location=Hex(0, 0),
         production_stored=0,
-        production_queue=(UnitType.WARRIOR,),
+        production_queue=(BuildItem.unit(UnitType.WARRIOR),),
     )
     state = _base_state(city)
     new_state = process_cities(state)
     assert new_state.units == ()
-    assert new_state.cities[0].production_queue == (UnitType.WARRIOR,)
+    assert new_state.cities[0].production_queue == (BuildItem.unit(UnitType.WARRIOR),)
 
 
 def test_process_cities_is_immutable():
@@ -179,4 +182,37 @@ def test_idle_city_auto_queues_default_unit():
     state = _base_state(city)
     new_state = process_cities(state)
     # No scout existed → queue should now hold a SCOUT.
-    assert new_state.cities[0].production_queue == (UnitType.SCOUT,)
+    assert new_state.cities[0].production_queue == (BuildItem.unit(UnitType.SCOUT),)
+
+
+def test_city_completes_building_and_applies_food_bonus_next_tick():
+    cost = BUILDINGS[BuildingType.GRANARY].cost
+    city = City(
+        id=1,
+        owner=0,
+        name="X",
+        location=Hex(0, 0),
+        production_stored=cost - 1,
+        production_queue=(BuildItem.building(BuildingType.GRANARY),),
+    )
+    state = _base_state(city)
+    built_state = process_cities(state)
+    built_city = built_state.cities[0]
+    assert BuildingType.GRANARY in built_city.buildings
+    assert built_city.production_queue == ()
+
+    after_bonus = process_cities(built_state)
+    assert after_bonus.cities[0].food_stored > built_city.food_stored
+
+
+def test_city_with_monument_adds_culture_each_tick():
+    city = City(
+        id=1,
+        owner=0,
+        name="X",
+        location=Hex(0, 0),
+        buildings=frozenset({BuildingType.MONUMENT}),
+    )
+    state = _base_state(city)
+    new_state = process_cities(state)
+    assert new_state.civs[0].culture == 1

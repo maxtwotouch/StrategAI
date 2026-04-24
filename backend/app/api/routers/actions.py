@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.schemas import (
     AttackRequest,
+    AttackCityRequest,
     BuildRequest,
     FoundCityRequest,
     GameStateOut,
@@ -16,9 +17,9 @@ from app.api.store import store
 from app.engine.diplomacy import DiplomacyError, MessageKind, SendMessage, apply_diplomatic_action
 from app.engine.directives import DirectiveError, QueueProduction, apply_directive
 from app.engine.city_founding import FoundError, found_city
-from app.engine.combat import CombatError, attack
+from app.engine.combat import CombatError, attack, attack_city
 from app.engine.hex import Hex
-from app.engine.models import UnitType
+from app.engine.models import BuildItem, BuildKind, BuildingType, UnitType
 from app.engine.movement import MoveError, move_unit
 from app.engine.research import ResearchError, set_research
 
@@ -54,6 +55,17 @@ def action_attack(game_id: int, req: AttackRequest) -> GameStateOut:
     return state_to_out(game_id, new_state)
 
 
+@router.post("/attack-city", response_model=GameStateOut)
+def action_attack_city(game_id: int, req: AttackCityRequest) -> GameStateOut:
+    state = _load(game_id)
+    try:
+        new_state = attack_city(state, req.attacker_id, req.city_id)
+    except CombatError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    store.put(game_id, new_state)
+    return state_to_out(game_id, new_state)
+
+
 @router.post("/found", response_model=GameStateOut)
 def action_found(game_id: int, req: FoundCityRequest) -> GameStateOut:
     state = _load(game_id)
@@ -80,11 +92,21 @@ def action_research(game_id: int, req: ResearchRequest) -> GameStateOut:
 def action_build(game_id: int, req: BuildRequest) -> GameStateOut:
     state = _load(game_id)
     try:
-        unit_type = UnitType(req.unit_type)
+        if req.item_id is not None:
+            item_id = req.item_id
+        elif req.unit_type is not None:
+            item_id = req.unit_type
+        else:
+            raise ValueError("missing item_id")
+        build_kind = BuildKind(req.build_kind)
+        if build_kind is BuildKind.UNIT:
+            item = BuildItem.unit(UnitType(item_id))
+        else:
+            item = BuildItem.building(BuildingType(item_id))
         new_state = apply_directive(
             state,
             req.civ_id,
-            QueueProduction(city_id=req.city_id, unit_type=unit_type),
+            QueueProduction(city_id=req.city_id, item=item),
         )
     except (DirectiveError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))

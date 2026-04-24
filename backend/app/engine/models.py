@@ -19,6 +19,18 @@ class UnitType(str, Enum):
     SCOUT = "scout"
 
 
+class BuildingType(str, Enum):
+    GRANARY = "granary"
+    MONUMENT = "monument"
+    LIBRARY = "library"
+    BARRACKS = "barracks"
+
+
+class BuildKind(str, Enum):
+    UNIT = "unit"
+    BUILDING = "building"
+
+
 @dataclass(frozen=True, slots=True)
 class UnitStats:
     max_health: int
@@ -40,6 +52,20 @@ UNIT_BUILD_COST: dict[UnitType, int] = {
     UnitType.WARRIOR: 10,
     UnitType.SCOUT: 8,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class BuildItem:
+    kind: BuildKind
+    id: str
+
+    @classmethod
+    def unit(cls, unit_type: UnitType) -> "BuildItem":
+        return cls(kind=BuildKind.UNIT, id=unit_type.value)
+
+    @classmethod
+    def building(cls, building_type: BuildingType) -> "BuildItem":
+        return cls(kind=BuildKind.BUILDING, id=building_type.value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +121,11 @@ class City:
     population: int = 1
     food_stored: int = 0
     production_stored: int = 0
-    production_queue: tuple[UnitType, ...] = ()
+    health: int = 20
+    max_health: int = 20
+    is_capital: bool = False
+    buildings: frozenset[BuildingType] = field(default_factory=frozenset)
+    production_queue: tuple[BuildItem, ...] = ()
 
     def growth_threshold(self) -> int:
         return 10 * self.population

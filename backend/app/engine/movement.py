@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from app.engine.hex import Hex, hex_distance
-from app.engine.models import GameState, Unit
+from app.engine.models import City, GameState, Unit
 from app.engine.terrain import is_passable
 
 
@@ -18,6 +18,10 @@ def _find_unit(state: GameState, unit_id: int) -> Unit:
         if u.id == unit_id:
             return u
     raise MoveError(f"unknown unit id {unit_id}")
+
+
+def _city_at(state: GameState, destination: Hex) -> City | None:
+    return next((city for city in state.cities if city.location == destination), None)
 
 
 def move_unit(state: GameState, unit_id: int, destination: Hex) -> GameState:
@@ -46,4 +50,37 @@ def move_unit(state: GameState, unit_id: int, destination: Hex) -> GameState:
 
     moved = unit.with_location(destination).with_moves(unit.moves_remaining - 1)
     new_units = tuple(moved if u.id == unit_id else u for u in state.units)
-    return replace(state, units=new_units)
+    city = _city_at(state, destination)
+    if city is None or city.owner == unit.owner:
+        return replace(state, units=new_units)
+    if city.health > 0:
+        raise MoveError("enemy city must be reduced to 0 health before capture")
+
+    captured_city = replace(
+        city,
+        owner=unit.owner,
+        health=city.max_health,
+        population=max(1, city.population - 1),
+        food_stored=0,
+        production_stored=0,
+        is_capital=False,
+        production_queue=(),
+    )
+    replacement_cities = [
+        replace(captured_city, is_capital=not any(
+            c.owner == unit.owner and c.id != city.id and c.is_capital
+            for c in state.cities
+        ))
+        if existing.id == city.id
+        else existing
+        for existing in state.cities
+    ]
+
+    old_owner_remaining = [c for c in replacement_cities if c.owner == city.owner]
+    if old_owner_remaining and not any(c.is_capital for c in old_owner_remaining):
+        promote_id = old_owner_remaining[0].id
+        replacement_cities = [
+            replace(c, is_capital=True) if c.id == promote_id else c
+            for c in replacement_cities
+        ]
+    return replace(state, units=new_units, cities=tuple(replacement_cities))

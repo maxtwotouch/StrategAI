@@ -53,6 +53,10 @@ class CityOut(BaseModel):
     population: int
     food_stored: int
     production_stored: int
+    health: int
+    max_health: int
+    is_capital: bool
+    buildings: list[str]
     production_queue: list[str]
 
 
@@ -134,7 +138,11 @@ def city_to_out(c: City) -> CityOut:
         population=c.population,
         food_stored=c.food_stored,
         production_stored=c.production_stored,
-        production_queue=[u.value for u in c.production_queue],
+        health=c.health,
+        max_health=c.max_health,
+        is_capital=c.is_capital,
+        buildings=sorted(b.value for b in c.buildings),
+        production_queue=[item.id for item in c.production_queue],
     )
 
 
@@ -221,6 +229,11 @@ class AttackRequest(BaseModel):
     defender_id: int
 
 
+class AttackCityRequest(BaseModel):
+    attacker_id: int
+    city_id: int
+
+
 class FoundCityRequest(BaseModel):
     unit_id: int
     name: str
@@ -234,7 +247,9 @@ class ResearchRequest(BaseModel):
 class BuildRequest(BaseModel):
     civ_id: int
     city_id: int
-    unit_type: str
+    unit_type: str | None = None
+    build_kind: str = Field(default="unit")
+    item_id: str | None = None
 
 
 class MessageRequest(BaseModel):

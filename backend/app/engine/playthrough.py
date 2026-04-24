@@ -106,7 +106,7 @@ def _describe_directive(directive: Directive) -> str:
     if isinstance(directive, QueueProduction):
         return (
             f"QueueProduction city={directive.city_id} "
-            f"unit={directive.unit_type.value}"
+            f"{directive.item.kind.value}={directive.item.id}"
         )
     if isinstance(directive, StartResearch):
         return f"StartResearch tech={directive.tech_id!r}"

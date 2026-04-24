@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from app.engine.models import Civilization, GameState
+from app.engine.buildings import BUILDINGS
+from app.engine.models import BuildingType, Civilization, GameState, UnitType
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +48,12 @@ TECHS: dict[str, Tech] = {
 
 
 SCIENCE_PER_CITY = 2
+
+UNIT_TECH_REQUIREMENTS: dict[UnitType, str | None] = {
+    UnitType.SETTLER: None,
+    UnitType.WARRIOR: None,
+    UnitType.SCOUT: None,
+}
 
 
 class ResearchError(ValueError):
@@ -102,7 +109,21 @@ def default_tech_for(civ: Civilization) -> str | None:
     return candidates[0].id
 
 
+def can_build_unit(civ: Civilization, unit_type: UnitType) -> bool:
+    requirement = UNIT_TECH_REQUIREMENTS.get(unit_type)
+    return requirement is None or requirement in civ.known_techs
+
+
+def can_build_building(civ: Civilization, building_type: BuildingType) -> bool:
+    building = BUILDINGS.get(building_type)
+    if building is None:
+        return False
+    return building.prerequisite is None or building.prerequisite in civ.known_techs
+
+
 def tick_research(state: GameState) -> GameState:
+    from app.engine.buildings import city_science_bonus
+
     new_civs: list[Civilization] = []
     for civ in state.civs:
         researching = civ.researching
@@ -116,7 +137,10 @@ def tick_research(state: GameState) -> GameState:
         if tech is None:
             new_civs.append(replace(civ, researching=None))
             continue
-        new_points = civ.science + _science_income(state, civ.id)
+        science_bonus = sum(
+            city_science_bonus(city) for city in state.cities_for(civ.id)
+        )
+        new_points = civ.science + _science_income(state, civ.id) + science_bonus
         if new_points >= tech.cost:
             known = frozenset(civ.known_techs | {tech.id})
             new_civs.append(

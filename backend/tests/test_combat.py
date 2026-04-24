@@ -2,10 +2,11 @@ from dataclasses import replace
 
 import pytest
 
-from app.engine.combat import CombatError, attack
+from app.engine.combat import CombatError, attack, attack_city
 from app.engine.hex import Hex
 from app.engine.map_generator import generate_map
 from app.engine.models import (
+    City,
     Civilization,
     GameState,
     Unit,
@@ -36,6 +37,20 @@ def _state(units: tuple[Unit, ...]) -> GameState:
         map=generate_map(3, seed=0),
         civs=civs,
         cities=(),
+        units=units,
+    )
+
+
+def _state_with_city(units: tuple[Unit, ...], city: City) -> GameState:
+    civs = (
+        Civilization(id=0, name="A", leader_name="L", is_human=True),
+        Civilization(id=1, name="B", leader_name="M", is_human=False),
+    )
+    return GameState(
+        turn=1,
+        map=generate_map(3, seed=0),
+        civs=civs,
+        cities=(city,),
         units=units,
     )
 
@@ -106,3 +121,21 @@ def test_attack_unknown_unit_raises():
     state = _state((a,))
     with pytest.raises(CombatError, match="unknown unit"):
         attack(state, 1, 999)
+
+
+def test_attack_city_reduces_city_health_and_uses_moves():
+    a = _unit(1, 0, UnitType.WARRIOR, Hex(0, 0))
+    city = City(id=9, owner=1, name="Enemy", location=Hex(1, 0))
+    state = _state_with_city((a,), city)
+    new_state = attack_city(state, attacker_id=1, city_id=9)
+    updated_city = new_state.cities[0]
+    updated_attacker = new_state.units[0]
+    assert updated_city.health < city.health
+    assert updated_attacker.moves_remaining == 0
+
+
+def test_attack_city_unknown_city_raises():
+    a = _unit(1, 0, UnitType.WARRIOR, Hex(0, 0))
+    state = _state((a,))
+    with pytest.raises(CombatError, match="unknown city"):
+        attack_city(state, 1, 99)

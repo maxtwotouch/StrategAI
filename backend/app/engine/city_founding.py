@@ -49,6 +49,7 @@ def found_city(state: GameState, unit_id: int, name: str) -> GameState:
         name=name,
         location=unit.location,
         population=1,
+        is_capital=not state.cities_for(unit.owner),
     )
     new_cities = state.cities + (new_city,)
     new_units = tuple(u for u in state.units if u.id != unit_id)

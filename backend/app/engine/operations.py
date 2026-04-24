@@ -38,6 +38,7 @@ from app.engine.intents import (
     Speak,
 )
 from app.engine.models import (
+    BuildItem,
     City,
     DiplomaticStance,
     GameState,
@@ -324,7 +325,7 @@ def _do_build(state: GameState, civ_id: int, intent: Build) -> _Out:
     else:
         city = cities[0]
     out.directives.append(
-        QueueProduction(city_id=city.id, unit_type=intent.unit_type)
+        QueueProduction(city_id=city.id, item=BuildItem.unit(intent.unit_type))
     )
     return out
 

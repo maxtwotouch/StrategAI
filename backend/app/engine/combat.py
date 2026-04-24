@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from app.engine.hex import hex_distance
-from app.engine.models import GameState, Unit
+from app.engine.models import City, GameState, Unit
 
 
 class CombatError(ValueError):
@@ -25,6 +25,50 @@ def _damage_to_defender(attacker: Unit, defender: Unit) -> int:
 
 def _damage_to_attacker(attacker: Unit, defender: Unit) -> int:
     return max(0, defender.stats.attack - attacker.stats.defense)
+
+
+def _find_city(state: GameState, city_id: int) -> City:
+    for city in state.cities:
+        if city.id == city_id:
+            return city
+    raise CombatError(f"unknown city id {city_id}")
+
+
+def _city_defense(city: City) -> int:
+    return 2 + city.population + len(city.buildings)
+
+
+def attack_city(state: GameState, attacker_id: int, city_id: int) -> GameState:
+    attacker = _find(state, attacker_id)
+    city = _find_city(state, city_id)
+
+    if attacker.owner == city.owner:
+        raise CombatError("cannot attack own city")
+    if attacker.moves_remaining <= 0:
+        raise CombatError(f"attacker {attacker_id} has no moves")
+    if hex_distance(attacker.location, city.location) != 1:
+        raise CombatError("target city not adjacent")
+
+    dmg_city = max(1, 2 * attacker.stats.attack - _city_defense(city))
+    dmg_attacker = max(0, _city_defense(city) - attacker.stats.defense)
+    new_city_health = max(0, city.health - dmg_city)
+    new_attacker_health = attacker.health - dmg_attacker
+
+    new_units: list[Unit] = []
+    for unit in state.units:
+        if unit.id == attacker_id:
+            if new_attacker_health > 0:
+                new_units.append(
+                    replace(unit, health=new_attacker_health, moves_remaining=0)
+                )
+        else:
+            new_units.append(unit)
+
+    new_cities = tuple(
+        replace(c, health=new_city_health) if c.id == city_id else c
+        for c in state.cities
+    )
+    return replace(state, units=tuple(new_units), cities=new_cities)
 
 
 def attack(state: GameState, attacker_id: int, defender_id: int) -> GameState:
