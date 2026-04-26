@@ -5,6 +5,10 @@ Output layout:
 - <out_dir>/images/*.png
 - <out_dir>/metadata.jsonl
 - (optional) <out_dir>/metadata/*.json (trimmed sidecars)
+
+Expects minimal sidecars with fields like:
+  {"asset_family": "...", "id": "...", "image_path": "...", "positive_prompt": "..."}
+Generation prompts are read from ComfyUI-embedded PNG metadata (tEXt/zTXt/iTXt).
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_EXTRA_FIELDS = ["asset_family", "domain", "object_class"]
+DEFAULT_EXTRA_FIELDS = ["asset_family"]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_KEY_PROMPT = "prompt"
 
@@ -57,15 +61,6 @@ def resolve_image_path(metadata: dict, image_dir: Path) -> Path:
         if candidate.exists():
             return candidate
     return image_dir / "unknown.png"
-
-
-def pick_caption(metadata: dict) -> str:
-    # Prefer compact captions when available, then fallback to caption/prompt.
-    for key in ("lora_caption", "caption", "positive_prompt"):
-        value = metadata.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
 
 
 def _iter_chunks_tolerant(png_bytes: bytes) -> list[tuple[bytes, bytes]]:
@@ -177,11 +172,7 @@ def extract_positive_prompt_from_embedded_prompt(raw_prompt_field: str) -> str:
     return raw
 
 
-def resolve_generated_prompt_text(metadata: dict, image_path: Path) -> str:
-    meta_prompt = metadata.get("positive_prompt")
-    if isinstance(meta_prompt, str) and meta_prompt.strip():
-        return meta_prompt.strip()
-
+def resolve_generated_prompt_text(image_path: Path) -> str:
     png_fields = read_png_text_fields(image_path, {PNG_KEY_PROMPT})
     return extract_positive_prompt_from_embedded_prompt(png_fields.get(PNG_KEY_PROMPT, ""))
 
@@ -199,7 +190,6 @@ def link_or_copy(src: Path, dst: Path, mode: str) -> None:
             os.link(src, dst)
             return
         except OSError:
-            # Fallback to copy if hardlink is not possible (filesystem boundary, permissions, etc).
             pass
 
     shutil.copy2(src, dst)
@@ -237,12 +227,6 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated metadata fields to keep in metadata.jsonl in addition to id/file_name/text.",
     )
     parser.add_argument(
-        "--caption-source",
-        choices=["generated_prompt", "metadata_caption"],
-        default="generated_prompt",
-        help="Text source used for metadata `text` and image-sidecar `.txt` captions.",
-    )
-    parser.add_argument(
         "--linearize-ids",
         dest="linearize_ids",
         action="store_true",
@@ -271,6 +255,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Write minimal JSON sidecars to <out_dir>/metadata/.",
     )
+    parser.set_defaults(write_trimmed_sidecars=False)
     parser.add_argument(
         "--write-captions-txt",
         dest="write_captions_txt",
@@ -372,13 +357,10 @@ def main() -> int:
                     dst_image_path = out_images / out_image_name
                     link_or_copy(image_path, dst_image_path, args.link_mode)
 
-                    if args.caption_source == "generated_prompt":
-                        caption_text = resolve_generated_prompt_text(metadata, image_path)
-                        if not caption_text:
-                            caption_text = pick_caption(metadata)
-                            prompt_caption_fallbacks += 1
-                    else:
-                        caption_text = pick_caption(metadata)
+                    caption_text = resolve_generated_prompt_text(image_path)
+                    if not caption_text:
+                        caption_text = str(metadata.get("positive_prompt") or "").strip()
+                        prompt_caption_fallbacks += 1
 
                     row = {
                         "id": image_id,
@@ -390,11 +372,6 @@ def main() -> int:
                     for field in extra_fields:
                         if field in metadata:
                             row[field] = metadata[field]
-                            continue
-
-                        generation = metadata.get("generation", {})
-                        if isinstance(generation, dict) and field in generation:
-                            row[field] = generation[field]
 
                     metadata_jsonl.write(json.dumps(row, ensure_ascii=False) + "\n")
 
@@ -436,7 +413,6 @@ def main() -> int:
         "skipped_missing_images": skipped_missing_images,
         "captions_txt_written": captions_txt_written,
         "write_captions_txt": args.write_captions_txt,
-        "caption_source": args.caption_source,
         "linearize_ids": args.linearize_ids,
         "linear_id_width": args.linear_id_width,
         "include_source_id": args.include_source_id,

@@ -428,8 +428,6 @@ def build_rows_tiles(target_count: int, start_idx: int, tile_template: str):
             "palette": palette,
             "positive_prompt": prompt,
             "negative_prompt": "",
-            "pose_token": "<pose_overhead>",
-            "style_token": "<pixel_art_tile_seamless>"
         })
         idx += 1
     return rows, idx

@@ -1,6 +1,6 @@
-python3 source-data.py \
- --comfy-url http://localhost:9000 \
-  --workflow-api-json ../config/DATASET-WORKFLOW.json \
+python3 src/dataset_generator.py \
+  --comfy-url http://127.0.0.1:8188 \
+  --workflow-api-json ./config/DATASET-WORKFLOW.json \
   --limit 2000 \
   --prompt-node 100 \
   --guidance-node 101 \
@@ -8,7 +8,7 @@ python3 source-data.py \
   --guidance-min 15 \
   --guidance-max 60 \
   --guidance-decimals 3 \
-  --tile-workflow-api-json ../config/BG-TILE-WORKFLOW.json \
+  --tile-workflow-api-json ./config/BG-TILE-WORKFLOW.json \
   --prompt-pack ./dataset/prompts/generated_prompts.jsonl \
   --tile-prompt-node 100 \
   --tile-guidance-node 101 \
