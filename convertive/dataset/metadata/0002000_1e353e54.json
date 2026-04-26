@@ -1,0 +1,39 @@
+{
+  "id": "0002000_1e353e54",
+  "domain": "medieval_pixel_assets",
+  "asset_family": "structure",
+  "image_path": "generated/images/0002000_1e353e54.png",
+  "caption": "<sks> A medieval granary in a steampunk industrial expansion setting, featuring aged masonry seams and timber bracing, ritually maintained character, ornate detail, reinforced buttresses, dark wood beams with stone base, heavily used industrial wear, and desaturated retro palette",
+  "positive_prompt": "<sks> front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. A medieval granary in a steampunk industrial expansion setting, featuring aged masonry seams and timber bracing, ritually maintained character, ornate detail, reinforced buttresses, dark wood beams with stone base, heavily used industrial wear, and desaturated retro palette. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
+  "negative_prompt": "",
+  "generation": {
+    "comfy_prompt_id": "7341a97c-a316-43f4-8524-76b8c6715f98",
+    "client_id": "010df984-d1c3-4bf6-9d16-92be5a3c86ec",
+    "selected_workflow_api_json": "./DATASET-WORKFLOW.json",
+    "workflow_type": "primary",
+    "resolved_seed": 255808013,
+    "resolved_guidance": 29.377,
+    "guidance_source": "global",
+    "guidance_range_used": [
+      15.0,
+      60.0
+    ],
+    "overrides_applied": {
+      "100.text": {
+        "old": "",
+        "new": "<sks> front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. A medieval granary in a steampunk industrial expansion setting, featuring aged masonry seams and timber bracing, ritually maintained character, ornate detail, reinforced buttresses, dark wood beams with stone base, heavily used industrial wear, and desaturated retro palette. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects."
+      },
+      "70.seed": {
+        "old": 516438303470968,
+        "new": 255808013
+      },
+      "101.guidance": {
+        "old": 60,
+        "new": 29.377
+      }
+    }
+  },
+  "generation_object_type": "structure",
+  "lora_caption": "<sks> A medieval granary in a steampunk industrial expansion setting, featuring aged masonry seams and timber bracing, ritually maintained character, ornate detail, reinforced buttresses, dark wood beams with stone base, heavily used industrial wear, and desaturated retro palette",
+  "original_caption": "<sks> front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. A medieval granary in a steampunk industrial expansion setting, featuring aged masonry seams and timber bracing, ritually maintained character, ornate detail, reinforced buttresses, dark wood beams with stone base, heavily used industrial wear, and desaturated retro palette. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects. <pose_overhead> <pixel_art_medieval_arch>"
+}

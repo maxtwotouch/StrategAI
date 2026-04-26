@@ -1,0 +1,25 @@
+python3 source-data.py \
+ --comfy-url http://localhost:9000 \
+  --workflow-api-json ./DATASET-WORKFLOW.json \
+  --limit 2000 \
+  --prompt-node 100 \
+  --guidance-node 101 \
+  --guidance-randomize \
+  --guidance-min 15 \
+  --guidance-max 60 \
+  --guidance-decimals 3 \
+  --tile-workflow-api-json ./BG-TILE-WORKFLOW.json \
+  --prompt-pack ./dataset/prompts/medieval_prompt_pack.jsonl \
+  --tile-prompt-node 100 \
+  --tile-guidance-node 101 \
+  --guidance-key guidance \
+  --tile-guidance-key guidance \
+  --tile-guidance-min 1.0 \
+  --tile-guidance-max 2.5 \
+  --use-category-guidance-policy \
+  --nature-guidance-min 60.0 \
+  --nature-guidance-max 80.0 \
+  --override-seed-mode random \
+  --ksampler-node 70 \
+  --tile-ksampler-node 70 \
+  --start 2000 \
