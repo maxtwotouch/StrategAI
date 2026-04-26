@@ -7,7 +7,7 @@ import random
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import requests
 
 # ----------------------------
@@ -82,18 +82,69 @@ def save_json(path: Path, obj: Dict[str, Any]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
-def ensure_dirs(base_dir: Path):
-    dirs = {
-        "images": base_dir / "generated" / "images",
-        "metadata": base_dir / "generated" / "metadata",
-        "manifest": base_dir / "generated" / "dataset_manifest.jsonl",
-        "errors": base_dir / "generated" / "errors.jsonl",
-        "run_report": base_dir / "generated" / "run_report.json",
-    }
+def ensure_dirs(base_dir: Path, output_layout: str, hf_metadata_filename: str):
+    if output_layout == "huggingface":
+        dirs = {
+            "images": base_dir / "images",
+            "metadata": base_dir / "metadata",
+            "manifest": base_dir / "manifest_full.jsonl",
+            "errors": base_dir / "errors.jsonl",
+            "run_report": base_dir / "run_report.json",
+            "hf_metadata": base_dir / hf_metadata_filename,
+        }
+    else:
+        dirs = {
+            "images": base_dir / "generated" / "images",
+            "metadata": base_dir / "generated" / "metadata",
+            "manifest": base_dir / "generated" / "dataset_manifest.jsonl",
+            "errors": base_dir / "generated" / "errors.jsonl",
+            "run_report": base_dir / "generated" / "run_report.json",
+            "hf_metadata": base_dir / "generated" / hf_metadata_filename,
+        }
     dirs["images"].mkdir(parents=True, exist_ok=True)
     dirs["metadata"].mkdir(parents=True, exist_ok=True)
     dirs["manifest"].parent.mkdir(parents=True, exist_ok=True)
+    dirs["hf_metadata"].parent.mkdir(parents=True, exist_ok=True)
     return dirs
+
+
+def build_publishable_record(
+    row: Dict[str, Any],
+    image_id: str,
+    image_rel_path: str,
+    training_text: str,
+) -> Dict[str, Any]:
+    return {
+        "id": image_id,
+        "file_name": image_rel_path,
+        "text": training_text,
+        "asset_family": row.get("asset_family"),
+        "domain": row.get("domain", "medieval_pixel_assets"),
+        "object_class": row.get("object_class"),
+    }
+
+
+def build_short_training_text(row: Dict[str, Any]) -> str:
+    family = (row.get("asset_family") or "").lower()
+    obj = (row.get("object_class") or "asset").replace("_", " ").strip()
+
+    if family == "background_tile":
+        material = (row.get("material_profile") or obj or "ground").replace("_", " ").strip()
+        return f"seamless medieval {material} tile texture, pixel art"
+
+    theme = row.get("theme_mood") or row.get("palette") or "medieval"
+    if family == "nature_object":
+        return f"pixel art {obj}, top-down game asset, {theme}"
+    return f"pixel art {obj}, top-down game asset, {theme}"
+
+
+def resolve_training_text(row: Dict[str, Any], text_style: str) -> str:
+    if text_style == "positive_prompt":
+        return (row.get("positive_prompt") or "").strip()
+    if text_style == "build_caption":
+        return build_caption(row)
+    # short
+    return build_short_training_text(row)
 
 # ----------------------------
 # Workflow mutation helpers
@@ -130,7 +181,7 @@ def resolve_guidance_for_row(
     nature_max: float,
     use_category_policy: bool,
     decimals: int,
-) -> (float, str, List[float]):
+) -> Tuple[float, str, List[float]]:
     """
     Guidance routing priority:
       1) background_tile -> tile range
@@ -195,6 +246,34 @@ def parse_args():
     ap.add_argument("--shuffle", action="store_true")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--timeout-sec", type=int, default=900)
+    ap.add_argument(
+        "--output-layout",
+        choices=["generated", "huggingface"],
+        default="generated",
+        help="generated=<base>/generated/... (legacy), huggingface=<base>/images + metadata + metadata.jsonl",
+    )
+    ap.add_argument(
+        "--sidecar-profile",
+        choices=["full", "publishable"],
+        default="publishable",
+        help="Sidecar metadata format: full legacy record or a trimmed publishable record.",
+    )
+    ap.add_argument(
+        "--training-text-style",
+        choices=["short", "positive_prompt", "build_caption"],
+        default="short",
+        help="Controls `text` in publishable/HF metadata rows.",
+    )
+    ap.add_argument(
+        "--emit-hf-metadata",
+        action="store_true",
+        help="Also append Hugging Face imagefolder metadata rows (file_name/text) into JSONL.",
+    )
+    ap.add_argument(
+        "--hf-metadata-filename",
+        default="metadata.jsonl",
+        help="HF metadata JSONL filename under the selected output layout root.",
+    )
 
     return ap.parse_args()
 
@@ -214,7 +293,7 @@ def main():
     primary_workflow = load_json(Path(args.workflow_api_json))
     tile_workflow = load_json(Path(args.tile_workflow_api_json))
     rows = load_jsonl(Path(args.prompt_pack))
-    dirs = ensure_dirs(base_dir)
+    dirs = ensure_dirs(base_dir, args.output_layout, args.hf_metadata_filename)
 
     if args.shuffle:
         random.shuffle(rows)
@@ -307,7 +386,7 @@ def main():
                 set_node_input(workflow, guidance_node, guidance_key, resolved_guidance, applied)
 
             # Run workflow
-            prompt_id = api_post_prompt(args.comfy-url if False else args.comfy_url, workflow, client_id)
+            prompt_id = api_post_prompt(args.comfy_url, workflow, client_id)
             hist_item = wait_for_completion(args.comfy_url, prompt_id, timeout_sec=args.timeout_sec)
             images = extract_output_images(hist_item)
             if not images:
@@ -325,12 +404,17 @@ def main():
             with open(out_path, "wb") as f:
                 f.write(blob)
 
+            image_rel = str(out_path.relative_to(base_dir))
+            hf_file_name = str(out_path.relative_to(dirs["hf_metadata"].parent))
+            caption = build_caption(row)
+            training_text = resolve_training_text(row, args.training_text_style)
+
             record = {
                 "id": image_id,
                 "domain": row.get("domain", "medieval_pixel_assets"),
                 "asset_family": row.get("asset_family"),
-                "image_path": str(out_path.relative_to(base_dir)),
-                "caption": build_caption(row),
+                "image_path": image_rel,
+                "caption": caption,
                 "positive_prompt": row.get("positive_prompt"),
                 "negative_prompt": "",
                 "generation": {
@@ -338,17 +422,23 @@ def main():
                     "client_id": client_id,
                     "selected_workflow_api_json": selected_workflow_path,
                     "workflow_type": "tile" if tile_row else "primary",
-                    "resolved_seed": resolved_seed,
-                    "resolved_guidance": resolved_guidance,
-                    "guidance_source": guidance_source,          # global | background_tile | nature_object
-                    "guidance_range_used": guidance_range_used,  # [min,max]
                     "overrides_applied": applied
                 }
             }
 
+            publishable_record = build_publishable_record(
+                row=row,
+                image_id=image_id,
+                image_rel_path=hf_file_name,
+                training_text=training_text,
+            )
+
             sidecar = dirs["metadata"] / f"{image_id}.json"
-            save_json(sidecar, record)
-            append_jsonl(dirs["manifest"], record)
+            sidecar_payload = publishable_record if args.sidecar_profile == "publishable" else record
+            save_json(sidecar, sidecar_payload)
+            append_jsonl(dirs["manifest"], sidecar_payload)
+            if args.emit_hf_metadata:
+                append_jsonl(dirs["hf_metadata"], publishable_record)
             stats["success"] += 1
 
         except Exception as e:

@@ -47,7 +47,7 @@
   },
   "70": {
     "inputs": {
-      "seed": 779651635167511,
+      "seed": 516438303470968,
       "steps": 25,
       "cfg": 1,
       "sampler_name": "dpmpp_2m",
@@ -89,6 +89,19 @@
       "title": "Load LoRA"
     }
   },
+  "81": {
+    "inputs": {
+      "model_name": "isnet-general-use",
+      "image": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "Image Remove Background (rembg)",
+    "_meta": {
+      "title": "Image Remove Background (rembg)"
+    }
+  },
   "86": {
     "inputs": {
       "palette": "GAMEBOY",
@@ -112,7 +125,7 @@
       "cleanup_pixels_threshold": 0.02,
       "dither": "none",
       "images": [
-        "8",
+        "81",
         0
       ],
       "paletteList": [
@@ -130,7 +143,7 @@
       "colors": 16,
       "mode": "Chart",
       "image": [
-        "8",
+        "81",
         0
       ]
     },
@@ -139,11 +152,24 @@
       "title": "🎨PixelArt Palette Generator"
     }
   },
+  "90": {
+    "inputs": {
+      "model_name": "u2net",
+      "image": [
+        "86",
+        0
+      ]
+    },
+    "class_type": "Image Remove Background (rembg)",
+    "_meta": {
+      "title": "Image Remove Background (rembg)"
+    }
+  },
   "91": {
     "inputs": {
-      "filename_prefix": "BACKGROUND",
+      "filename_prefix": "DATASET_PIX_BG",
       "images": [
-        "86",
+        "90",
         0
       ]
     },
@@ -190,7 +216,7 @@
   },
   "101": {
     "inputs": {
-      "guidance": 40,
+      "guidance": 60,
       "conditioning": [
         "100",
         0

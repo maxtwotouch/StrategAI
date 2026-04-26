@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# generate_medieval_prompt_pack_flux2.py
+# generate_generated_prompts_flux2.py
 
 import argparse
 import json
@@ -7,26 +7,6 @@ import random
 import itertools
 from pathlib import Path
 from collections import defaultdict
-
-OBJECT_PROMPT_TEMPLATE = (
-    "<sks> front view overhead shot elevated shot medium shot. "
-    "The structure faces the camera straight from the front. "
-    "The structure should flow into any inserted background. "
-    "Isolate the object on a plain white background, only focusing on the specified object. "
-    "{PROMPT_HERE}. "
-    "Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. "
-    "Grounded, stable perspective, no floating objects."
-)
-
-TILE_PROMPT_TEMPLATE = (
-    "<sks> front view overhead shot elevated shot medium shot. "
-    "The entire image must be one single 16x16 pixel art tile that fully fills the frame with continuous texture. "
-    "No borders, no centered composition, no empty space. "
-    "Generate one cohesive tile that can be seamlessly repeated in all directions. "
-    "No disruptive features or objects touching the outermost pixel edges. "
-    "16x16 pixel art {material} texture with {texture_details}, no rocks or objects near the edges. "
-    "Crisp pixel edges, consistent top-down game tile style, perfect seamless tiling, simple and readable at small scale."
-)
 
 # ------------------------------------------------------------
 # STRUCTURES (updated with mystical/wizarding content)
@@ -61,8 +41,6 @@ STRUCTURE_TYPES = [
     "volcano caldera mining station",
     "steampunk workshop with brass piping",
     "gear-accented foundry hall",
-
-    # NEW mystical structures
     "wizarding tower",
     "arcane observatory tower",
     "rune-etched mage spire",
@@ -83,8 +61,8 @@ STRUCTURE_THEMES = [
     "post-siege reconstruction",
     "ashen volcanic frontier",
     "steampunk industrial expansion",
-    "mystical arcane enclave",  # NEW
-    "wizarding scholarly district",  # NEW
+    "mystical arcane enclave",
+    "wizarding scholarly district",
 ]
 
 THEME_MOTIFS = [
@@ -96,8 +74,8 @@ THEME_MOTIFS = [
     "ash dust buildup and heat-worn surfaces",
     "brass fittings and riveted mechanical accents",
     "aged masonry seams and timber bracing",
-    "glowing rune inlays and arcane sigils",   # NEW
-    "astronomical instruments and spellcraft details",  # NEW
+    "glowing rune inlays and arcane sigils", 
+    "astronomical instruments and spellcraft details",
 ]
 
 ARCHITECTURAL_PERSONALITY = [
@@ -107,7 +85,7 @@ ARCHITECTURAL_PERSONALITY = [
     "improvised frontier engineering",
     "ritually maintained",
     "industrially retrofitted",
-    "mystical but grounded",   # NEW
+    "mystical but grounded", 
 ]
 
 DETAIL_LEVELS = ["low detail", "medium detail", "high detail", "ornate detail"]
@@ -120,7 +98,7 @@ STRUCTURAL_COMPLEXITY = [
     "layered rooflines",
     "asymmetrical annexes",
     "industrial annex modules",
-    "vertical spire layering",  # NEW (for wizard towers)
+    "vertical spire layering",
 ]
 
 MATERIALS_STRUCTURE = [
@@ -132,7 +110,7 @@ MATERIALS_STRUCTURE = [
     "iron braces and chain supports",
     "brass and iron mechanical accents",
     "volcanic basalt stone and reinforced timber",
-    "rune-carved stone and reinforced masonry",  # NEW
+    "rune-carved stone and reinforced masonry",
 ]
 
 CONDITIONS_STRUCTURE = [
@@ -142,7 +120,7 @@ CONDITIONS_STRUCTURE = [
     "partially ruined",
     "heavily used industrial wear",
     "heat-scorched but operational",
-    "well-kept arcane condition",  # NEW
+    "well-kept arcane condition",
 ]
 
 PALETTES_STRUCTURE = [
@@ -153,7 +131,7 @@ PALETTES_STRUCTURE = [
     "high contrast retro palette",
     "smoky sepia palette",
     "ash-and-ember palette",
-    "mystic violet-cyan palette",  # NEW
+    "mystic violet-cyan palette",
 ]
 
 # ------------------------------------------------------------
@@ -175,8 +153,6 @@ NATURE_OBJECTS = [
     "rounded ridge hill",
     "volcanic rock spire",
     "charred stump cluster",
-
-    # NEW wheat/farming nature objects
     "wheat field patch",
     "harvest-ready wheat field",
     "wind-swept wheat cluster",
@@ -189,7 +165,7 @@ NATURE_DRAMA = [
     "battle-scarred surface forms",
     "volcanic weathering and fracture lines",
     "ominous high-contrast shape breakup",
-    "wind-rippled crop flow",  # NEW (for wheat)
+    "wind-rippled crop flow",
 ]
 
 NATURE_COMPLEXITY = [
@@ -206,7 +182,7 @@ MATERIALS_NATURE = [
     "mossy stone texture",
     "packed earth and dry grass",
     "volcanic basalt texture",
-    "golden wheat stalk texture",  # NEW
+    "golden wheat stalk texture",
 ]
 
 CONDITIONS_NATURE = [
@@ -215,7 +191,7 @@ CONDITIONS_NATURE = [
     "overgrown",
     "storm-worn",
     "heat-scorched",
-    "harvest-ready condition",  # NEW
+    "harvest-ready condition",
 ]
 
 PALETTES_NATURE = [
@@ -225,7 +201,7 @@ PALETTES_NATURE = [
     "high contrast retro palette",
     "storm-muted palette",
     "ash-and-ember palette",
-    "golden harvest palette",  # NEW
+    "golden harvest palette",
 ]
 
 HILL_TOP_SHAPES = ["wide flat top", "broad rounded top", "wide plateau top"]
@@ -258,17 +234,49 @@ TILE_VARIANTS = [
     ("shallow water", "soft ripple bands, gentle wave noise, restrained highlights, faint dithering"),
     ("water", "calm surface texture, micro-ripple variation, smooth tonal transitions, subtle dithering"),
     ("deep water", "darker pooled texture, low-frequency ripple noise, controlled highlight specks, faint dithering"),
-    ("wheat-ground", "dry straw flecks, golden grain noise, subtle directional variation, faint dithering"),  # NEW thematic tile
+    ("wheat-ground", "dry straw flecks, golden grain noise, subtle directional variation, faint dithering"),
 ]
 
 # ------------------------------------------------------------
 # Prompt composition
 # ------------------------------------------------------------
-def make_object_prompt(story_text: str) -> str:
-    return OBJECT_PROMPT_TEMPLATE.replace("{PROMPT_HERE}", story_text)
+def make_object_prompt_from_template(story_text: str, object_template: str) -> str:
+    return object_template.replace("{PROMPT_HERE}", story_text)
 
-def make_tile_prompt(material: str, texture_details: str) -> str:
-    return TILE_PROMPT_TEMPLATE.format(material=material, texture_details=texture_details)
+def make_tile_prompt_from_template(material: str, texture_details: str, tile_template: str) -> str:
+    return tile_template.format(material=material, texture_details=texture_details)
+
+
+def load_prompt_templates(path: Path) -> tuple[str, str]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    templates = data.get("templates", {})
+    required_placeholders = data.get("required_placeholders", {})
+    if not isinstance(templates, dict):
+        raise ValueError("Invalid templates JSON: `templates` must be an object")
+    if required_placeholders and not isinstance(required_placeholders, dict):
+        raise ValueError("Invalid templates JSON: `required_placeholders` must be an object when provided")
+
+    object_template = templates.get("structure")
+    tile_template = templates.get("background_tile")
+    if not isinstance(object_template, str) or not object_template.strip():
+        raise ValueError("Invalid templates JSON: `templates.structure` must be a non-empty string")
+    if not isinstance(tile_template, str) or not tile_template.strip():
+        raise ValueError("Invalid templates JSON: `templates.background_tile` must be a non-empty string")
+
+    if "{PROMPT_HERE}" not in object_template:
+        raise ValueError("`templates.structure` must contain {PROMPT_HERE}")
+    if "{material}" not in tile_template or "{texture_details}" not in tile_template:
+        raise ValueError("`templates.background_tile` must contain {material} and {texture_details}")
+
+    if required_placeholders:
+        structure_required = required_placeholders.get("structure", [])
+        tile_required = required_placeholders.get("background_tile", [])
+        if any(token not in object_template for token in structure_required):
+            raise ValueError("`templates.structure` is missing one or more required placeholders")
+        if any(token not in tile_template for token in tile_required):
+            raise ValueError("`templates.background_tile` is missing one or more required placeholders")
+
+    return object_template, tile_template
 
 def structure_story(structure, theme, motif, personality, detail, complexity, material, condition, palette):
     return (
@@ -318,8 +326,10 @@ def ratio_to_counts(total_target: int, ratios: dict) -> dict:
 # ------------------------------------------------------------
 # Row builders
 # ------------------------------------------------------------
-def build_rows_structures(target_count: int, start_idx: int):
+def build_rows_structures(target_count: int, start_idx: int, object_template: str):
     rows, idx = [], start_idx
+    if target_count <= 0:
+        return rows, idx
     combos = list(itertools.product(
         STRUCTURE_TYPES, STRUCTURE_THEMES, THEME_MOTIFS, ARCHITECTURAL_PERSONALITY,
         DETAIL_LEVELS, STRUCTURAL_COMPLEXITY, MATERIALS_STRUCTURE, CONDITIONS_STRUCTURE, PALETTES_STRUCTURE
@@ -331,8 +341,9 @@ def build_rows_structures(target_count: int, start_idx: int):
         c = combos[ptr % len(combos)]
         ptr += 1
         structure, theme, motif, personality, detail, complexity, material, condition, palette = c
-        prompt = make_object_prompt(
-            structure_story(structure, theme, motif, personality, detail, complexity, material, condition, palette)
+        prompt = make_object_prompt_from_template(
+            structure_story(structure, theme, motif, personality, detail, complexity, material, condition, palette),
+            object_template,
         )
         rows.append({
             "id": f"mdv_{idx:07d}",
@@ -355,8 +366,10 @@ def build_rows_structures(target_count: int, start_idx: int):
         idx += 1
     return rows, idx
 
-def build_rows_nature(target_count: int, start_idx: int):
+def build_rows_nature(target_count: int, start_idx: int, object_template: str):
     rows, idx = [], start_idx
+    if target_count <= 0:
+        return rows, idx
     combos = list(itertools.product(
         NATURE_OBJECTS, NATURE_DRAMA, DETAIL_LEVELS, NATURE_COMPLEXITY,
         MATERIALS_NATURE, CONDITIONS_NATURE, PALETTES_NATURE
@@ -368,7 +381,10 @@ def build_rows_nature(target_count: int, start_idx: int):
         c = combos[ptr % len(combos)]
         ptr += 1
         obj, drama, detail, complexity, material, condition, palette = c
-        prompt = make_object_prompt(nature_story(obj, drama, detail, complexity, material, condition, palette))
+        prompt = make_object_prompt_from_template(
+            nature_story(obj, drama, detail, complexity, material, condition, palette),
+            object_template,
+        )
         rows.append({
             "id": f"mdv_{idx:07d}",
             "domain": "medieval_pixel_assets",
@@ -388,8 +404,10 @@ def build_rows_nature(target_count: int, start_idx: int):
         idx += 1
     return rows, idx
 
-def build_rows_tiles(target_count: int, start_idx: int):
+def build_rows_tiles(target_count: int, start_idx: int, tile_template: str):
     rows, idx = [], start_idx
+    if target_count <= 0:
+        return rows, idx
     combos = list(itertools.product(TILE_VARIANTS, PALETTES_NATURE))
     random.shuffle(combos)
 
@@ -397,7 +415,7 @@ def build_rows_tiles(target_count: int, start_idx: int):
     for _ in range(target_count):
         (material, texture_details), palette = combos[ptr % len(combos)]
         ptr += 1
-        prompt = make_tile_prompt(material, texture_details)
+        prompt = make_tile_prompt_from_template(material, texture_details, tile_template)
         rows.append({
             "id": f"mdv_{idx:07d}",
             "domain": "medieval_pixel_assets",
@@ -427,6 +445,12 @@ def parse_args():
     ap.add_argument("--ratio-structures", type=float, default=0.54)
     ap.add_argument("--ratio-nature", type=float, default=0.28)
     ap.add_argument("--ratio-tiles", type=float, default=0.18)
+    ap.add_argument(
+        "--templates-json",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent / "config" / "prompt_templates.json",
+        help="Path to JSON file containing structure/background tile prompt templates.",
+    )
     return ap.parse_args()
 
 def main():
@@ -434,6 +458,8 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     random.seed(args.seed)
+    templates_json_path = args.templates_json.resolve()
+    object_template, tile_template = load_prompt_templates(templates_json_path)
 
     ratios = {
         "structure": args.ratio_structures,
@@ -445,9 +471,9 @@ def main():
     all_rows = []
     cursor = 0
 
-    rs, cursor = build_rows_structures(counts["structure"], cursor)
-    rn, cursor = build_rows_nature(counts["nature_object"], cursor)
-    rt, cursor = build_rows_tiles(counts["background_tile"], cursor)
+    rs, cursor = build_rows_structures(counts["structure"], cursor, object_template)
+    rn, cursor = build_rows_nature(counts["nature_object"], cursor, object_template)
+    rt, cursor = build_rows_tiles(counts["background_tile"], cursor, tile_template)
 
     all_rows.extend(rs)
     all_rows.extend(rn)
@@ -456,7 +482,7 @@ def main():
     random.shuffle(all_rows)
     all_rows = all_rows[:args.total_target]
 
-    out_jsonl = out_dir / "medieval_prompt_pack.jsonl"
+    out_jsonl = out_dir / "generated_prompts.jsonl"
     with open(out_jsonl, "w", encoding="utf-8") as f:
         for r in all_rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -473,6 +499,7 @@ def main():
         "total_prompts": len(all_rows),
         "input_ratios": ratios,
         "normalized_targets": counts,
+        "templates_json": str(templates_json_path),
         "added_features": {
             "mystical_structures": [
                 "wizarding tower",
@@ -491,7 +518,7 @@ def main():
         "distribution": summary
     }
 
-    summary_path = out_dir / "medieval_prompt_pack_summary.json"
+    summary_path = out_dir / "generated_prompts_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_payload, f, indent=2, ensure_ascii=False)
 
