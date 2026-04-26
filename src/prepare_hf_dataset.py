@@ -22,6 +22,10 @@ import zlib
 from pathlib import Path
 from typing import Iterable
 
+from PIL import Image
+from PIL import ImageFile
+
+ImageFile.LOAD_TRUNCATED_IMAGES = False
 
 DEFAULT_EXTRA_FIELDS = ["asset_family"]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -177,6 +181,18 @@ def resolve_generated_prompt_text(image_path: Path) -> str:
     return extract_positive_prompt_from_embedded_prompt(png_fields.get(PNG_KEY_PROMPT, ""))
 
 
+def normalize_image(image_path: Path, dst_path: Path) -> None:
+    """Convert RGBA->RGB and ensure consistent format for training compatibility."""
+    img = Image.open(image_path)
+    if img.mode == "RGBA":
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[3])
+        img = background
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+    img.save(dst_path, "PNG")
+
+
 def link_or_copy(src: Path, dst: Path, mode: str) -> None:
     if dst.exists():
         dst.unlink()
@@ -275,6 +291,19 @@ def parse_args() -> argparse.Namespace:
         help="Fail immediately on missing/corrupt rows. Default behavior skips bad rows and reports them.",
     )
     parser.add_argument(
+        "--normalize-images",
+        dest="normalize_images",
+        action="store_true",
+        default=True,
+        help="Convert RGBA→RGB and standardize format for training (default: enabled).",
+    )
+    parser.add_argument(
+        "--no-normalize-images",
+        dest="normalize_images",
+        action="store_false",
+        help="Skip image normalization and use raw copy/link.",
+    )
+    parser.add_argument(
         "--fail-on-missing-image",
         action="store_true",
         help="Treat missing image files as hard errors instead of intentional skips.",
@@ -351,11 +380,15 @@ def main() -> int:
                         root_skipped += 1
                         errors.append({"file": str(meta_path), "error": message})
                         continue
-                    seen_ids.add(image_id)
 
                     out_image_name = f"{image_id}.png"
                     dst_image_path = out_images / out_image_name
-                    link_or_copy(image_path, dst_image_path, args.link_mode)
+                    if args.normalize_images:
+                        normalize_image(image_path, dst_image_path)
+                    else:
+                        link_or_copy(image_path, dst_image_path, args.link_mode)
+
+                    seen_ids.add(image_id)
 
                     caption_text = resolve_generated_prompt_text(image_path)
                     if not caption_text:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# generate_generated_prompts_flux2.py
+# prompt_generator.py
 
 import argparse
 import json
@@ -360,8 +360,6 @@ def build_rows_structures(target_count: int, start_idx: int, object_template: st
             "palette": palette,
             "positive_prompt": prompt,
             "negative_prompt": "",
-            "pose_token": "<pose_overhead>",
-            "style_token": "<pixel_art_medieval_arch>"
         })
         idx += 1
     return rows, idx
@@ -398,8 +396,6 @@ def build_rows_nature(target_count: int, start_idx: int, object_template: str):
             "palette": palette,
             "positive_prompt": prompt,
             "negative_prompt": "",
-            "pose_token": "<pose_overhead>",
-            "style_token": "<pixel_art_medieval_arch>"
         })
         idx += 1
     return rows, idx
@@ -436,7 +432,7 @@ def build_rows_tiles(target_count: int, start_idx: int, tile_template: str):
 # Main
 # ------------------------------------------------------------
 def parse_args():
-    ap = argparse.ArgumentParser(description="Generate medieval FLUX prompt pack with mystical structures + wheat assets")
+    ap = argparse.ArgumentParser(description="Generate medieval FLUX prompt data with mystical structures + wheat assets")
     ap.add_argument("--out-dir", default="./dataset/prompts")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--total-target", type=int, default=28000)

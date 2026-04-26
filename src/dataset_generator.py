@@ -186,7 +186,7 @@ def parse_args():
 
     ap.add_argument("--comfy-url", default="http://127.0.0.1:8188")
     ap.add_argument("--base-dir", default="./dataset")
-    ap.add_argument("--prompt-data", default="./dataset/prompts/generated_prompts.jsonl")
+    ap.add_argument("--prompt-data", dest="prompt_data", default="./dataset/prompts/generated_prompts.jsonl")
 
     # Separate workflows
     ap.add_argument("--workflow-api-json", required=True, help="Primary workflow for non-tile assets")
