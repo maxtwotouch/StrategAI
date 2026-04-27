@@ -28,6 +28,9 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = False
 
 DEFAULT_EXTRA_FIELDS = ["asset_family"]
+CAPTION_STRIP_PREFIXES = [
+    "<sks> front view overhead shot elevated shot medium shot.",
+]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_KEY_PROMPT = "prompt"
 
@@ -217,6 +220,23 @@ def parse_extra_fields(extra_fields_raw: str) -> list[str]:
     return [field.strip() for field in extra_fields_raw.split(",") if field.strip()]
 
 
+def strip_caption_prefixes(text: str, prefixes: list[str]) -> str:
+    """Remove known prompt-only boilerplate prefixes from training captions."""
+    caption = (text or "").strip()
+    if not caption:
+        return ""
+
+    lowered = caption.lower()
+    for prefix in prefixes:
+        prefix_clean = (prefix or "").strip()
+        if not prefix_clean:
+            continue
+        if lowered.startswith(prefix_clean.lower()):
+            caption = caption[len(prefix_clean) :].lstrip(" .\t\n\r")
+            break
+    return caption
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build a Hugging Face imagefolder-ready dataset export.")
     parser.add_argument(
@@ -313,6 +333,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fail when duplicate ids would overwrite files in output/images.",
     )
+    parser.add_argument(
+        "--strip-caption-prefixes",
+        dest="strip_caption_prefixes",
+        action="store_true",
+        default=True,
+        help="Strip known prompt-only boilerplate prefixes from captions (default: enabled).",
+    )
+    parser.add_argument(
+        "--no-strip-caption-prefixes",
+        dest="strip_caption_prefixes",
+        action="store_false",
+        help="Disable caption prefix stripping.",
+    )
     return parser.parse_args()
 
 
@@ -394,6 +427,8 @@ def main() -> int:
                     if not caption_text:
                         caption_text = str(metadata.get("positive_prompt") or "").strip()
                         prompt_caption_fallbacks += 1
+                    if args.strip_caption_prefixes:
+                        caption_text = strip_caption_prefixes(caption_text, CAPTION_STRIP_PREFIXES)
 
                     row = {
                         "id": image_id,
@@ -449,6 +484,7 @@ def main() -> int:
         "linearize_ids": args.linearize_ids,
         "linear_id_width": args.linear_id_width,
         "include_source_id": args.include_source_id,
+        "strip_caption_prefixes": args.strip_caption_prefixes,
         "prompt_caption_fallbacks": prompt_caption_fallbacks,
         "per_root": per_root,
         "errors": len(errors),
