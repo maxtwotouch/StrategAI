@@ -182,11 +182,11 @@ def resolve_guidance_for_row(
 # Main
 # ----------------------------
 def parse_args():
-    ap = argparse.ArgumentParser(description="Generate FLUX dataset via ComfyUI with category-specific guidance ranges")
+    ap = argparse.ArgumentParser(description="Generate FLUX raw-dataset via ComfyUI with category-specific guidance ranges")
 
     ap.add_argument("--comfy-url", default="http://127.0.0.1:8188")
-    ap.add_argument("--base-dir", default="./dataset")
-    ap.add_argument("--prompt-data", dest="prompt_data", default="./dataset/prompts/generated_prompts.jsonl")
+    ap.add_argument("--base-dir", default="./raw-dataset")
+    ap.add_argument("--prompt-data", dest="prompt_data", default="./raw-dataset/prompts/generated_prompts.jsonl")
 
     # Separate workflows
     ap.add_argument("--workflow-api-json", required=True, help="Primary workflow for non-tile assets")

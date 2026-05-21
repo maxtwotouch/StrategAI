@@ -63,7 +63,7 @@ dimtoneff/ComfyUI-PixelArt-Detector
 
 ```bash
 python3 src/prompt_generator.py \
-  --out-dir ./dataset/prompts \
+  --out-dir ./raw-dataset/prompts \
   --templates-json ./config/prompt_templates.json
 ```
 
@@ -72,8 +72,8 @@ python3 src/prompt_generator.py \
 ```bash
 python3 src/dataset_generator.py \
   --comfy-url http://127.0.0.1:8188 \
-  --base-dir ./dataset \
-  --prompt-data ./dataset/prompts/generated_prompts.jsonl \
+  --base-dir ./raw-dataset \
+  --prompt-data ./raw-dataset/prompts/generated_prompts.jsonl \
   --workflow-api-json ./config/structure_workflow.json \
   --tile-workflow-api-json ./config/background_tile_workflow.json \
   --prompt-node 100 \
@@ -95,8 +95,8 @@ Delete bad PNGs from `dataset/generated/images/` by visual review. `prepare_hf_d
 
 ```bash
 python3 src/prepare_hf_dataset.py \
-  ./dataset \
-  --out-dir ./dataset/hf_ready \
+  ./raw-dataset \
+  --out-dir ./raw-dataset/hf_ready \
   --link-mode hardlink \
   --write-trimmed-sidecars
 ```
@@ -112,7 +112,7 @@ Output:
 ### 4) Validate export before publish
 
 ```bash
-python3 src/validate_hf_export.py ./dataset/hf_ready
+python3 src/validate_hf_export.py ./raw-dataset/hf_ready
 ```
 
 By default, this writes:
@@ -123,9 +123,9 @@ By default, this writes:
 Useful strict modes:
 
 ```bash
-python3 src/validate_hf_export.py ./dataset/hf_ready --require-caption-txt
-python3 src/validate_hf_export.py ./dataset/hf_ready --require-caption-txt --fail-on-warnings
-python3 src/validate_hf_export.py ./dataset/hf_ready --skip-orphan-check
+python3 src/validate_hf_export.py ./raw-dataset/hf_ready --require-caption-txt
+python3 src/validate_hf_export.py ./raw-dataset/hf_ready --require-caption-txt --fail-on-warnings
+python3 src/validate_hf_export.py ./raw-dataset/hf_ready --skip-orphan-check
 ```
 
 ## Metadata Contracts
@@ -164,10 +164,10 @@ Rows include:
 ## Frequently Used Export Flags
 
 ```bash
-python3 src/prepare_hf_dataset.py ./dataset --out-dir ./dataset/hf_ready --fail-on-missing-image
-python3 src/prepare_hf_dataset.py ./dataset --out-dir ./dataset/hf_ready --fail-on-duplicate-id
-python3 src/prepare_hf_dataset.py ./dataset --out-dir ./dataset/hf_ready --skip-captions-txt
-python3 src/prepare_hf_dataset.py ./dataset --out-dir ./dataset/hf_ready --keep-source-ids
+python3 src/prepare_hf_dataset.py ./raw-dataset --out-dir ./raw-dataset/hf_ready --fail-on-missing-image
+python3 src/prepare_hf_dataset.py ./raw-dataset --out-dir ./raw-dataset/hf_ready --fail-on-duplicate-id
+python3 src/prepare_hf_dataset.py ./raw-dataset --out-dir ./raw-dataset/hf_ready --skip-captions-txt
+python3 src/prepare_hf_dataset.py ./raw-dataset --out-dir ./raw-dataset/hf_ready --keep-source-ids
 ```
 
 ## License

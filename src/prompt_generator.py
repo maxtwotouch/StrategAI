@@ -433,7 +433,7 @@ def build_rows_tiles(target_count: int, start_idx: int, tile_template: str):
 # ------------------------------------------------------------
 def parse_args():
     ap = argparse.ArgumentParser(description="Generate medieval FLUX prompt data with mystical structures + wheat assets")
-    ap.add_argument("--out-dir", default="./dataset/prompts")
+    ap.add_argument("--out-dir", default="./raw-dataset/prompts")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--total-target", type=int, default=28000)
     ap.add_argument("--ratio-structures", type=float, default=0.54)

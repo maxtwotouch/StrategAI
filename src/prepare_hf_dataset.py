@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a PNG + JSON sidecar dataset for Hugging Face imagefolder publishing.
+"""Prepare a PNG + JSON sidecar raw-dataset for Hugging Face imagefolder publishing.
 
 Output layout:
 - <out_dir>/images/*.png
@@ -238,12 +238,12 @@ def strip_caption_prefixes(text: str, prefixes: list[str]) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a Hugging Face imagefolder-ready dataset export.")
+    parser = argparse.ArgumentParser(description="Build a Hugging Face imagefolder-ready raw-dataset export.")
     parser.add_argument(
         "dataset_roots",
         nargs="+",
         type=Path,
-        help="One or more source dataset roots (processed in the order provided).",
+        help="One or more source raw-dataset roots (processed in the order provided).",
     )
     parser.add_argument(
         "--out-dir",
@@ -353,7 +353,7 @@ def main() -> int:
     args = parse_args()
     dataset_roots = [root.resolve() for root in args.dataset_roots]
     if len(dataset_roots) > 1 and args.out_dir is None:
-        raise ValueError("--out-dir is required when merging multiple dataset roots")
+        raise ValueError("--out-dir is required when merging multiple raw-dataset roots")
 
     base_root = dataset_roots[0]
     out_dir = (args.out_dir.resolve() if args.out_dir else (base_root / "hf_ready").resolve())
