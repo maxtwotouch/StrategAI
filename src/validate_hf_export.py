@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Validate a Hugging Face-ready raw-dataset export.
+"""Validate a Hugging Face-ready dataset export for publishing and fine-tuning.
 
-This script validates `prepare_hf_dataset.py` outputs under an `hf_ready` directory.
+This script validates `prepare_hf_dataset.py` outputs under a `v2` directory.
 It is designed for local QA and CI use with deterministic reports and exit codes.
 
 Expected layout:
@@ -66,12 +66,12 @@ class ValidationConfig:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate a prepared Hugging Face raw-dataset export for publishing and fine-tuning.",
+        description="Validate a prepared dataset export for publishing and fine-tuning.",
     )
     parser.add_argument(
         "hf_dir",
         type=Path,
-        help="Path to the prepared raw-dataset root (typically ./raw-dataset/hf_ready).",
+        help="Path to the prepared dataset root (typically ./dataset/v2).",
     )
     parser.add_argument(
         "--report-path",

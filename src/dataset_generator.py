@@ -125,11 +125,11 @@ def ensure_dirs(base_dir: Path, output_layout: str):
         }
     else:
         dirs = {
-            "images": base_dir / "generated" / "images",
-            "metadata": base_dir / "generated" / "metadata",
-            "manifest": base_dir / "generated" / "dataset_manifest.jsonl",
-            "errors": base_dir / "generated" / "errors.jsonl",
-            "run_report": base_dir / "generated" / "run_report.json",
+            "images": base_dir / "v1" / "images",
+            "metadata": base_dir / "v1" / "metadata",
+            "manifest": base_dir / "v1" / "dataset_manifest.jsonl",
+            "errors": base_dir / "v1" / "errors.jsonl",
+            "run_report": base_dir / "v1" / "run_report.json",
         }
     dirs["images"].mkdir(parents=True, exist_ok=True)
     dirs["metadata"].mkdir(parents=True, exist_ok=True)
@@ -182,11 +182,11 @@ def resolve_guidance_for_row(
 # Main
 # ----------------------------
 def parse_args():
-    ap = argparse.ArgumentParser(description="Generate FLUX raw-dataset via ComfyUI with category-specific guidance ranges")
+    ap = argparse.ArgumentParser(description="Generate FLUX dataset via ComfyUI with category-specific guidance ranges")
 
     ap.add_argument("--comfy-url", default="http://127.0.0.1:8188")
-    ap.add_argument("--base-dir", default="./raw-dataset")
-    ap.add_argument("--prompt-data", dest="prompt_data", default="./raw-dataset/prompts/generated_prompts.jsonl")
+    ap.add_argument("--base-dir", default="./dataset")
+    ap.add_argument("--prompt-data", dest="prompt_data", default="./dataset/prompts/generated_prompts.jsonl")
 
     # Separate workflows
     ap.add_argument("--workflow-api-json", required=True, help="Primary workflow for non-tile assets")
@@ -255,7 +255,7 @@ def main():
     base_dir = Path(args.base_dir)
     primary_workflow = load_json(Path(args.workflow_api_json))
     tile_workflow = load_json(Path(args.tile_workflow_api_json))
-    rows = load_jsonl(Path(args.prompt_pack))
+    rows = load_jsonl(Path(args.prompt_data))
     dirs = ensure_dirs(base_dir, args.output_layout)
 
     if args.shuffle:
@@ -397,4 +397,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -220,9 +220,13 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Dataset outputs (temporary generated assets and HF-ready exports)
-# Only source code/config should be in GitHub; HF-ready data lives in the Hugging Face raw-dataset repo.
-raw-dataset/generated/
-raw-dataset/hf_ready/
+# Only source code/config should be in GitHub; HF-ready data lives in the Hugging Face dataset repo.
+dataset/v1/images/
+dataset/v1/metadata/
+dataset/v1/dataset_manifest.jsonl
+dataset/v1/run_report.json
+dataset/v1/errors.jsonl
+dataset/v2/
 # Prompt outputs are generated from templates and can be regenerated
 dataset/prompts/*.jsonl
 dataset/prompts/*.json

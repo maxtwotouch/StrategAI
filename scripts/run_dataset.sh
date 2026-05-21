@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 python3 src/dataset_generator.py \
   --comfy-url http://127.0.0.1:8188 \
   --base-dir ./dataset \
