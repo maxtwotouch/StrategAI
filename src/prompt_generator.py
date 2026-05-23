@@ -4,12 +4,11 @@
 import argparse
 import json
 import random
-import itertools
 from pathlib import Path
 from collections import defaultdict
 
 # ------------------------------------------------------------
-# STRUCTURES (updated with mystical/wizarding content)
+# STRUCTURES
 # ------------------------------------------------------------
 STRUCTURE_TYPES = [
     "timber-framed cottage",
@@ -74,7 +73,7 @@ THEME_MOTIFS = [
     "ash dust buildup and heat-worn surfaces",
     "brass fittings and riveted mechanical accents",
     "aged masonry seams and timber bracing",
-    "glowing rune inlays and arcane sigils", 
+    "glowing rune inlays and arcane sigils",
     "astronomical instruments and spellcraft details",
 ]
 
@@ -85,7 +84,7 @@ ARCHITECTURAL_PERSONALITY = [
     "improvised frontier engineering",
     "ritually maintained",
     "industrially retrofitted",
-    "mystical but grounded", 
+    "mystical but grounded",
 ]
 
 DETAIL_LEVELS = ["low detail", "medium detail", "high detail", "ornate detail"]
@@ -135,9 +134,9 @@ PALETTES_STRUCTURE = [
 ]
 
 # ------------------------------------------------------------
-# NATURE OBJECTS (updated with wheat fields)
+# OBJECTS (trees, boulders, wheat, stumps, reeds, brambles, volcanic spires)
 # ------------------------------------------------------------
-NATURE_OBJECTS = [
+OBJECT_TYPES = [
     "ancient oak tree",
     "windswept pine tree",
     "lightning-scarred dead tree",
@@ -148,9 +147,6 @@ NATURE_OBJECTS = [
     "broken rock cluster",
     "reeds cluster",
     "grass tuft cluster",
-    "large hill",
-    "broad plateau hill",
-    "rounded ridge hill",
     "volcanic rock spire",
     "charred stump cluster",
     "wheat field patch",
@@ -158,7 +154,7 @@ NATURE_OBJECTS = [
     "wind-swept wheat cluster",
 ]
 
-NATURE_DRAMA = [
+OBJECT_DRAMA = [
     "storm-battered silhouette",
     "wind-carved shape language",
     "ancient growth with twisted massing",
@@ -168,14 +164,14 @@ NATURE_DRAMA = [
     "wind-rippled crop flow",
 ]
 
-NATURE_COMPLEXITY = [
+OBJECT_COMPLEXITY = [
     "simple silhouette",
     "layered silhouette",
     "dense readable forms",
     "weathered rough form",
 ]
 
-MATERIALS_NATURE = [
+MATERIALS_OBJECT = [
     "lush foliage and bark",
     "dark evergreen foliage",
     "dry bark and sparse foliage",
@@ -185,7 +181,7 @@ MATERIALS_NATURE = [
     "golden wheat stalk texture",
 ]
 
-CONDITIONS_NATURE = [
+CONDITIONS_OBJECT = [
     "healthy growth",
     "weathered growth",
     "overgrown",
@@ -194,7 +190,7 @@ CONDITIONS_NATURE = [
     "harvest-ready condition",
 ]
 
-PALETTES_NATURE = [
+PALETTES_OBJECT = [
     "earthy palette",
     "cool medieval palette",
     "desaturated retro palette",
@@ -204,19 +200,49 @@ PALETTES_NATURE = [
     "golden harvest palette",
 ]
 
-HILL_TOP_SHAPES = ["wide flat top", "broad rounded top", "wide plateau top"]
-HILL_SIDE_SMOOTHNESS = ["soft smooth side slopes", "medium smooth side slopes", "controlled semi-sharp side slopes"]
-HILL_SEAM_INTEGRITY = [
+# ------------------------------------------------------------
+# TERRAIN (hills/plateaus — always wide flat top)
+# ------------------------------------------------------------
+TERRAIN_TYPES = [
+    "large hill",
+    "broad plateau hill",
+    "rounded ridge hill",
+]
+
+TERRAIN_SIDE_SMOOTHNESS = [
+    "soft smooth side slopes",
+    "medium smooth side slopes",
+    "controlled semi-sharp side slopes",
+]
+
+TERRAIN_SEAM_INTEGRITY = [
     "slope mass tapers cleanly before tile boundaries",
     "side slopes preserve edge readability near tile seams",
     "outer silhouette avoids seam collisions and edge tangents",
     "base footprint remains map-placeable without seam artifacts",
 ]
 
-NATURE_TILE_COMPAT_CLAUSE = (
-    "Composed as a clean game asset silhouette with tile-grid aware proportions, "
-    "readable placement footprint, and seam-safe outer contour for top-down RPG maps."
-)
+MATERIALS_TERRAIN = [
+    "packed earth and dry grass",
+    "mossy stone texture",
+    "volcanic basalt texture",
+    "lush foliage and bark",
+]
+
+CONDITIONS_TERRAIN = [
+    "weathered growth",
+    "healthy growth",
+    "overgrown",
+    "storm-worn",
+]
+
+PALETTES_TERRAIN = [
+    "earthy palette",
+    "cool medieval palette",
+    "desaturated retro palette",
+    "high contrast retro palette",
+    "storm-muted palette",
+]
 
 # ------------------------------------------------------------
 # BACKGROUND TILE VARIANTS
@@ -237,68 +263,94 @@ TILE_VARIANTS = [
     ("wheat-ground", "dry straw flecks, golden grain noise, subtle directional variation, faint dithering"),
 ]
 
+PALETTES_TILE = [
+    "earthy palette",
+    "cool medieval palette",
+    "desaturated retro palette",
+    "high contrast retro palette",
+    "storm-muted palette",
+    "ash-and-ember palette",
+    "golden harvest palette",
+]
+
 # ------------------------------------------------------------
-# Prompt composition
+# CAPTION BUILDERS (clean, template-free, descriptive)
 # ------------------------------------------------------------
-def make_object_prompt_from_template(story_text: str, object_template: str) -> str:
-    return object_template.replace("{PROMPT_HERE}", story_text)
-
-def make_tile_prompt_from_template(material: str, texture_details: str, tile_template: str) -> str:
-    return tile_template.format(material=material, texture_details=texture_details)
-
-
-def load_prompt_templates(path: Path) -> tuple[str, str]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    templates = data.get("templates", {})
-    required_placeholders = data.get("required_placeholders", {})
-    if not isinstance(templates, dict):
-        raise ValueError("Invalid templates JSON: `templates` must be an object")
-    if required_placeholders and not isinstance(required_placeholders, dict):
-        raise ValueError("Invalid templates JSON: `required_placeholders` must be an object when provided")
-
-    object_template = templates.get("structure")
-    tile_template = templates.get("background_tile")
-    if not isinstance(object_template, str) or not object_template.strip():
-        raise ValueError("Invalid templates JSON: `templates.structure` must be a non-empty string")
-    if not isinstance(tile_template, str) or not tile_template.strip():
-        raise ValueError("Invalid templates JSON: `templates.background_tile` must be a non-empty string")
-
-    if "{PROMPT_HERE}" not in object_template:
-        raise ValueError("`templates.structure` must contain {PROMPT_HERE}")
-    if "{material}" not in tile_template or "{texture_details}" not in tile_template:
-        raise ValueError("`templates.background_tile` must contain {material} and {texture_details}")
-
-    if required_placeholders:
-        structure_required = required_placeholders.get("structure", [])
-        tile_required = required_placeholders.get("background_tile", [])
-        if any(token not in object_template for token in structure_required):
-            raise ValueError("`templates.structure` is missing one or more required placeholders")
-        if any(token not in tile_template for token in tile_required):
-            raise ValueError("`templates.background_tile` is missing one or more required placeholders")
-
-    return object_template, tile_template
-
-def structure_story(structure, theme, motif, personality, detail, complexity, material, condition, palette):
+def structure_caption(structure, theme, motif, personality, detail, complexity, material, condition, palette):
     return (
-        f"A medieval {structure} in a {theme} setting, featuring {motif}, {personality} character, "
-        f"{detail}, {complexity}, {material}, {condition}, and {palette}"
+        f"a medieval {structure} in a {theme} setting, "
+        f"featuring {motif}, {personality} character, "
+        f"{detail}, {complexity}, {material}, {condition}, {palette}"
     )
 
-def nature_story(obj, drama, detail, complexity, material, condition, palette):
-    if "hill" in obj:
-        top_shape = random.choice(HILL_TOP_SHAPES)
-        side_shape = random.choice(HILL_SIDE_SMOOTHNESS)
-        seam_rule = random.choice(HILL_SEAM_INTEGRITY)
-        base = (
-            f"A dramatic terrain object of a {obj} with {top_shape}, {side_shape}, {seam_rule}, "
-            f"{detail}, {complexity}, {material}, {condition}, and {palette}"
-        )
-    else:
-        base = (
-            f"A dramatic medieval world asset object of a {obj} with {drama}, "
-            f"{detail}, {complexity}, {material}, {condition}, and {palette}"
-        )
-    return f"{base}. {NATURE_TILE_COMPAT_CLAUSE}"
+
+def object_caption(obj, drama, complexity, material, condition, palette):
+    return (
+        f"a dramatic medieval world asset of a {obj} with {drama}, "
+        f"{complexity}, {material}, {condition}, {palette}"
+    )
+
+
+def terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, material, condition, palette):
+    return (
+        f"a {terrain_type} with wide flat top, {side_smoothness}, "
+        f"{complexity}, {seam_integrity}, "
+        f"{material}, {condition}, {palette}"
+    )
+
+
+def background_caption(material, texture_details, palette):
+    return (
+        f"{material} texture with {texture_details}, "
+        f"stable tile state, {palette}"
+    )
+
+
+# ------------------------------------------------------------
+# POSITIVE PROMPT BUILDERS (ComfyUI template injection)
+# ------------------------------------------------------------
+def structure_positive_prompt(story_text, template):
+    return template.replace("{PROMPT_HERE}", story_text)
+
+
+def object_positive_prompt(story_text, template):
+    return template.replace("{PROMPT_HERE}", story_text)
+
+
+def terrain_positive_prompt(story_text, template):
+    return template.replace("{PROMPT_HERE}", story_text)
+
+
+def background_positive_prompt(material, texture_details, template):
+    return template.format(material=material, texture_details=texture_details)
+
+
+# ------------------------------------------------------------
+# Template loader
+# ------------------------------------------------------------
+def load_prompt_templates(path: Path) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    templates = data.get("templates", {})
+    if not isinstance(templates, dict):
+        raise ValueError("Invalid templates JSON: `templates` must be an object")
+
+    required = ["structure", "object", "terrain", "background"]
+    for key in required:
+        val = templates.get(key)
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"Invalid templates JSON: `templates.{key}` must be a non-empty string")
+
+    if "{PROMPT_HERE}" not in templates["structure"]:
+        raise ValueError("`templates.structure` must contain {PROMPT_HERE}")
+    if "{PROMPT_HERE}" not in templates["object"]:
+        raise ValueError("`templates.object` must contain {PROMPT_HERE}")
+    if "{PROMPT_HERE}" not in templates["terrain"]:
+        raise ValueError("`templates.terrain` must contain {PROMPT_HERE}")
+    if "{material}" not in templates["background"] or "{texture_details}" not in templates["background"]:
+        raise ValueError("`templates.background` must contain {material} and {texture_details}")
+
+    return templates
+
 
 # ------------------------------------------------------------
 # Ratio helpers
@@ -323,129 +375,160 @@ def ratio_to_counts(total_target: int, ratios: dict) -> dict:
 
     return {keys[i]: base[i] for i in range(len(keys))}
 
+
 # ------------------------------------------------------------
 # Row builders
 # ------------------------------------------------------------
-def build_rows_structures(target_count: int, start_idx: int, object_template: str):
+def _pick_one(choices):
+    """Return random.choice without materializing product space."""
+    return random.choice(choices)
+
+
+def build_structure_rows(target_count, start_idx, templates):
     rows, idx = [], start_idx
     if target_count <= 0:
         return rows, idx
-    combos = list(itertools.product(
-        STRUCTURE_TYPES, STRUCTURE_THEMES, THEME_MOTIFS, ARCHITECTURAL_PERSONALITY,
-        DETAIL_LEVELS, STRUCTURAL_COMPLEXITY, MATERIALS_STRUCTURE, CONDITIONS_STRUCTURE, PALETTES_STRUCTURE
-    ))
-    random.shuffle(combos)
 
-    ptr = 0
     for _ in range(target_count):
-        c = combos[ptr % len(combos)]
-        ptr += 1
-        structure, theme, motif, personality, detail, complexity, material, condition, palette = c
-        prompt = make_object_prompt_from_template(
-            structure_story(structure, theme, motif, personality, detail, complexity, material, condition, palette),
-            object_template,
+        structure = _pick_one(STRUCTURE_TYPES)
+        theme = _pick_one(STRUCTURE_THEMES)
+        motif = _pick_one(THEME_MOTIFS)
+        personality = _pick_one(ARCHITECTURAL_PERSONALITY)
+        detail = _pick_one(DETAIL_LEVELS)
+        complexity = _pick_one(STRUCTURAL_COMPLEXITY)
+        material = _pick_one(MATERIALS_STRUCTURE)
+        condition = _pick_one(CONDITIONS_STRUCTURE)
+        palette = _pick_one(PALETTES_STRUCTURE)
+
+        story = (
+            f"A medieval {structure} in a {theme} setting, featuring {motif}, "
+            f"{personality} character, {detail}, {complexity}, {material}, {condition}, "
+            f"and {palette}"
         )
+
+        caption = structure_caption(structure, theme, motif, personality, detail, complexity, material, condition, palette)
+        positive_prompt = structure_positive_prompt(story, templates["structure"])
+
         rows.append({
             "id": f"mdv_{idx:07d}",
-            "domain": "medieval_pixel_assets",
-            "asset_family": "structure",
-            "object_class": structure,
-            "theme_mood": theme,
-            "theme_motif": motif,
-            "architectural_personality": personality,
-            "detail_level": detail,
-            "complexity": complexity,
-            "material_profile": material,
-            "condition": condition,
+            "asset_type": "structure",
+            "caption": caption,
+            "positive_prompt": positive_prompt,
             "palette": palette,
-            "positive_prompt": prompt,
-            "negative_prompt": "",
         })
         idx += 1
     return rows, idx
 
-def build_rows_nature(target_count: int, start_idx: int, object_template: str):
+
+def build_object_rows(target_count, start_idx, templates):
     rows, idx = [], start_idx
     if target_count <= 0:
         return rows, idx
-    combos = list(itertools.product(
-        NATURE_OBJECTS, NATURE_DRAMA, DETAIL_LEVELS, NATURE_COMPLEXITY,
-        MATERIALS_NATURE, CONDITIONS_NATURE, PALETTES_NATURE
-    ))
-    random.shuffle(combos)
 
-    ptr = 0
     for _ in range(target_count):
-        c = combos[ptr % len(combos)]
-        ptr += 1
-        obj, drama, detail, complexity, material, condition, palette = c
-        prompt = make_object_prompt_from_template(
-            nature_story(obj, drama, detail, complexity, material, condition, palette),
-            object_template,
+        obj = _pick_one(OBJECT_TYPES)
+        drama = _pick_one(OBJECT_DRAMA)
+        complexity = _pick_one(OBJECT_COMPLEXITY)
+        material = _pick_one(MATERIALS_OBJECT)
+        condition = _pick_one(CONDITIONS_OBJECT)
+        palette = _pick_one(PALETTES_OBJECT)
+
+        story = (
+            f"A dramatic medieval world asset object of a {obj} with {drama}, "
+            f"{complexity}, {material}, {condition}, and {palette}"
         )
+
+        caption = object_caption(obj, drama, complexity, material, condition, palette)
+        positive_prompt = object_positive_prompt(story, templates["object"])
+
         rows.append({
             "id": f"mdv_{idx:07d}",
-            "domain": "medieval_pixel_assets",
-            "asset_family": "nature_object",
-            "object_class": obj,
-            "nature_drama": drama,
-            "detail_level": detail,
-            "complexity": complexity,
-            "material_profile": material,
-            "condition": condition,
+            "asset_type": "object",
+            "caption": caption,
+            "positive_prompt": positive_prompt,
             "palette": palette,
-            "positive_prompt": prompt,
-            "negative_prompt": "",
         })
         idx += 1
     return rows, idx
 
-def build_rows_tiles(target_count: int, start_idx: int, tile_template: str):
+
+def build_terrain_rows(target_count, start_idx, templates):
     rows, idx = [], start_idx
     if target_count <= 0:
         return rows, idx
-    combos = list(itertools.product(TILE_VARIANTS, PALETTES_NATURE))
-    random.shuffle(combos)
 
-    ptr = 0
     for _ in range(target_count):
-        (material, texture_details), palette = combos[ptr % len(combos)]
-        ptr += 1
-        prompt = make_tile_prompt_from_template(material, texture_details, tile_template)
+        terrain_type = _pick_one(TERRAIN_TYPES)
+        side_smoothness = _pick_one(TERRAIN_SIDE_SMOOTHNESS)
+        seam_integrity = _pick_one(TERRAIN_SEAM_INTEGRITY)
+        complexity = _pick_one(OBJECT_COMPLEXITY)
+        material = _pick_one(MATERIALS_TERRAIN)
+        condition = _pick_one(CONDITIONS_TERRAIN)
+        palette = _pick_one(PALETTES_TERRAIN)
+
+        story = (
+            f"A dramatic terrain object of a {terrain_type} with wide flat top, "
+            f"{side_smoothness}, {seam_integrity}, {complexity}, {material}, {condition}, "
+            f"and {palette}"
+        )
+
+        caption = terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, material, condition, palette)
+        positive_prompt = terrain_positive_prompt(story, templates["terrain"])
+
         rows.append({
             "id": f"mdv_{idx:07d}",
-            "domain": "medieval_pixel_assets",
-            "asset_family": "background_tile",
-            "object_class": f"{material}_tile",
-            "detail_level": "tile_optimized",
-            "complexity": "seamless_repeatable",
-            "material_profile": material,
-            "condition": "stable_tile_state",
+            "asset_type": "terrain",
+            "caption": caption,
+            "positive_prompt": positive_prompt,
             "palette": palette,
-            "positive_prompt": prompt,
-            "negative_prompt": "",
         })
         idx += 1
     return rows, idx
+
+
+def build_background_rows(target_count, start_idx, templates):
+    rows, idx = [], start_idx
+    if target_count <= 0:
+        return rows, idx
+
+    for _ in range(target_count):
+        (material, texture_details) = _pick_one(TILE_VARIANTS)
+        palette = _pick_one(PALETTES_TILE)
+
+        caption = background_caption(material, texture_details, palette)
+        positive_prompt = background_positive_prompt(material, texture_details, templates["background"])
+
+        rows.append({
+            "id": f"mdv_{idx:07d}",
+            "asset_type": "background",
+            "caption": caption,
+            "positive_prompt": positive_prompt,
+            "palette": palette,
+        })
+        idx += 1
+    return rows, idx
+
 
 # ------------------------------------------------------------
 # Main
 # ------------------------------------------------------------
 def parse_args():
-    ap = argparse.ArgumentParser(description="Generate medieval FLUX prompt data with mystical structures + wheat assets")
+    ap = argparse.ArgumentParser(description="Generate medieval FLUX prompt data: 4 asset types with clean captions")
     ap.add_argument("--out-dir", default="./dataset/prompts")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--total-target", type=int, default=28000)
-    ap.add_argument("--ratio-structures", type=float, default=0.54)
-    ap.add_argument("--ratio-nature", type=float, default=0.28)
-    ap.add_argument("--ratio-tiles", type=float, default=0.18)
+    ap.add_argument("--ratio-structure", type=float, default=0.50)
+    ap.add_argument("--ratio-object", type=float, default=0.20)
+    ap.add_argument("--ratio-background", type=float, default=0.20)
+    ap.add_argument("--ratio-terrain", type=float, default=0.10)
     ap.add_argument(
         "--templates-json",
         type=Path,
         default=Path(__file__).resolve().parent.parent / "config" / "prompt_templates.json",
-        help="Path to JSON file containing structure/background tile prompt templates.",
+        help="Path to JSON file containing prompt templates.",
     )
     return ap.parse_args()
+
 
 def main():
     args = parse_args()
@@ -453,24 +536,27 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     random.seed(args.seed)
     templates_json_path = args.templates_json.resolve()
-    object_template, tile_template = load_prompt_templates(templates_json_path)
+    templates = load_prompt_templates(templates_json_path)
 
     ratios = {
-        "structure": args.ratio_structures,
-        "nature_object": args.ratio_nature,
-        "background_tile": args.ratio_tiles,
+        "structure": args.ratio_structure,
+        "object": args.ratio_object,
+        "background": args.ratio_background,
+        "terrain": args.ratio_terrain,
     }
     counts = ratio_to_counts(args.total_target, ratios)
 
     all_rows = []
     cursor = 0
 
-    rs, cursor = build_rows_structures(counts["structure"], cursor, object_template)
-    rn, cursor = build_rows_nature(counts["nature_object"], cursor, object_template)
-    rt, cursor = build_rows_tiles(counts["background_tile"], cursor, tile_template)
+    rs, cursor = build_structure_rows(counts["structure"], cursor, templates)
+    ro, cursor = build_object_rows(counts["object"], cursor, templates)
+    rb, cursor = build_background_rows(counts["background"], cursor, templates)
+    rt, cursor = build_terrain_rows(counts["terrain"], cursor, templates)
 
     all_rows.extend(rs)
-    all_rows.extend(rn)
+    all_rows.extend(ro)
+    all_rows.extend(rb)
     all_rows.extend(rt)
 
     random.shuffle(all_rows)
@@ -483,33 +569,15 @@ def main():
 
     summary = defaultdict(lambda: defaultdict(int))
     for r in all_rows:
-        summary["asset_family"][r["asset_family"]] += 1
-        summary["object_class"][r["object_class"]] += 1
+        summary["asset_type"][r["asset_type"]] += 1
         summary["palette"][r["palette"]] += 1
-        if r["asset_family"] == "structure":
-            summary["structure_theme"][r.get("theme_mood", "unknown")] += 1
 
     summary_payload = {
         "total_prompts": len(all_rows),
         "input_ratios": ratios,
         "normalized_targets": counts,
         "templates_json": str(templates_json_path),
-        "added_features": {
-            "mystical_structures": [
-                "wizarding tower",
-                "arcane observatory tower",
-                "rune-etched mage spire",
-                "enchanted library tower",
-                "alchemist laboratory tower"
-            ],
-            "wheat_assets": [
-                "wheat field patch",
-                "harvest-ready wheat field",
-                "wind-swept wheat cluster",
-                "wheat-ground tile variant"
-            ]
-        },
-        "distribution": summary
+        "distribution": summary,
     }
 
     summary_path = out_dir / "generated_prompts_summary.json"
@@ -518,6 +586,7 @@ def main():
 
     print(f"Wrote {len(all_rows)} prompts to {out_jsonl}")
     print(f"Wrote summary to {summary_path}")
+
 
 if __name__ == "__main__":
     main()

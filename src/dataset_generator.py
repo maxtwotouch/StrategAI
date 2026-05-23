@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 import requests
 
+from png_metadata import embed_metadata_into_file
+
 
 # ----------------------------
 # ComfyUI API helpers
@@ -99,7 +101,7 @@ def normalize_text(value: Any) -> str:
 
 
 def validate_prompt_row(row: Dict[str, Any], idx: int) -> None:
-    required_fields = ("asset_family", "positive_prompt", "object_class")
+    required_fields = ("asset_type", "positive_prompt", "caption")
     missing = [field for field in required_fields if not normalize_text(row.get(field))]
     if missing:
         raise ValueError(f"Prompt row index={idx} is missing required fields: {', '.join(missing)}")
@@ -114,29 +116,6 @@ def resolve_asset_id(row: Dict[str, Any], idx: int, id_counts: Dict[str, int]) -
     return f"{base_id}_{seen_count + 1}", True
 
 
-def ensure_dirs(base_dir: Path, output_layout: str):
-    if output_layout == "huggingface":
-        dirs = {
-            "images": base_dir / "images",
-            "metadata": base_dir / "metadata",
-            "manifest": base_dir / "manifest.jsonl",
-            "errors": base_dir / "errors.jsonl",
-            "run_report": base_dir / "run_report.json",
-        }
-    else:
-        dirs = {
-            "images": base_dir / "v1" / "images",
-            "metadata": base_dir / "v1" / "metadata",
-            "manifest": base_dir / "v1" / "dataset_manifest.jsonl",
-            "errors": base_dir / "v1" / "errors.jsonl",
-            "run_report": base_dir / "v1" / "run_report.json",
-        }
-    dirs["images"].mkdir(parents=True, exist_ok=True)
-    dirs["metadata"].mkdir(parents=True, exist_ok=True)
-    dirs["manifest"].parent.mkdir(parents=True, exist_ok=True)
-    return dirs
-
-
 # ----------------------------
 # Workflow mutation helpers
 # ----------------------------
@@ -146,12 +125,15 @@ def set_node_input(workflow: Dict[str, Any], node_id: str, key: str, value: Any)
     workflow[node_id].setdefault("inputs", {})[key] = value
 
 
-def is_tile(row: Dict[str, Any]) -> bool:
-    return (row.get("asset_family") or "").lower() == "background_tile"
+def is_background(row: Dict[str, Any]) -> bool:
+    """Route to tile workflow when asset_type == 'background'."""
+    return (row.get("asset_type") or "").lower() == "background"
 
 
-def is_nature(row: Dict[str, Any]) -> bool:
-    return (row.get("asset_family") or "").lower() == "nature_object"
+def is_object_or_terrain(row: Dict[str, Any]) -> bool:
+    """Object and terrain assets share the nature guidance range."""
+    at = (row.get("asset_type") or "").lower()
+    return at in ("object", "terrain")
 
 
 def resolve_guidance_for_row(
@@ -167,13 +149,13 @@ def resolve_guidance_for_row(
 ) -> float:
     """
     Guidance routing priority:
-      1) background_tile -> tile range
-      2) nature_object   -> nature range
-      3) fallback        -> global range
+      1) background -> tile range
+      2) object / terrain -> nature range
+      3) fallback (structure) -> global range
     """
-    if use_category_policy and is_tile(row):
+    if use_category_policy and is_background(row):
         return round(random.uniform(tile_min, tile_max), decimals)
-    if use_category_policy and is_nature(row):
+    if use_category_policy and is_object_or_terrain(row):
         return round(random.uniform(nature_min, nature_max), decimals)
     return round(random.uniform(global_min, global_max), decimals)
 
@@ -181,6 +163,27 @@ def resolve_guidance_for_row(
 # ----------------------------
 # Main
 # ----------------------------
+def ensure_dirs(base_dir: Path, output_layout: str):
+    """Create output directories. All metadata goes into PNG tEXt chunks — no sidecars."""
+    if output_layout == "huggingface":
+        dirs = {
+            "images": base_dir / "images",
+            "manifest": base_dir / "manifest.jsonl",
+            "errors": base_dir / "errors.jsonl",
+            "run_report": base_dir / "run_report.json",
+        }
+    else:
+        dirs = {
+            "images": base_dir / "raw" / "images",
+            "manifest": base_dir / "raw" / "dataset_manifest.jsonl",
+            "errors": base_dir / "raw" / "errors.jsonl",
+            "run_report": base_dir / "raw" / "run_report.json",
+        }
+    dirs["images"].mkdir(parents=True, exist_ok=True)
+    dirs["manifest"].parent.mkdir(parents=True, exist_ok=True)
+    return dirs
+
+
 def parse_args():
     ap = argparse.ArgumentParser(description="Generate FLUX dataset via ComfyUI with category-specific guidance ranges")
 
@@ -211,9 +214,9 @@ def parse_args():
     ap.add_argument("--tile-guidance-min", type=float, default=1.0)
     ap.add_argument("--tile-guidance-max", type=float, default=4.0)
 
-    # Nature-object range (higher guidance)
-    ap.add_argument("--nature-guidance-min", type=float, default=5.0, help="Min guidance for nature_object rows")
-    ap.add_argument("--nature-guidance-max", type=float, default=8.0, help="Max guidance for nature_object rows")
+    # Object+terrain range (higher guidance, formerly nature_object)
+    ap.add_argument("--nature-guidance-min", type=float, default=5.0, help="Min guidance for object/terrain rows")
+    ap.add_argument("--nature-guidance-max", type=float, default=8.0, help="Max guidance for object/terrain rows")
 
     ap.add_argument("--guidance-decimals", type=int, default=3)
     ap.add_argument("--use-category-guidance-policy", action="store_true")
@@ -234,7 +237,7 @@ def parse_args():
         "--output-layout",
         choices=["generated", "huggingface"],
         default="generated",
-        help="generated=<base>/generated/... (legacy), huggingface=<base>/images + metadata",
+        help="generated → <base>/raw/...; huggingface → <base>/images + metadata",
     )
 
     return ap.parse_args()
@@ -272,6 +275,7 @@ def main():
         "used_primary_workflow": 0,
         "used_tile_workflow": 0,
         "duplicate_id_collisions": 0,
+        "metadata_embedded": 0,
         "guidance_policy": {
             "global": [args.guidance_min, args.guidance_max],
             "background_tile": [args.tile_guidance_min, args.tile_guidance_max],
@@ -292,7 +296,7 @@ def main():
             if had_collision:
                 stats["duplicate_id_collisions"] += 1
             image_name = f"{image_id}.png"
-            tile_row = is_tile(row)
+            tile_row = is_background(row)
 
             if tile_row:
                 workflow = json.loads(json.dumps(tile_workflow))
@@ -364,17 +368,14 @@ def main():
 
             image_rel = str(out_path.relative_to(base_dir))
 
-            sidecar_payload = {
-                "id": image_id,
-                "asset_family": normalize_text(row.get("asset_family")),
-                "image_path": image_rel,
-                "positive_prompt": normalize_text(row.get("positive_prompt")),
-                "object_class": normalize_text(row.get("object_class")),
-            }
+            # Embed the full prompt row as metadata into the PNG
+            metadata_payload = dict(row)
+            metadata_payload["image_path"] = image_rel
 
-            sidecar = dirs["metadata"] / f"{image_id}.json"
-            save_json(sidecar, sidecar_payload)
-            append_jsonl(dirs["manifest"], sidecar_payload)
+            embed_metadata_into_file(out_path, metadata_payload)
+            stats["metadata_embedded"] += 1
+
+            append_jsonl(dirs["manifest"], metadata_payload)
             stats["success"] += 1
 
         except Exception as e:
@@ -382,8 +383,7 @@ def main():
             append_jsonl(dirs["errors"], {
                 "index": idx,
                 "row_id": row.get("id"),
-                "asset_family": row.get("asset_family"),
-                "object_class": row.get("object_class"),
+                "asset_type": row.get("asset_type"),
                 "error": str(e),
             })
             print(f"[ERROR] idx={idx} row_id={row.get('id')} err={e}")
