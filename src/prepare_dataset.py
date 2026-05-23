@@ -2,7 +2,7 @@
 """Post-curation step: extract captions from embedded PNG metadata and produce HF imagefolder layout.
 
 Usage:
-    python3 src/prepare_dataset.py ./dataset/raw/images --out-dir ./dataset/hf
+    python3 src/prepare_dataset.py ./dataset/raw --out-dir ./dataset/hf
 """
 
 from __future__ import annotations
@@ -48,8 +48,7 @@ def main() -> int:
         print(f"ERROR: images directory not found: {images_dir}", file=sys.stderr)
         return 1
 
-    out_images = out_dir / "images"
-    out_images.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     metadata_rows: list[dict[str, Any]] = []
     processed = 0
@@ -79,7 +78,7 @@ def main() -> int:
             skipped += 1
             continue
 
-        dest_png = out_images / png_path.name
+        dest_png = out_dir / png_path.name
 
         if args.hardlink:
             if dest_png.exists():
@@ -90,7 +89,7 @@ def main() -> int:
             shutil.copy2(png_path, dest_png)
 
         # Write side-by-side .txt caption file
-        txt_path = out_images / f"{stem}.txt"
+        txt_path = out_dir / f"{stem}.txt"
         txt_path.write_text(caption, encoding="utf-8")
 
         # Build HF imagefolder-compatible metadata row
@@ -124,7 +123,7 @@ def main() -> int:
     )
 
     print(f"Processed {processed} images, skipped {skipped}")
-    print(f"Output: {out_images}/  ({processed} PNGs + {processed} TXTs)")
+    print(f"Output: {out_dir}/  ({processed} PNGs + {processed} TXTs)")
     print(f"Metadata: {meta_path}")
     print(f"Report: {summary_path}")
 

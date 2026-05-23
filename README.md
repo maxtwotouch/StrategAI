@@ -77,24 +77,24 @@ Each row: `id`, `asset_type`, `caption`, `positive_prompt`, `palette`
 ```
 
 Output:
-- `dataset/raw/images/*.png` (with embedded `generation_metadata` tEXt chunk)
+- `dataset/raw/*.png` (with embedded `generation_metadata` tEXt chunk)
 - `dataset/raw/dataset_manifest.jsonl`
 - `dataset/raw/run_report.json`
 - `dataset/raw/errors.jsonl`
 
 ### 2) Curate quality
 
-Delete bad PNGs from `dataset/raw/images/` by visual review. `prepare_dataset.py` only includes assets whose PNGs still exist.
+Delete bad PNGs from `dataset/raw/` by visual review. `prepare_dataset.py` only includes assets whose PNGs still exist.
 
 ### 3) Prepare final dataset (HF)
 
 ```bash
-python3 src/prepare_dataset.py ./dataset/raw/images --out-dir ./dataset/hf
+python3 src/prepare_dataset.py ./dataset/raw --out-dir ./dataset/hf
 ```
 
 Output:
-- `dataset/hf/images/*.png` — curated PNGs
-- `dataset/hf/images/*.txt` — caption text files (caption field only)
+- `dataset/hf/*.png` — curated PNGs
+- `dataset/hf/*.txt` — caption text files (caption field only)
 - `dataset/hf/metadata.jsonl` — HF `imagefolder`-compatible: `file_name`, `text`, `asset_type`, `palette`
 - `dataset/hf/prepare_report.json`
 

@@ -167,14 +167,14 @@ def ensure_dirs(base_dir: Path, output_layout: str):
     """Create output directories. All metadata goes into PNG tEXt chunks — no sidecars."""
     if output_layout == "huggingface":
         dirs = {
-            "images": base_dir / "images",
+            "images": base_dir,
             "manifest": base_dir / "manifest.jsonl",
             "errors": base_dir / "errors.jsonl",
             "run_report": base_dir / "run_report.json",
         }
     else:
         dirs = {
-            "images": base_dir / "raw" / "images",
+            "images": base_dir / "raw",
             "manifest": base_dir / "raw" / "dataset_manifest.jsonl",
             "errors": base_dir / "raw" / "errors.jsonl",
             "run_report": base_dir / "raw" / "run_report.json",
