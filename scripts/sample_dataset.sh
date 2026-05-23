@@ -14,7 +14,7 @@ OUTPUT_DIR="$ROOT_DIR/sampled_datasets"
 OUTPUT_METADATA="$OUTPUT_DIR/metadata.${TARGET_SIZE}.jsonl"
 
 python3 -m src.sample_dataset \
-  --dataset-root "$ROOT_DIR/hf_ready" \
+  --dataset-root "$ROOT_DIR/dataset" \
   --metadata-file metadata.jsonl \
   --output-metadata "$OUTPUT_METADATA" \
   --target-size "$TARGET_SIZE" \

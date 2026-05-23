@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from src.common import build_ostris_training_payload, read_yaml
+from src.tokens import parse_token_config
 
 
 def main() -> int:
@@ -19,6 +20,8 @@ def main() -> int:
         str(dataset_root),
         "--expected-resolution",
         "1024",
+        "--token-config",
+        str(root / "config" / "data.yaml"),
     ]
     result = subprocess.run(validate_cmd, check=False)
     if result.returncode != 0:
@@ -26,18 +29,27 @@ def main() -> int:
         return result.returncode
 
     print("[SMOKE] Building in-memory Ostris ai-toolkit config payload...")
-    data_cfg = read_yaml(root / "configs" / "data.yaml")
-    model_cfg = read_yaml(root / "configs" / "model_flux2_klein_4b.yaml")
-    run_cfg = read_yaml(root / "configs" / "run_lora.yaml")
-    payload = build_ostris_training_payload(data_cfg, model_cfg, run_cfg)
+    data_cfg = read_yaml(root / "config" / "data.yaml")
+    model_cfg = read_yaml(root / "config" / "model_flux2_klein_4b.yaml")
+    run_cfg = read_yaml(root / "config" / "run_lora.yaml")
+    token_cfg = parse_token_config(data_cfg)
+    payload = build_ostris_training_payload(data_cfg, model_cfg, run_cfg, token_config=token_cfg)
 
-    required_sections = ["toolkit", "task", "model", "dataset", "training", "lora"]
-    missing = [section for section in required_sections if section not in payload]
+    # Validate the ai-toolkit job + config structure
+    if payload.get("job") != "extension":
+        print(f"[SMOKE] Missing 'job: extension' top-level key.")
+        return 1
+    config = payload.get("config", {})
+    required_sections = ["process", "model", "datasets", "train", "network", "save", "sample"]
+    missing = [section for section in required_sections if section not in config]
     if missing:
         print(f"[SMOKE] Missing config sections: {missing}")
         return 1
-    if payload.get("toolkit") != "ostris-ai-toolkit":
-        print(f"[SMOKE] Unexpected toolkit value: {payload.get('toolkit')}")
+    if config["model"].get("arch") != "flux2_klein_4b":
+        print(f"[SMOKE] Unexpected model arch: {config['model'].get('arch')}")
+        return 1
+    if config["train"].get("noise_scheduler") != "flowmatch":
+        print(f"[SMOKE] Wrong noise_scheduler: {config['train'].get('noise_scheduler')}")
         return 1
 
     print("[SMOKE] Dry-running train launcher...")
@@ -46,11 +58,11 @@ def main() -> int:
         "-m",
         "src.train_lora",
         "--data-config",
-        str(root / "configs" / "data.yaml"),
+        str(root / "config" / "data.yaml"),
         "--model-config",
-        str(root / "configs" / "model_flux2_klein_4b.yaml"),
+        str(root / "config" / "model_flux2_klein_4b.yaml"),
         "--run-config",
-        str(root / "configs" / "run_lora.yaml"),
+        str(root / "config" / "run_lora.yaml"),
         "--run-name",
         "smoke_test_run",
         "--dataset-size",

@@ -1,8 +1,0 @@
-name: flux2-klein-4b
-variant: flux2-klein
-parameter_count: 4B
-base_model_id: ostris/flux2-klein-4b-base
-dtype: bf16
-min_vram_gb: 24
-notes: Replace base_model_id with your licensed/public Ostris model identifier.
-

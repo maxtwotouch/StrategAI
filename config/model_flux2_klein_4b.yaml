@@ -1,0 +1,13 @@
+name: flux2-klein-4b
+arch: flux2_klein_4b
+parameter_count: 4B
+base_model_id: black-forest-labs/FLUX.2-klein-4B
+dtype: bf16
+min_vram_gb: 16
+quantize: true
+qtype: qfloat8
+low_vram: true
+notes: |
+  Replace base_model_id with your licensed Hugging Face model identifier.
+  The model is gated — accept the license at huggingface.co then run
+  `huggingface-cli login` before training.

@@ -15,7 +15,9 @@ from src.dataset_sampling import (
     load_sidecar_caption_rows,
     stratified_sample_rows,
     write_metadata_rows,
+    write_prepared_dataset,
 )
+from src.tokens import parse_token_config
 
 
 def _load_dotenv(root: Path) -> None:
@@ -72,17 +74,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip the minimum dataset size warning.",
     )
-    parser.add_argument(
-        "--trigger-token",
-        type=str,
-        default=None,
-        help="Optional trigger token override. If set, this token can be prepended to captions.",
-    )
-    parser.add_argument(
-        "--prepend-trigger-token",
-        action="store_true",
-        help="Prepend trigger token to every caption before training metadata is written.",
-    )
     return parser.parse_args()
 
 
@@ -94,7 +85,7 @@ def _resolve_train_command_template() -> str:
     template = os.environ.get("OSTRIS_TRAIN_COMMAND", "").strip()
     if template:
         return template
-    return "ai-toolkit train lora --config {config_path}"
+    return "python run.py {config_path}"
 
 
 def _load_rows_for_training(data_cfg: Dict[str, object], dataset_root: Path) -> List[Dict[str, object]]:
@@ -105,7 +96,7 @@ def _load_rows_for_training(data_cfg: Dict[str, object], dataset_root: Path) -> 
     if source == "sidecar_txt":
         image_dir = (dataset_root / str(data_cfg.get("image_dir", "images"))).resolve()
         caption_extension = str(data_cfg.get("caption_txt_extension", ".txt"))
-        image_extensions = data_cfg.get("image_extensions", ["png", "jpg", "jpeg", "webp"])
+        image_extensions = data_cfg.get("image_extensions", ["png", "jpg", "jpeg"])
         if not isinstance(image_extensions, list):
             raise ValueError("data.image_extensions must be a list when using caption_source=sidecar_txt")
 
@@ -147,16 +138,23 @@ def main() -> int:
     sampling_cfg = data_cfg.get("sampling", {}) if isinstance(data_cfg.get("sampling", {}), dict) else {}
     dataset_root = Path(data_cfg["dataset_root"]).resolve()
 
-    trigger_token = str(args.trigger_token if args.trigger_token is not None else data_cfg.get("trigger_token", "")).strip()
-    prepend_trigger_token = bool(data_cfg.get("prepend_trigger_token", False) or args.prepend_trigger_token)
+    # Parse token configuration from structured tokens: block
+    token_config = parse_token_config(data_cfg)
     caption_column = str(data_cfg.get("caption_column", "text"))
+
+
+    # Log token configuration
+    all_tokens = token_config.token_values()
+    if all_tokens:
+        print(f"[INFO] Custom tokens: {', '.join(all_tokens)}")
+        print(f"[INFO] Token prepend: {'enabled' if token_config.prepend_to_captions else 'disabled'}")
+        print(f"[INFO] Token validation: {'enabled' if token_config.validate_presence else 'disabled'}")
 
     rows = _load_rows_for_training(data_cfg=data_cfg, dataset_root=dataset_root)
     rows = apply_caption_transform(
         rows=rows,
         caption_column=caption_column,
-        trigger_token=trigger_token,
-        prepend_trigger_token=prepend_trigger_token,
+        token_config=token_config,
     )
 
     target_size = args.dataset_size if args.dataset_size is not None else sampling_cfg.get("dataset_size")
@@ -195,33 +193,30 @@ def main() -> int:
         data_cfg["format"] = "hf_jsonl"
         print(f"[INFO] Wrote prepared metadata: {prepared_metadata_path}")
 
-    if prepend_trigger_token and trigger_token:
-        print(f"[INFO] Trigger token will be prepended to captions: {trigger_token}")
+    if token_config.prepend_to_captions and token_config.token_values():
+        print(f"[INFO] Tokens prepended to captions: {', '.join(token_config.token_values())}")
 
-    # Pre-training sanity checks
-    num_rows = len(rows)
-    steps = int(run_cfg.get("num_train_steps", 1500))
-    batch = int(run_cfg.get("train_batch_size", 1))
-    grad = int(run_cfg.get("gradient_accumulation_steps", 4))
-    eff_batch = batch * grad
-    repeats = int(data_cfg.get("repeats", 1))
-    images_seen = steps * eff_batch
-    epochs = images_seen / max(num_rows * repeats, 1)
+    # ── Write prepared dataset for the ai-toolkit ──────────────────────
+    # The toolkit expects a folder with image files and matching .txt
+    # sidecar captions.  We write the token-injected rows here so the
+    # generated config can point datasets.folder_path at this directory.
+    prepared_dataset_dir = run_dir / "prepared_dataset"
+    write_prepared_dataset(
+        rows=rows,
+        prepared_dir=prepared_dataset_dir,
+        image_dir=dataset_root,
+        image_column=str(data_cfg.get("image_column", "file_name")),
+        caption_column=caption_column,
+    )
+    print(f"[INFO] Wrote prepared dataset (images + token-injected captions): {prepared_dataset_dir}")
 
-    print(f"[INFO] Dataset size: {num_rows} images (repeats={repeats})")
-    print(f"[INFO] Effective batch size: {eff_batch}  |  Steps: {steps}  |  Images seen: ~{images_seen}")
-    print(f"[INFO] Estimated epochs: {epochs:.2f}")
-
-    if num_rows < 10 and not args.skip_size_check:
-        print(f"[WARN] Dataset only has {num_rows} images. Training on <10 images causes severe overfitting.")
-        print("[WARN] Add more data, or pass --skip-size-check to proceed anyway.")
-        return 1
-    elif num_rows < 30 and not args.skip_size_check:
-        print(f"[WARN] Dataset has {num_rows} images. This is below the recommended 30+ per style.")
-        print("[WARN] Pass --skip-size-check to proceed anyway.")
-        return 1
-
-    payload = build_ostris_training_payload(data_cfg=data_cfg, model_cfg=model_cfg, run_cfg=run_cfg)
+    payload = build_ostris_training_payload(
+        data_cfg=data_cfg,
+        model_cfg=model_cfg,
+        run_cfg=run_cfg,
+        token_config=token_config,
+        prepared_dataset_dir=prepared_dataset_dir,
+    )
     config_path = run_dir / "ostris_train.yaml"
     write_yaml(config_path, payload)
 
@@ -262,4 +257,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

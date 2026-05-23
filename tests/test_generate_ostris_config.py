@@ -21,8 +21,7 @@ def test_parse_overrides_coerces_common_types() -> None:
 def test_parse_overrides_rejects_missing_separator() -> None:
     with pytest.raises(ValueError) as exc:
         parse_overrides(["not_an_override"])
-
-        assert "key=value" in str(exc)
+    assert "key=value" in str(exc.value)
 
 
 

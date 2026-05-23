@@ -9,11 +9,11 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from src.common import read_yaml
+from src.tokens import parse_token_config
 
 
 class CheckResult:
@@ -32,13 +32,13 @@ def _check_file_exists(path: Path, description: str) -> CheckResult:
 
 def check_configs(root: Path) -> List[CheckResult]:
     results: List[CheckResult] = []
-    for name in ("configs/data.yaml", "configs/model_flux2_klein_4b.yaml", "configs/run_lora.yaml"):
+    for name in ("config/data.yaml", "config/model_flux2_klein_4b.yaml", "config/run_lora.yaml"):
         results.append(_check_file_exists(root / name, f"Config file: {name}"))
     return results
 
 
 def check_ostris_command() -> CheckResult:
-    cmd = os.environ.get("OSTRIS_TRAIN_COMMAND", "").strip() or "ai-toolkit train lora --config {config_path}"
+    cmd = os.environ.get("OSTRIS_TRAIN_COMMAND", "").strip() or "python run.py {config_path}"
     binary = cmd.split()[0]
     try:
         subprocess.run([binary, "--version"], capture_output=True, check=False)
@@ -54,27 +54,49 @@ def check_ostris_command() -> CheckResult:
 
 def check_dataset(root: Path) -> List[CheckResult]:
     results: List[CheckResult] = []
-    data_cfg = read_yaml(root / "configs" / "data.yaml")
+    data_cfg = read_yaml(root / "config" / "data.yaml")
     dataset_root = (root / str(data_cfg.get("dataset_root", "dataset"))).resolve()
     caption_source = str(data_cfg.get("caption_source", "metadata")).strip().lower()
 
-    prepend_trigger = bool(data_cfg.get("prepend_trigger_token", False))
-    trigger_token = str(data_cfg.get("trigger_token", "")).strip()
-    if prepend_trigger and not trigger_token:
+    # ── Token configuration check ──────────────────────────────────────────
+    token_config = parse_token_config(data_cfg)
+    all_tokens = token_config.token_values()
+
+    if token_config.prepend_to_captions and not all_tokens:
         results.append(
             CheckResult(
-                "Trigger token config",
+                "Custom tokens",
                 False,
-                "prepend_trigger_token=true but trigger_token is empty.",
-                "Set data.trigger_token in configs/data.yaml or disable prepend_trigger_token.",
+                "prepend_to_captions=true but no tokens defined.",
+                "Define at least a trigger token in config/data.yaml under tokens:",
+            )
+        )
+    elif all_tokens:
+        categories = []
+        if token_config.trigger:
+            categories.append(f"trigger={token_config.trigger.value}")
+        if token_config.pose:
+            categories.append(f"pose={token_config.pose.value}")
+        if token_config.style:
+            categories.append(f"style={token_config.style.value}")
+        if token_config.asset:
+            categories.append(f"asset={token_config.asset.value}")
+        if token_config.custom:
+            categories.append(f"custom=[{', '.join(t.value for t in token_config.custom)}]")
+        cat_str = ", ".join(categories) if categories else "none"
+        results.append(
+            CheckResult(
+                "Custom tokens",
+                True,
+                f"{len(all_tokens)} token(s) defined ({cat_str}), prepend={token_config.prepend_to_captions}",
             )
         )
     else:
         results.append(
             CheckResult(
-                "Trigger token config",
+                "Custom tokens",
                 True,
-                f"prepend_trigger_token={prepend_trigger}, trigger_token={'set' if trigger_token else 'empty'}",
+                "No custom tokens defined (using raw captions).",
             )
         )
 
@@ -84,7 +106,7 @@ def check_dataset(root: Path) -> List[CheckResult]:
         if not image_dir.exists():
             return results
 
-        image_exts = data_cfg.get("image_extensions", ["png", "jpg", "jpeg", "webp"])
+        image_exts = data_cfg.get("image_extensions", ["png", "jpg", "jpeg"])
         normalized_exts = {str(ext).lower().lstrip(".") for ext in image_exts if str(ext).strip()}
         caption_ext = str(data_cfg.get("caption_txt_extension", ".txt"))
         caption_ext = caption_ext if caption_ext.startswith(".") else f".{caption_ext}"
@@ -184,15 +206,15 @@ def check_env_file(root: Path) -> CheckResult:
     )
 
 
-def estimate_epochs(root: Path) -> Tuple[int, int, int, float]:
+def estimate_epochs(root: Path) -> Tuple[int, int, int, int]:
     """Return (num_train_steps, batch_size, grad_accum, effective_batch_size)."""
-    run_cfg = read_yaml(root / "configs" / "run_lora.yaml")
-    data_cfg = read_yaml(root / "configs" / "data.yaml")
+    run_cfg = read_yaml(root / "config" / "run_lora.yaml")
+    data_cfg = read_yaml(root / "config" / "data.yaml")
 
     steps = int(run_cfg.get("num_train_steps", 1500))
     batch = int(run_cfg.get("train_batch_size", 1))
     grad = int(run_cfg.get("gradient_accumulation_steps", 4))
-    eff_batch = batch * grad
+    eff_batch = int(batch * grad)
     return steps, batch, grad, eff_batch
 
 
@@ -247,4 +269,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

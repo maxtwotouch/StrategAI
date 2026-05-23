@@ -1,0 +1,76 @@
+---
+job: "extension"
+config:
+  # ── Job identity ──────────────────────────────────────────────────
+  name: "flux2_klein_9b_lora"
+  process:
+    - type: "diffusion_trainer"
+  training_folder: "./output"
+  device: "cuda"
+
+  # ── Trigger word (injected at training time) ──────────────────────
+  # Dataset captions already contain <tmp>; the toolkit skips
+  # prepending if already present (§3.1).
+  trigger_word: "<tmp>"
+
+  # ── LoRA network definition ───────────────────────────────────────
+  network:
+    type: "lora"
+    linear: 32
+    linear_alpha: 32
+
+  # ── Checkpoint saving ─────────────────────────────────────────────
+  save:
+    dtype: "bf16"
+    save_every: 500
+    max_step_saves_to_keep: 10
+
+  # ── Dataset ───────────────────────────────────────────────────────
+  datasets:
+    - folder_path: "./dataset/images"
+      default_caption: ""
+      caption_ext: "txt"
+      caption_dropout_rate: 0.05
+      resolution:
+        - 512
+        - 768
+        - 1024
+
+  # ── Training hyperparameters ──────────────────────────────────────
+  train:
+    batch_size: 1
+    gradient_accumulation: 2
+    steps: 1500
+    train_unet: true
+    train_text_encoder: false
+    gradient_checkpointing: true
+    noise_scheduler: "flowmatch"
+    optimizer: "adamw_8bit"
+    timestep_type: "sigmoid"
+    content_or_style: "balanced"
+    lr: 0.0001
+    weight_decay: 0.01
+    dtype: "bf16"
+    cache_text_embeddings: false
+
+  # ── Model loading ─────────────────────────────────────────────────
+  model:
+    name_or_path: "black-forest-labs/FLUX.2-klein-9B"
+    quantize: true
+    qtype: "qfloat8"
+    arch: "flux2_klein_9b"
+    low_vram: true
+
+  # ── Sample generation during training ─────────────────────────────
+  sample:
+    sampler: "flowmatch"
+    sample_every: 500
+    width: 1024
+    height: 1024
+    guidance_scale: 4
+    sample_steps: 25
+    seed: 42
+    walk_seed: true
+    samples:
+      - prompt: "front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. Isolate the object on a plain white background."
+      - prompt: "front view overhead shot elevated shot medium shot. One single 16x16 pixel art tile that fully fills the frame with continuous texture. Seamlessly repeatable in all directions."

@@ -9,7 +9,13 @@ from typing import Dict, List, Optional
 
 from PIL import Image
 
-from src.common import write_json
+from src.common import read_yaml, write_json
+from src.tokens import (
+    TokenConfig,
+    caption_has_all_tokens,
+    caption_has_token,
+    parse_token_config,
+)
 
 
 @dataclass
@@ -38,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--image-extensions",
-        default="png,jpg,jpeg,webp",
+        default="png,jpg,jpeg",
         help="Comma-separated image extensions for sidecar_txt mode.",
     )
     parser.add_argument("--expected-resolution", type=int, default=1024, help="Expected width/height in pixels (square).")
@@ -63,7 +69,13 @@ def parse_args() -> argparse.Namespace:
         "--require-trigger-token",
         type=str,
         default="",
-        help="If set, captions must begin with this token (example: <sks>).",
+        help="(Legacy) If set, captions must begin with this token. Prefer --token-config instead.",
+    )
+    parser.add_argument(
+        "--token-config",
+        type=Path,
+        default=None,
+        help="Path to data.yaml config for multi-token validation. Reads tokens: block.",
     )
     return parser.parse_args()
 
@@ -131,6 +143,33 @@ def validate_row(
     return issues
 
 
+def _validate_tokens(
+    text: str,
+    required_tokens: List[str],
+    row_idx: int,
+) -> List[ValidationIssue]:
+    """Validate that all required tokens are present in a caption."""
+    issues: List[ValidationIssue] = []
+    if not required_tokens:
+        return issues
+
+    for token in required_tokens:
+        tok = token.strip()
+        if not tok:
+            continue
+        if not caption_has_token(text, tok):
+            issues.append(
+                ValidationIssue(
+                    "warning",
+                    "missing_token",
+                    row_idx,
+                    f"Caption is missing required token '{tok}'.",
+                )
+            )
+    return issues
+
+
+# Legacy wrapper kept for backward compatibility
 def _validate_trigger_token(text: str, trigger_token: str, row_idx: int) -> Optional[ValidationIssue]:
     token = trigger_token.strip()
     if not token:
@@ -167,12 +206,24 @@ def main() -> int:
     metadata_path = dataset_root / args.metadata_file
     issues: List[ValidationIssue] = []
 
+    # ── Token configuration ────────────────────────────────────────────────
+    token_config: Optional[TokenConfig] = None
+    required_tokens: List[str] = []
+    if args.token_config is not None:
+        data_cfg = read_yaml(args.token_config.resolve())
+        token_config = parse_token_config(data_cfg)
+        if token_config.validate_presence:
+            required_tokens = [t.value for t in token_config.required_tokens()]
+            if required_tokens:
+                print(f"[INFO] Validating required tokens: {', '.join(required_tokens)}")
+
     rows_total = 0
     rows_parsed = 0
     unique_ids = set()
     unique_files = set()
     caption_lengths: List[int] = []
     asset_families: List[str] = []
+    token_missing_counts: Dict[str, int] = {}
 
     if args.mode == "hf_jsonl":
         if not metadata_path.exists():
@@ -214,6 +265,22 @@ def main() -> int:
                 if "text" in payload:
                     text = str(payload["text"])
                     caption_lengths.append(len(text))
+
+                    # Multi-token validation (new)
+                    token_issues = _validate_tokens(
+                        text=text,
+                        required_tokens=required_tokens,
+                        row_idx=line_number,
+                    )
+                    issues.extend(token_issues)
+                    for ti in token_issues:
+                        # Extract token name from message for counting
+                        for tok in required_tokens:
+                            if tok in ti.message:
+                                token_missing_counts[tok] = token_missing_counts.get(tok, 0) + 1
+                                break
+
+                    # Legacy trigger token validation (backward compatible)
                     trigger_issue = _validate_trigger_token(text=text, trigger_token=args.require_trigger_token, row_idx=line_number)
                     if trigger_issue is not None:
                         issues.append(trigger_issue)
@@ -261,6 +328,20 @@ def main() -> int:
             )
             issues.extend(row_issues)
 
+            # Multi-token validation (new)
+            token_issues = _validate_tokens(
+                text=text,
+                required_tokens=required_tokens,
+                row_idx=line_number,
+            )
+            issues.extend(token_issues)
+            for ti in token_issues:
+                for tok in required_tokens:
+                    if tok in ti.message:
+                        token_missing_counts[tok] = token_missing_counts.get(tok, 0) + 1
+                        break
+
+            # Legacy trigger token validation
             trigger_issue = _validate_trigger_token(text=text, trigger_token=args.require_trigger_token, row_idx=line_number)
             if trigger_issue is not None:
                 issues.append(trigger_issue)
@@ -295,6 +376,11 @@ def main() -> int:
             "avg": round((sum(caption_lengths) / len(caption_lengths)), 2) if caption_lengths else 0,
             "warn_threshold": args.caption_warn_chars,
         },
+        "tokens": {
+            "required": required_tokens,
+            "missing_counts": token_missing_counts if token_missing_counts else {},
+            "all_present": len(token_missing_counts) == 0 if required_tokens else None,
+        } if required_tokens else None,
     }
 
     report_path = dataset_root / "validation_report.ostris.json"
@@ -319,4 +405,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

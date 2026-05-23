@@ -9,16 +9,16 @@ if [[ "$#" -gt 0 ]]; then
 fi
 
 if [[ "$MODEL_SIZE" == "9b" ]]; then
-  MODEL_CONFIG="$ROOT_DIR/configs/model_flux2_klein_9b.yaml"
+  MODEL_CONFIG="$ROOT_DIR/config/model_flux2_klein_9b.yaml"
 else
-  MODEL_CONFIG="$ROOT_DIR/configs/model_flux2_klein_4b.yaml"
+  MODEL_CONFIG="$ROOT_DIR/config/model_flux2_klein_4b.yaml"
 fi
 
 python3 -m src.infer_lora \
   --model-config "$MODEL_CONFIG" \
+  --data-config "$ROOT_DIR/config/data.yaml" \
   --adapter-path "$ADAPTER_PATH" \
-  --prompt "<sks> medieval granary, top-down pixel art 16x16, white background" \
+  --prompt "top-down pixel art 16x16, white background" \
   --output-dir "$ROOT_DIR/eval_samples" \
   --num-images 4 \
   "$@"
-

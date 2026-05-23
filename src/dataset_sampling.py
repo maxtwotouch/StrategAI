@@ -4,7 +4,9 @@ import json
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from src.tokens import TokenConfig, prepend_tokens_to_caption
 
 
 def load_metadata_rows(metadata_path: Path) -> List[Dict[str, Any]]:
@@ -27,30 +29,42 @@ def write_metadata_rows(metadata_path: Path, rows: List[Dict[str, Any]]) -> None
             handle.write(json.dumps(row, ensure_ascii=True) + "\n")
 
 
-def prepend_trigger_token_to_caption(caption: str, trigger_token: str) -> str:
-    cleaned_caption = " ".join(caption.strip().split())
-    cleaned_trigger = trigger_token.strip()
-    if not cleaned_trigger:
-        return cleaned_caption
-    if not cleaned_caption:
-        return cleaned_trigger
-    if cleaned_caption.startswith(cleaned_trigger):
-        return cleaned_caption
-    return f"{cleaned_trigger} {cleaned_caption}"
-
-
 def apply_caption_transform(
     rows: List[Dict[str, Any]],
     caption_column: str,
-    trigger_token: str,
-    prepend_trigger_token: bool,
+    token_config: Optional[TokenConfig] = None,
+    trigger_token: str = "",
+    prepend_trigger_token: bool = False,
 ) -> List[Dict[str, Any]]:
+    """
+    Apply token prepending to captions.
+
+    Supports both new-style TokenConfig and legacy trigger_token arguments.
+    When token_config is provided, it takes precedence.
+    """
+    # Determine which tokens to prepend
+    tokens_to_prepend: List[str] = []
+    should_prepend = False
+
+    if token_config is not None and token_config.prepend_to_captions:
+        tokens_to_prepend = token_config.token_values()
+        should_prepend = True
+    elif prepend_trigger_token and trigger_token:
+        tokens_to_prepend = [trigger_token.strip()]
+        should_prepend = True
+
+    if not should_prepend or not tokens_to_prepend:
+        # No transformation needed — just normalize whitespace
+        return [
+            {**row, caption_column: " ".join(str(row.get(caption_column, "")).strip().split())}
+            for row in rows
+        ]
+
     transformed: List[Dict[str, Any]] = []
     for row in rows:
         next_row = dict(row)
         caption = str(next_row.get(caption_column, "")).strip()
-        if prepend_trigger_token:
-            caption = prepend_trigger_token_to_caption(caption=caption, trigger_token=trigger_token)
+        caption = prepend_tokens_to_caption(caption=caption, tokens=tokens_to_prepend)
         next_row[caption_column] = caption
         transformed.append(next_row)
     return transformed
@@ -59,7 +73,7 @@ def apply_caption_transform(
 def _iter_images(image_dir: Path, extensions: Iterable[str]) -> List[Path]:
     normalized = {ext.lower().lstrip(".") for ext in extensions if ext.strip()}
     if not normalized:
-        normalized = {"png", "jpg", "jpeg", "webp"}
+        normalized = {"png", "jpg", "jpeg"}
 
     images: List[Path] = []
     for path in sorted(image_dir.rglob("*")):
@@ -187,3 +201,36 @@ def stratified_sample_rows(
 
     return sampled, report
 
+
+def write_prepared_dataset(
+    rows: List[Dict[str, Any]],
+    prepared_dir: Path,
+    image_dir: Path,
+    image_column: str = "file_name",
+    caption_column: str = "text",
+) -> None:
+    """
+    Write token-injected captions as .txt sidecar files in a prepared
+    dataset directory that the ai-toolkit can consume directly.
+
+    Each row produces one .txt file named after its image, and a symlink
+    (or copy) of the image.  The resulting directory is a valid
+    ai-toolkit dataset folder.
+    """
+    prepared_dir.mkdir(parents=True, exist_ok=True)
+    for row in rows:
+        rel_path = row.get(image_column, "")
+        if not rel_path:
+            continue
+        src_image = (image_dir / rel_path).resolve()
+        dst_image = (prepared_dir / rel_path).resolve()
+        dst_image.parent.mkdir(parents=True, exist_ok=True)
+        if not dst_image.exists():
+            try:
+                dst_image.symlink_to(src_image)
+            except OSError:
+                import shutil
+                shutil.copy2(str(src_image), str(dst_image))
+        caption = str(row.get(caption_column, "")).strip()
+        cap_path = dst_image.with_suffix(".txt")
+        cap_path.write_text(caption + "\n", encoding="utf-8")

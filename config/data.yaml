@@ -1,0 +1,49 @@
+dataset_root: dataset
+metadata_file: metadata.jsonl
+image_dir: images
+format: hf_jsonl
+caption_source: metadata
+caption_txt_extension: .txt
+image_extensions:
+  - png
+  - jpg
+  - jpeg
+caption_column: text
+id_column: id
+image_column: file_name
+
+# ── Custom Token Configuration ─────────────────────────────────────────────
+# Tokens are prepended to every caption at training time and also injected
+# into validation prompts automatically — you do NOT need to put tokens in
+# your raw captions or validation prompts.
+#
+#   trigger: your LoRA's identity token (e.g. "<tmp>").  Used at inference
+#            to activate the trained LoRA.  Set to "" to disable.
+#   pose:    optional viewpoint token (e.g. "<pose-topdown>")
+#   style:   optional style token (e.g. "<style-steampunk>")
+#   asset:   optional asset-type token (e.g. "<asset-structure>")
+#   custom:  list of extra freeform tokens
+#
+#   prepend_to_captions: true → all defined tokens are prepended to captions
+#   validate_presence:    true → log a warning if captions lack expected tokens
+#
+# Set to null or "" to disable a token.
+# ────────────────────────────────────────────────────────────────────────────
+tokens:
+  trigger: "<tmp>"
+  pose: null
+  style: null
+  asset: null
+  custom: []
+  prepend_to_captions: true
+  validate_presence: true
+
+resolution: 1024
+repeats: 1
+default_caption: ""
+caption_max_chars: 700
+shuffle_seed: 42
+sampling:
+  dataset_size: null
+  stratify_column: asset_family
+  seed: 42
