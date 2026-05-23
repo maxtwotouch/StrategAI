@@ -156,7 +156,7 @@
     "inputs": {
       "filename_prefix": "DATASET_PIX_BG",
       "images": [
-        "112",
+        "117",
         0
       ]
     },
@@ -313,6 +313,41 @@
     "class_type": "SolidMask",
     "_meta": {
       "title": "SolidMask"
+    }
+  },
+  "117": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "121",
+        0
+      ],
+      "source": [
+        "112",
+        0
+      ],
+      "mask": [
+        "109",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "121": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1,
+      "color": 16777215
+    },
+    "class_type": "EmptyImage",
+    "_meta": {
+      "title": "EmptyImage"
     }
   }
 }
