@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 from src.common import build_ostris_training_payload, read_yaml, write_yaml
-from src.tokens import parse_token_config
 
 
 def _coerce_override(value: str) -> Any:
@@ -66,9 +65,7 @@ def main() -> int:
     overrides = parse_overrides(args.override)
     run_cfg.update(overrides)
 
-    token_cfg = parse_token_config(data_cfg)
-
-    payload = build_ostris_training_payload(data_cfg=data_cfg, model_cfg=model_cfg, run_cfg=run_cfg, token_config=token_cfg)
+    payload = build_ostris_training_payload(data_cfg=data_cfg, model_cfg=model_cfg, run_cfg=run_cfg)
     write_yaml(args.output.resolve(), payload)
 
     print(f"[INFO] Generated Ostris ai-toolkit config: {args.output.resolve()}")

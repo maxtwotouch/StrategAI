@@ -4,7 +4,6 @@ import subprocess
 from pathlib import Path
 
 from src.common import build_ostris_training_payload, read_yaml
-from src.tokens import parse_token_config
 
 
 def main() -> int:
@@ -20,7 +19,7 @@ def main() -> int:
         str(dataset_root),
         "--expected-resolution",
         "1024",
-        "--token-config",
+        "--data-config",
         str(root / "config" / "data.yaml"),
     ]
     result = subprocess.run(validate_cmd, check=False)
@@ -32,8 +31,7 @@ def main() -> int:
     data_cfg = read_yaml(root / "config" / "data.yaml")
     model_cfg = read_yaml(root / "config" / "model_flux2_klein_4b.yaml")
     run_cfg = read_yaml(root / "config" / "run_lora.yaml")
-    token_cfg = parse_token_config(data_cfg)
-    payload = build_ostris_training_payload(data_cfg, model_cfg, run_cfg, token_config=token_cfg)
+    payload = build_ostris_training_payload(data_cfg, model_cfg, run_cfg)
 
     # Validate the ai-toolkit job + config structure
     if payload.get("job") != "extension":

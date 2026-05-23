@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from src.common import read_yaml
-from src.tokens import parse_token_config
 
 
 class CheckResult:
@@ -58,45 +57,22 @@ def check_dataset(root: Path) -> List[CheckResult]:
     dataset_root = (root / str(data_cfg.get("dataset_root", "dataset"))).resolve()
     caption_source = str(data_cfg.get("caption_source", "metadata")).strip().lower()
 
-    # ── Token configuration check ──────────────────────────────────────────
-    token_config = parse_token_config(data_cfg)
-    all_tokens = token_config.token_values()
-
-    if token_config.prepend_to_captions and not all_tokens:
+    # ── Trigger word check ───────────────────────────────────────────────
+    trigger_word = str(data_cfg.get("trigger_word", "")).strip()
+    if trigger_word:
         results.append(
             CheckResult(
-                "Custom tokens",
-                False,
-                "prepend_to_captions=true but no tokens defined.",
-                "Define at least a trigger token in config/data.yaml under tokens:",
-            )
-        )
-    elif all_tokens:
-        categories = []
-        if token_config.trigger:
-            categories.append(f"trigger={token_config.trigger.value}")
-        if token_config.pose:
-            categories.append(f"pose={token_config.pose.value}")
-        if token_config.style:
-            categories.append(f"style={token_config.style.value}")
-        if token_config.asset:
-            categories.append(f"asset={token_config.asset.value}")
-        if token_config.custom:
-            categories.append(f"custom=[{', '.join(t.value for t in token_config.custom)}]")
-        cat_str = ", ".join(categories) if categories else "none"
-        results.append(
-            CheckResult(
-                "Custom tokens",
+                "Trigger word",
                 True,
-                f"{len(all_tokens)} token(s) defined ({cat_str}), prepend={token_config.prepend_to_captions}",
+                f"trigger_word={trigger_word} (injected by ai-toolkit at training time)",
             )
         )
     else:
         results.append(
             CheckResult(
-                "Custom tokens",
+                "Trigger word",
                 True,
-                "No custom tokens defined (using raw captions).",
+                "No trigger_word set — captions will be used as-is.",
             )
         )
 
@@ -165,12 +141,16 @@ def check_dataset(root: Path) -> List[CheckResult]:
 
     families: Dict[str, int] = {}
     missing_images = 0
+    trigger_in_captions = 0
     for row in rows:
         fam = str(row.get("asset_family", "__missing__"))
         families[fam] = families.get(fam, 0) + 1
         img_path = dataset_root / str(row.get("file_name", ""))
         if not img_path.exists():
             missing_images += 1
+        # Warn if trigger word is baked into source captions
+        if trigger_word and trigger_word in str(row.get(data_cfg.get("caption_column", "text"), "")):
+            trigger_in_captions += 1
 
     results.append(
         CheckResult(
@@ -189,6 +169,16 @@ def check_dataset(root: Path) -> List[CheckResult]:
             "Ensure every file_name in metadata points to an existing image.",
         )
     )
+
+    if trigger_word and trigger_in_captions:
+        results.append(
+            CheckResult(
+                "Trigger in captions",
+                False,
+                f"{trigger_in_captions} captions contain trigger_word '{trigger_word}'.",
+                "The toolkit injects trigger_word automatically. Remove it from source captions for cleaner, reusable data.",
+            )
+        )
 
     return results
 

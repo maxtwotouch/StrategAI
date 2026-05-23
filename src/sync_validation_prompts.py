@@ -3,14 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from src.common import read_yaml, write_yaml
-from src.tokens import TokenConfig, format_prompt_with_tokens, parse_token_config
 
 
 def normalize_text(text: str) -> str:
-    # Keep the wording style from training captions while removing excess whitespace.
     return " ".join(text.strip().split())
 
 
@@ -25,8 +23,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--caption-txt-extension", default=".txt")
     parser.add_argument("--image-extensions", default="png,jpg,jpeg")
     parser.add_argument("--run-config", type=Path, default=Path("config/run_lora.yaml"))
-    parser.add_argument("--data-config", type=Path, default=Path("config/data.yaml"),
-                        help="Path to data.yaml to read token configuration for prompt formatting.")
     parser.add_argument("--max-prompts", type=int, default=6)
     parser.add_argument("--max-chars", type=int, default=420)
     parser.add_argument("--caption-column", default="text")
@@ -49,8 +45,8 @@ def collect_prompts(
     caption_column: str,
     max_prompts: int,
     max_chars: int,
-    token_config: Optional[TokenConfig] = None,
 ) -> List[str]:
+    """Collect clean captions from metadata — toolkit injects trigger_word at training time."""
     prompts: List[str] = []
     seen = set()
 
@@ -67,9 +63,6 @@ def collect_prompts(
             if not raw:
                 continue
             clipped = clip_prompt(raw, max_chars)
-            # Apply token formatting if token config is available
-            if token_config is not None and token_config.token_values():
-                clipped = format_prompt_with_tokens(clipped, token_config)
             if clipped in seen:
                 continue
             seen.add(clipped)
@@ -84,8 +77,8 @@ def collect_prompts_from_sidecar_txt(
     image_extensions: str,
     max_prompts: int,
     max_chars: int,
-    token_config: Optional[TokenConfig] = None,
 ) -> List[str]:
+    """Collect clean captions from sidecar .txt files — toolkit injects trigger_word at training time."""
     prompts: List[str] = []
     seen = set()
     cap_ext = caption_extension if caption_extension.startswith(".") else f".{caption_extension}"
@@ -105,8 +98,6 @@ def collect_prompts_from_sidecar_txt(
         if not raw:
             continue
         clipped = clip_prompt(raw, max_chars)
-        if token_config is not None and token_config.token_values():
-            clipped = format_prompt_with_tokens(clipped, token_config)
         if clipped in seen:
             continue
         seen.add(clipped)
@@ -125,15 +116,6 @@ def main() -> int:
         print("[ERROR] --max-chars must be a positive integer.")
         return 1
 
-    # Parse token configuration for prompt formatting
-    token_config: Optional[TokenConfig] = None
-    data_config_path = args.data_config.resolve()
-    if data_config_path.exists():
-        data_cfg = read_yaml(data_config_path)
-        token_config = parse_token_config(data_cfg)
-        if token_config.token_values():
-            print(f"[INFO] Using custom tokens: {', '.join(token_config.token_values())}")
-
     dataset_root = args.dataset_root.resolve()
     metadata_path = dataset_root / args.metadata_file
 
@@ -151,7 +133,6 @@ def main() -> int:
             image_extensions=args.image_extensions,
             max_prompts=args.max_prompts,
             max_chars=args.max_chars,
-            token_config=token_config,
         )
     else:
         if not metadata_path.exists():
@@ -162,7 +143,6 @@ def main() -> int:
             caption_column=args.caption_column,
             max_prompts=args.max_prompts,
             max_chars=args.max_chars,
-            token_config=token_config,
         )
     if not prompts:
         print("[ERROR] No prompts collected from metadata.")

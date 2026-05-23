@@ -8,9 +8,9 @@ config:
   training_folder: "./output"
   device: "cuda"
 
-  # ── Trigger word (injected at training time) ──────────────────────
-  # Dataset captions already contain <tmp>; the toolkit skips
-  # prepending if already present (§3.1).
+  # ── Trigger word (injected at training time by ai-toolkit) ──────
+  # Source captions should NOT contain this token — the toolkit
+  # prepends it automatically at training time (§3.1 of training-guide.md).
   trigger_word: "<tmp>"
 
   # ── LoRA network definition ───────────────────────────────────────

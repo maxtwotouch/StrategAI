@@ -10,12 +10,6 @@ from typing import Dict, List, Optional
 from PIL import Image
 
 from src.common import read_yaml, write_json
-from src.tokens import (
-    TokenConfig,
-    caption_has_all_tokens,
-    caption_has_token,
-    parse_token_config,
-)
 
 
 @dataclass
@@ -66,16 +60,10 @@ def parse_args() -> argparse.Namespace:
         help="Minimum recommended samples per asset_family/style bucket.",
     )
     parser.add_argument(
-        "--require-trigger-token",
-        type=str,
-        default="",
-        help="(Legacy) If set, captions must begin with this token. Prefer --token-config instead.",
-    )
-    parser.add_argument(
-        "--token-config",
+        "--data-config",
         type=Path,
         default=None,
-        help="Path to data.yaml config for multi-token validation. Reads tokens: block.",
+        help="Path to data.yaml to read trigger_word for caption validation.",
     )
     return parser.parse_args()
 
@@ -143,40 +131,26 @@ def validate_row(
     return issues
 
 
-def _validate_tokens(
-    text: str,
-    required_tokens: List[str],
-    row_idx: int,
-) -> List[ValidationIssue]:
-    """Validate that all required tokens are present in a caption."""
-    issues: List[ValidationIssue] = []
-    if not required_tokens:
-        return issues
+def _check_trigger_in_caption(text: str, trigger_word: str, row_idx: int) -> Optional[ValidationIssue]:
+    """Warn if the trigger word appears in source captions.
 
-    for token in required_tokens:
-        tok = token.strip()
-        if not tok:
-            continue
-        if not caption_has_token(text, tok):
-            issues.append(
-                ValidationIssue(
-                    "warning",
-                    "missing_token",
-                    row_idx,
-                    f"Caption is missing required token '{tok}'.",
-                )
-            )
-    return issues
-
-
-# Legacy wrapper kept for backward compatibility
-def _validate_trigger_token(text: str, trigger_token: str, row_idx: int) -> Optional[ValidationIssue]:
-    token = trigger_token.strip()
-    if not token:
+    Per toolkit guidelines (§3.1 of training-guide.md), trigger words should
+    NOT be baked into source captions — the toolkit injects them at training
+    time.  If a user has baked the token in anyway, the toolkit's duplicate
+    detection will prevent double-injection, but we warn that the captions
+    are less portable.
+    """
+    if not trigger_word.strip():
         return None
-    if text.strip().startswith(token):
-        return None
-    return ValidationIssue("warning", "missing_trigger_prefix", row_idx, f"Caption does not start with trigger token '{token}'.")
+    if trigger_word.strip() in text:
+        return ValidationIssue(
+            "warning",
+            "trigger_in_caption",
+            row_idx,
+            f"Caption contains trigger word '{trigger_word}'. "
+            "The toolkit injects this automatically; consider removing it for cleaner, reusable captions.",
+        )
+    return None
 
 
 def _format_recommendation(rows_parsed: int, asset_counts: Counter, min_per_stratum: int) -> str:
@@ -206,16 +180,13 @@ def main() -> int:
     metadata_path = dataset_root / args.metadata_file
     issues: List[ValidationIssue] = []
 
-    # ── Token configuration ────────────────────────────────────────────────
-    token_config: Optional[TokenConfig] = None
-    required_tokens: List[str] = []
-    if args.token_config is not None:
-        data_cfg = read_yaml(args.token_config.resolve())
-        token_config = parse_token_config(data_cfg)
-        if token_config.validate_presence:
-            required_tokens = [t.value for t in token_config.required_tokens()]
-            if required_tokens:
-                print(f"[INFO] Validating required tokens: {', '.join(required_tokens)}")
+    # ── Trigger word ──────────────────────────────────────────────────────
+    trigger_word: str = ""
+    if args.data_config is not None:
+        data_cfg = read_yaml(args.data_config.resolve())
+        trigger_word = str(data_cfg.get("trigger_word", "")).strip()
+        if trigger_word:
+            print(f"[INFO] Trigger word: {trigger_word} — will warn if found in captions (toolkit injects automatically)")
 
     rows_total = 0
     rows_parsed = 0
@@ -223,7 +194,7 @@ def main() -> int:
     unique_files = set()
     caption_lengths: List[int] = []
     asset_families: List[str] = []
-    token_missing_counts: Dict[str, int] = {}
+    trigger_warnings = 0
 
     if args.mode == "hf_jsonl":
         if not metadata_path.exists():
@@ -266,24 +237,12 @@ def main() -> int:
                     text = str(payload["text"])
                     caption_lengths.append(len(text))
 
-                    # Multi-token validation (new)
-                    token_issues = _validate_tokens(
-                        text=text,
-                        required_tokens=required_tokens,
-                        row_idx=line_number,
-                    )
-                    issues.extend(token_issues)
-                    for ti in token_issues:
-                        # Extract token name from message for counting
-                        for tok in required_tokens:
-                            if tok in ti.message:
-                                token_missing_counts[tok] = token_missing_counts.get(tok, 0) + 1
-                                break
+                    if trigger_word:
+                        tw_issue = _check_trigger_in_caption(text, trigger_word, line_number)
+                        if tw_issue is not None:
+                            issues.append(tw_issue)
+                            trigger_warnings += 1
 
-                    # Legacy trigger token validation (backward compatible)
-                    trigger_issue = _validate_trigger_token(text=text, trigger_token=args.require_trigger_token, row_idx=line_number)
-                    if trigger_issue is not None:
-                        issues.append(trigger_issue)
                 family = payload.get("asset_family")
                 if family is not None:
                     asset_families.append(str(family))
@@ -328,23 +287,11 @@ def main() -> int:
             )
             issues.extend(row_issues)
 
-            # Multi-token validation (new)
-            token_issues = _validate_tokens(
-                text=text,
-                required_tokens=required_tokens,
-                row_idx=line_number,
-            )
-            issues.extend(token_issues)
-            for ti in token_issues:
-                for tok in required_tokens:
-                    if tok in ti.message:
-                        token_missing_counts[tok] = token_missing_counts.get(tok, 0) + 1
-                        break
-
-            # Legacy trigger token validation
-            trigger_issue = _validate_trigger_token(text=text, trigger_token=args.require_trigger_token, row_idx=line_number)
-            if trigger_issue is not None:
-                issues.append(trigger_issue)
+            if trigger_word:
+                tw_issue = _check_trigger_in_caption(text, trigger_word, line_number)
+                if tw_issue is not None:
+                    issues.append(tw_issue)
+                    trigger_warnings += 1
 
             unique_ids.add(payload["id"])
             unique_files.add(payload["file_name"])
@@ -376,12 +323,11 @@ def main() -> int:
             "avg": round((sum(caption_lengths) / len(caption_lengths)), 2) if caption_lengths else 0,
             "warn_threshold": args.caption_warn_chars,
         },
-        "tokens": {
-            "required": required_tokens,
-            "missing_counts": token_missing_counts if token_missing_counts else {},
-            "all_present": len(token_missing_counts) == 0 if required_tokens else None,
-        } if required_tokens else None,
     }
+
+    if trigger_word:
+        report["trigger_word"] = trigger_word
+        report["trigger_in_captions"] = trigger_warnings
 
     report_path = dataset_root / "validation_report.ostris.json"
     issues_path = dataset_root / "validation_issues.ostris.jsonl"

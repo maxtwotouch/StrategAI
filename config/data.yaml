@@ -12,31 +12,11 @@ caption_column: text
 id_column: id
 image_column: file_name
 
-# ── Custom Token Configuration ─────────────────────────────────────────────
-# Tokens are prepended to every caption at training time and also injected
-# into validation prompts automatically — you do NOT need to put tokens in
-# your raw captions or validation prompts.
-#
-#   trigger: your LoRA's identity token (e.g. "<tmp>").  Used at inference
-#            to activate the trained LoRA.  Set to "" to disable.
-#   pose:    optional viewpoint token (e.g. "<pose-topdown>")
-#   style:   optional style token (e.g. "<style-steampunk>")
-#   asset:   optional asset-type token (e.g. "<asset-structure>")
-#   custom:  list of extra freeform tokens
-#
-#   prepend_to_captions: true → all defined tokens are prepended to captions
-#   validate_presence:    true → log a warning if captions lack expected tokens
-#
-# Set to null or "" to disable a token.
-# ────────────────────────────────────────────────────────────────────────────
-tokens:
-  trigger: "<tmp>"
-  pose: null
-  style: null
-  asset: null
-  custom: []
-  prepend_to_captions: true
-  validate_presence: true
+# ── Trigger word (injected at training time by ai-toolkit) ──────────────────
+# The toolkit prepends this to every caption and validation prompt automatically.
+# Source captions should NOT contain the trigger word — it's a training artifact.
+# Set to "" or null to disable.
+trigger_word: "<tmp>"
 
 resolution: 1024
 repeats: 1

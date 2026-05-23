@@ -7,8 +7,6 @@ from typing import Any, Dict, Optional
 
 import yaml
 
-from src.tokens import TokenConfig, parse_token_config, prepend_tokens_to_caption
-
 
 def read_yaml(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
@@ -45,33 +43,28 @@ def build_ostris_training_payload(
     data_cfg: Dict[str, Any],
     model_cfg: Dict[str, Any],
     run_cfg: Dict[str, Any],
-    token_config: Optional[TokenConfig] = None,
-    prepared_dataset_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """
-    Build an ai-toolkit-compatible training config (the format accepted by
-    ``python run.py <config.yml>`` in a standard Ostris ai-toolkit install).
+    Build an ai-toolkit-compatible training config.
 
-    Field names and structure follow the reference described in
-    training-guide.md §4.1 — compatible with the real toolkit CLI.
+    The toolkit's native ``trigger_word`` handles all token injection —
+    captions and sample prompts are kept clean; the toolkit prepends the
+    trigger at training time.  This follows the reference in
+    training-guide.md §3.1.
     """
     data_cfg = expand_env(data_cfg)
     model_cfg = expand_env(model_cfg)
     run_cfg = expand_env(run_cfg)
 
-    token_config = token_config or parse_token_config(data_cfg)
+    # ── trigger word ─────────────────────────────────────────────
+    trigger_word = str(data_cfg.get("trigger_word", "")).strip() or None
 
-    # ── dataset folder ────────────────────────────────────────────
-    if prepared_dataset_dir is not None:
-        folder_path = str(prepared_dataset_dir.resolve())
-    else:
-        # Fallback — the toolkit won't find sidecar .txt files unless
-        # the user has already prepared them manually.
-        dataset_root = Path(data_cfg["dataset_root"]).resolve()
-        image_dir = (dataset_root / data_cfg.get("image_dir", "images")).resolve()
-        folder_path = str(image_dir)
+    # ── dataset folder (point toolkit directly at source images) ─
+    dataset_root = Path(data_cfg["dataset_root"]).resolve()
+    image_dir = (dataset_root / data_cfg.get("image_dir", "images")).resolve()
+    folder_path = str(image_dir)
 
-    # ── resolution buckets (prefer run_cfg list over data_cfg scalar)
+    # ── resolution buckets ───────────────────────────────────────
     raw_resolution = run_cfg.get("resolution_buckets") or data_cfg.get("resolution")
     if raw_resolution is None:
         resolution_buckets = [1024]
@@ -80,32 +73,14 @@ def build_ostris_training_payload(
     else:
         resolution_buckets = [int(raw_resolution)]
 
-    # ── trigger_word ──────────────────────────────────────────────
-    # If tokens are already baked into captions via our prepend step,
-    # we leave trigger_word unset so the toolkit doesn't double-prepend.
-    trigger_word = None
-    if token_config.trigger is not None and token_config.trigger.value.strip():
-        if not token_config.prepend_to_captions:
-            # User wants the toolkit itself to inject the trigger word.
-            trigger_word = token_config.trigger.value.strip()
-
-    # ── validation prompts (tokenised only when WE are doing the prepend) ──
-    # When trigger_word is set, the toolkit prepends it to every caption and
-    # sample prompt — we must NOT also prepend here or the token appears twice.
+    # ── validation prompts (kept clean; toolkit injects trigger) ─
     raw_prompts: list = run_cfg.get("validation_prompts", [])
-    sample_prompts = []
-    if not trigger_word and token_config.prepend_to_captions and token_config.token_values():
-        tokens = token_config.token_values()
-        for p in raw_prompts:
-            sample_prompts.append({"prompt": prepend_tokens_to_caption(str(p), tokens)})
-    else:
-        for p in raw_prompts:
-            sample_prompts.append({"prompt": str(p)})
+    sample_prompts = [{"prompt": str(p)} for p in raw_prompts]
 
     # ── optimizer ─────────────────────────────────────────────────
     optimizer = str(run_cfg.get("optimizer", "adamw_8bit"))
 
-    # ── assemble the config block ─────────────────────────────────
+    # ── assemble config block ─────────────────────────────────────
     config_block: Dict[str, Any] = {
         "name": run_cfg.get("run_name", "flux2_klein_lora"),
         "process": [{"type": "diffusion_trainer"}],

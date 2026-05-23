@@ -10,14 +10,11 @@ from typing import Dict, List
 
 from src.common import build_ostris_training_payload, read_yaml, write_yaml
 from src.dataset_sampling import (
-    apply_caption_transform,
     load_metadata_rows,
     load_sidecar_caption_rows,
     stratified_sample_rows,
     write_metadata_rows,
-    write_prepared_dataset,
 )
-from src.tokens import parse_token_config
 
 
 def _load_dotenv(root: Path) -> None:
@@ -138,24 +135,15 @@ def main() -> int:
     sampling_cfg = data_cfg.get("sampling", {}) if isinstance(data_cfg.get("sampling", {}), dict) else {}
     dataset_root = Path(data_cfg["dataset_root"]).resolve()
 
-    # Parse token configuration from structured tokens: block
-    token_config = parse_token_config(data_cfg)
-    caption_column = str(data_cfg.get("caption_column", "text"))
+    # ── Trigger word logging ──────────────────────────────────────
+    trigger_word = str(data_cfg.get("trigger_word", "")).strip()
+    if trigger_word:
+        print(f"[INFO] Trigger word: {trigger_word} (injected by ai-toolkit at training time)")
+    else:
+        print("[INFO] No trigger word set — captions will be used as-is.")
 
-
-    # Log token configuration
-    all_tokens = token_config.token_values()
-    if all_tokens:
-        print(f"[INFO] Custom tokens: {', '.join(all_tokens)}")
-        print(f"[INFO] Token prepend: {'enabled' if token_config.prepend_to_captions else 'disabled'}")
-        print(f"[INFO] Token validation: {'enabled' if token_config.validate_presence else 'disabled'}")
-
+    # ── Load rows (for metadata audit only; captions stay clean) ─
     rows = _load_rows_for_training(data_cfg=data_cfg, dataset_root=dataset_root)
-    rows = apply_caption_transform(
-        rows=rows,
-        caption_column=caption_column,
-        token_config=token_config,
-    )
 
     target_size = args.dataset_size if args.dataset_size is not None else sampling_cfg.get("dataset_size")
     if target_size is not None:
@@ -180,42 +168,25 @@ def main() -> int:
             json.dump(sampling_report, handle, indent=2)
             handle.write("\n")
 
+        # Write a sampled metadata audit copy
         data_cfg["metadata_file"] = str(sampled_metadata_path)
         data_cfg["format"] = "hf_jsonl"
         print(f"[INFO] Applied stratified sampling: {target_size} rows by `{stratify_column}`")
         print(f"[INFO] Wrote sampled metadata: {sampled_metadata_path}")
         print(f"[INFO] Wrote sampling report: {sampling_report_path}")
-        rows = sampled_rows
     else:
+        # Write metadata audit copy for transparency
         prepared_metadata_path = run_dir / "metadata.prepared.jsonl"
         write_metadata_rows(prepared_metadata_path, rows)
-        data_cfg["metadata_file"] = str(prepared_metadata_path)
-        data_cfg["format"] = "hf_jsonl"
-        print(f"[INFO] Wrote prepared metadata: {prepared_metadata_path}")
+        print(f"[INFO] Wrote metadata audit: {prepared_metadata_path}")
 
-    if token_config.prepend_to_captions and token_config.token_values():
-        print(f"[INFO] Tokens prepended to captions: {', '.join(token_config.token_values())}")
-
-    # ── Write prepared dataset for the ai-toolkit ──────────────────────
-    # The toolkit expects a folder with image files and matching .txt
-    # sidecar captions.  We write the token-injected rows here so the
-    # generated config can point datasets.folder_path at this directory.
-    prepared_dataset_dir = run_dir / "prepared_dataset"
-    write_prepared_dataset(
-        rows=rows,
-        prepared_dir=prepared_dataset_dir,
-        image_dir=dataset_root,
-        image_column=str(data_cfg.get("image_column", "file_name")),
-        caption_column=caption_column,
-    )
-    print(f"[INFO] Wrote prepared dataset (images + token-injected captions): {prepared_dataset_dir}")
+    if not args.skip_size_check and len(rows) < 30:
+        print(f"[WARN] Dataset has only {len(rows)} images. Minimum 30-50 per style recommended.")
 
     payload = build_ostris_training_payload(
         data_cfg=data_cfg,
         model_cfg=model_cfg,
         run_cfg=run_cfg,
-        token_config=token_config,
-        prepared_dataset_dir=prepared_dataset_dir,
     )
     config_path = run_dir / "ostris_train.yaml"
     write_yaml(config_path, payload)
@@ -228,7 +199,6 @@ def main() -> int:
         "resume_from": args.resume_from.resolve() if args.resume_from else "",
     }
 
-    # Safely shell-quote values while letting users define their own command template.
     fmt = _stringify_mapping({k: shlex.quote(str(v)) for k, v in placeholders.items()})
     command = cmd_template.format(**fmt)
 
