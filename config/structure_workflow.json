@@ -154,7 +154,7 @@
   },
   "90": {
     "inputs": {
-      "model_name": "u2net",
+      "model_name": "isnet-general-use",
       "image": [
         "86",
         0
