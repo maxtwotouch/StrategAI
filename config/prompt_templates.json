@@ -1,6 +1,5 @@
 {
-  "_comment": "These templates are ComfyUI-only (positive_prompt field). Captions are built independently in prompt_generator.py without templates.",
-  "schema_version": 2,
+  "schema_version": 1,
   "templates": {
     "structure": "<sks> front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
     "object": "<sks> front view overhead shot elevated shot medium shot. The object faces the camera straight from the front. The object should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
