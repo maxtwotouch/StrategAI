@@ -3,9 +3,23 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
-from src.common import read_yaml, write_yaml
+import yaml
+
+
+def _read_yaml(path: Path) -> Dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected a mapping in {path}, got {type(data).__name__}")
+    return data
+
+
+def _write_yaml(path: Path, payload: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(payload, handle, sort_keys=False)
 
 
 def normalize_text(text: str) -> str:
@@ -14,7 +28,7 @@ def normalize_text(text: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Sync validation prompts in run config from dataset captions so prompts stay anchored to training data."
+        description="Sync validation prompts in training config from dataset captions."
     )
     parser.add_argument("--dataset-root", type=Path, default=Path("dataset"))
     parser.add_argument("--mode", choices=["hf_jsonl", "sidecar_txt"], default="hf_jsonl")
@@ -22,7 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-dir", default="images")
     parser.add_argument("--caption-txt-extension", default=".txt")
     parser.add_argument("--image-extensions", default="png,jpg,jpeg")
-    parser.add_argument("--run-config", type=Path, default=Path("config/run_lora.yaml"))
+    parser.add_argument("--training-config", type=Path, default=Path("config/lora_4b.yaml"))
     parser.add_argument("--max-prompts", type=int, default=6)
     parser.add_argument("--max-chars", type=int, default=420)
     parser.add_argument("--caption-column", default="text")
@@ -119,8 +133,8 @@ def main() -> int:
     dataset_root = args.dataset_root.resolve()
     metadata_path = dataset_root / args.metadata_file
 
-    run_cfg_path = args.run_config.resolve()
-    run_cfg = read_yaml(run_cfg_path)
+    training_cfg_path = args.training_config.resolve()
+    training_cfg = _read_yaml(training_cfg_path)
 
     if args.mode == "sidecar_txt":
         image_dir = (dataset_root / args.image_dir).resolve()
@@ -148,10 +162,12 @@ def main() -> int:
         print("[ERROR] No prompts collected from metadata.")
         return 1
 
-    run_cfg["validation_prompts"] = prompts
-    write_yaml(run_cfg_path, run_cfg)
+    config_block = training_cfg.setdefault("config", training_cfg)
+    sample_block = config_block.setdefault("sample", {})
+    sample_block["samples"] = [{"prompt": p} for p in prompts]
+    _write_yaml(training_cfg_path, training_cfg)
 
-    print(f"[INFO] Updated validation_prompts in: {run_cfg_path}")
+    print(f"[INFO] Updated sample.samples in: {training_cfg_path}")
     print(f"[INFO] Prompt count: {len(prompts)}")
     return 0
 

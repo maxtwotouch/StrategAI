@@ -7,9 +7,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import yaml
 from PIL import Image
 
-from src.common import read_yaml, write_json
+
+def _read_yaml(path: Path) -> Dict[str, object]:
+    with path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected a mapping in {path}, got {type(data).__name__}")
+    return data
+
+
+def _write_json(path: Path, payload: Dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+        handle.write("\n")
 
 
 @dataclass
@@ -21,49 +35,27 @@ class ValidationIssue:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Validate HF-style text-to-image dataset for Ostris ai-toolkit fine-tuning.")
-    parser.add_argument("--dataset-root", type=Path, default=Path("dataset"), help="Path to the HF-ready dataset root.")
+    parser = argparse.ArgumentParser(description="Validate dataset for Ostris ai-toolkit fine-tuning.")
+    parser.add_argument("--dataset-root", type=Path, default=Path("dataset"), help="Path to dataset root.")
     parser.add_argument(
         "--mode",
         choices=["hf_jsonl", "sidecar_txt"],
         default="hf_jsonl",
-        help="Validation mode: metadata jsonl or sidecar .txt captions next to images.",
+        help="Validation mode: metadata jsonl or sidecar .txt captions.",
     )
-    parser.add_argument("--metadata-file", default="metadata.jsonl", help="Metadata JSONL filename, relative to dataset root.")
-    parser.add_argument("--image-dir", default="images", help="Image directory used in sidecar_txt mode.")
+    parser.add_argument("--metadata-file", default="metadata.jsonl", help="Metadata JSONL filename.")
+    parser.add_argument("--image-dir", default="images", help="Image directory for sidecar_txt mode.")
+    parser.add_argument("--caption-txt-extension", default=".txt", help="Caption sidecar extension.")
+    parser.add_argument("--image-extensions", default="png,jpg,jpeg", help="Comma-separated image extensions.")
+    parser.add_argument("--expected-resolution", type=int, default=1024, help="Expected width/height in pixels.")
+    parser.add_argument("--allow-non-square", action="store_true", help="Allow non-square images.")
+    parser.add_argument("--caption-warn-chars", type=int, default=700, help="Warn when caption exceeds this length.")
+    parser.add_argument("--min-per-stratum", type=int, default=30, help="Minimum recommended samples per bucket.")
     parser.add_argument(
-        "--caption-txt-extension",
-        default=".txt",
-        help="Caption sidecar extension used in sidecar_txt mode.",
-    )
-    parser.add_argument(
-        "--image-extensions",
-        default="png,jpg,jpeg",
-        help="Comma-separated image extensions for sidecar_txt mode.",
-    )
-    parser.add_argument("--expected-resolution", type=int, default=1024, help="Expected width/height in pixels (square).")
-    parser.add_argument(
-        "--allow-non-square",
-        action="store_true",
-        help="Allow non-square image files. If omitted, images must be square.",
-    )
-    parser.add_argument(
-        "--caption-warn-chars",
-        type=int,
-        default=700,
-        help="Warn when a caption exceeds this character count.",
-    )
-    parser.add_argument(
-        "--min-per-stratum",
-        type=int,
-        default=30,
-        help="Minimum recommended samples per asset_family/style bucket.",
-    )
-    parser.add_argument(
-        "--data-config",
+        "--training-config",
         type=Path,
         default=None,
-        help="Path to data.yaml to read trigger_word for caption validation.",
+        help="Path to training config (e.g. config/lora_4b.yaml) to read trigger_word for caption validation.",
     )
     return parser.parse_args()
 
@@ -182,9 +174,10 @@ def main() -> int:
 
     # ── Trigger word ──────────────────────────────────────────────────────
     trigger_word: str = ""
-    if args.data_config is not None:
-        data_cfg = read_yaml(args.data_config.resolve())
-        trigger_word = str(data_cfg.get("trigger_word", "")).strip()
+    if args.training_config is not None:
+        training_cfg = _read_yaml(args.training_config.resolve())
+        config_block = training_cfg.get("config", {})
+        trigger_word = str(config_block.get("trigger_word", "")).strip()
         if trigger_word:
             print(f"[INFO] Trigger word: {trigger_word} — will warn if found in captions (toolkit injects automatically)")
 
@@ -331,7 +324,7 @@ def main() -> int:
 
     report_path = dataset_root / "validation_report.ostris.json"
     issues_path = dataset_root / "validation_issues.ostris.jsonl"
-    write_json(report_path, report)
+    _write_json(report_path, report)
 
     with issues_path.open("w", encoding="utf-8") as handle:
         for issue in issues:

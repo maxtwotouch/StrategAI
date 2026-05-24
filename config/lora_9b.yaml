@@ -11,7 +11,8 @@ config:
   # ── Trigger word (injected at training time by ai-toolkit) ──────
   # Source captions should NOT contain this token — the toolkit
   # prepends it automatically at training time (§3.1 of training-guide.md).
-  trigger_word: "<tmp>"
+  # Using a bracketed token like <tdmp> works well with Flux2's text encoders.
+  trigger_word: "<tdmp>"
 
   # ── LoRA network definition ───────────────────────────────────────
   network:
@@ -72,5 +73,5 @@ config:
     seed: 42
     walk_seed: true
     samples:
-      - prompt: "front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. Isolate the object on a plain white background."
-      - prompt: "front view overhead shot elevated shot medium shot. One single 16x16 pixel art tile that fully fills the frame with continuous texture. Seamlessly repeatable in all directions."
+      - prompt: "A medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing."
+      - prompt: "A lush green grass texture tile for top-down games, with dense micro-blade clusters, soft color variation, and faint dithering. Seamlessly repeatable in all directions. 16x16 pixel art, crisp edges, readable at small scale."

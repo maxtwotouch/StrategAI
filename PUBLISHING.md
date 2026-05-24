@@ -1,183 +1,119 @@
-# Publishing a Flux2 Klein LoRA
+# Publishing Guide — Top-Down Medieval Pixel Art LoRA
 
-This is the shortest path from a working dataset to a published LoRA on Hugging Face / Civitai / GitHub.
-
----
-
-## 0. Before you start
-
-- You've already run `python -m src.validate_dataset` and it passes with `status: pass`.
-- You've run `./scripts/smoke_test.sh` and it passes.
-- You have the Ostris ai-toolkit installed and `ai-toolkit --version` works.
-- **⚠️ Compatibility caveat:** The generated `ostris_train.yaml` config contains field names that are a best-guess approximation of the ai-toolkit schema. Before a full training run, test with a 2-image dry run (`--dataset-size 2 --skip-size-check` without `--dry-run`). If the toolkit rejects unknown keys, the field mapping lives in `src/common.py:build_ostris_training_payload()`. Adjust and retest.
-- You have a Hugging Face account (or wherever you're publishing).
+This document helps you prepare the final model card and repository for publication on Hugging Face, Civitai, or your preferred model hub.
 
 ---
 
-## 1. Pick your model and tune your run config
+## Model Card Template
 
-Edit `config/run_lora.yaml`:
+When publishing your trained LoRA, include the following sections in your model card:
 
+### Trigger Token
+
+**`<tdmp>`**
+
+Always use the angle brackets. The token is injected automatically during training and must be present at inference to activate the LoRA.
+
+Example prompt:
 ```
-num_train_steps: 1500      # Default. Increase for larger datasets (e.g. 3000).
-learning_rate: 0.0001      # Start here, rarely needs changing.
-lora_rank: 32              # 32 for detail, 16 for smaller files.
-validation_prompts: [...]  # 4-8 prompts that match your training caption style.
-```
-
-Set your trigger token in `config/data.yaml`:
-
-```yaml
-tokens:
-  trigger: "<your_token>"   # e.g. "<tmp>", "<medieval-lora>"
-  prepend_to_captions: true
+<tdmp> a medieval granary in steampunk industrial style, top-down pixel art 16x16, white background
 ```
 
-Pick 4B or 9B:
-- `config/model_flux2_klein_4b.yaml` — 16 GB VRAM, easier to run
-- `config/model_flux2_klein_9b.yaml` — 48 GB VRAM, higher quality ceiling
+### Base Model
+
+- **4B config**: `black-forest-labs/FLUX.2-klein-4B`
+- **9B config**: `black-forest-labs/FLUX.2-klein-9B`
+
+### Training Summary
+
+| Parameter | Value |
+|-----------|-------|
+| Method | LoRA |
+| Rank | 32 |
+| Learning rate | 1e-4 |
+| Steps | 1500 |
+| Optimizer | adamw_8bit |
+| Resolution buckets | 512, 768, 1024 |
+| Scheduler | flowmatch / sigmoid |
+| Captions | Natural language, no trigger token in source |
+
+### Intended Use
+
+- Top-down (overhead) medieval/fantasy pixel art assets
+- Game development tilesets (structures, backgrounds, props)
+- 16×16 and similar small-scale pixel art styles
+- Consistent art direction across multiple assets
+
+### Limitations
+
+- Trained on a specific art style; may not generalize to non-pixel-art or non-medieval subjects
+- Small dataset size requires careful inference parameter tuning
+- Best results with white/isolated backgrounds during training; may need prompt engineering for complex scenes
+
+### Inference Settings
+
+| Setting | Recommended |
+|---------|-------------|
+| Sampler | FlowMatch |
+| Steps | 4–25 |
+| Guidance scale | 3–4 |
+| LoRA strength | 0.8–1.0 |
+| Resolution | 1024×1024 (native), scales down well |
 
 ---
 
-## 2. Sync your validation prompts from real captions
+## Files to Publish
 
-```zsh
-./scripts/sync_validation_prompts.sh --max-prompts 6 --max-chars 420
-```
+After training completes, publish:
 
-This pulls captions from your dataset and writes them into `run_lora.yaml` with your trigger token prepended. Validation images will match your training style.
-
----
-
-## 3. Dry-run to inspect what the model will see
-
-```zsh
-MODEL_SIZE=4b ./scripts/train_lora.sh --dry-run
-```
-
-Open `runs/flux2_klein_lora_v1/metadata.prepared.jsonl` and verify:
-- Trigger token is prepended to every caption
-- No duplicate tokens
-- Captions are under ~420 chars
-
-If anything looks wrong, fix `config/data.yaml` (tokens block) or your source captions.
+1. **The `.safetensors` checkpoint** (e.g. `flux2_klein_4b_lora_step_1500.safetensors`)
+2. **This repo's `README.md`** (adapted for the model card)
+3. **Sample images** from `output/<name>/samples/`
+4. **Config reference** (the `config/lora_4b.yaml` or `config/lora_9b.yaml` used)
 
 ---
 
-## 4. Train
+## License Considerations
 
-```zsh
-MODEL_SIZE=4b ./scripts/train_lora.sh
-```
-
-Let it run. Checkpoints save to `runs/flux2_klein_lora_v1/` every `save_every_steps`.
-
-If you need a smaller stratified sample:
-
-```zsh
-MODEL_SIZE=4b ./scripts/train_lora.sh --dataset-size 200 --skip-size-check
-```
+- The base model (`FLUX.2 Klein`) is gated by Black Forest Labs. Users must accept the license on Hugging Face before downloading.
+- Your LoRA weights are your own work. License them as you see fit (e.g. CC-BY-SA 4.0, MIT, or commercial).
+- Include a note that the LoRA requires the base model and acceptance of its license.
 
 ---
 
-## 5. Pick the best checkpoint
-
-Generate samples from multiple checkpoints:
-
-```zsh
-./scripts/run_eval_samples.sh runs/flux2_klein_lora_v1/checkpoint-600
-./scripts/run_eval_samples.sh runs/flux2_klein_lora_v1/checkpoint-1200
-./scripts/run_eval_samples.sh runs/flux2_klein_lora_v1/checkpoint-1800
-./scripts/run_eval_samples.sh runs/flux2_klein_lora_v1/checkpoint-2400
-```
-
-Judge by:
-- **Style separability** — different styles actually look different
-- **Pose stability** — your fixed pose doesn't drift
-- **No overfitting** — the model generalizes, doesn't memorize
-
-Usually the best checkpoint is at 60-80% of total steps, not the final one.
-
----
-
-## 6. Save the winning adapter
-
-```zsh
-cp -r runs/flux2_klein_lora_v1/checkpoint-1800 ./flux2-klein-medieval-pixelart-lora
-```
-
-Your adapter folder should contain at minimum the LoRA weights file (usually `lora_weights.safetensors` or similar).
-
----
-
-## 7. Create a model card
-
-Write a `README.md` inside the adapter folder with:
+## Example Model Card (Markdown)
 
 ```markdown
-# Flux2 Klein — Medieval Pixel Art LoRA
+# Top-Down Medieval Pixel Art — FLUX.2 Klein LoRA
 
-Base model: black-forest-labs/FLUX.2-klein-4B
-Trigger token: <tmp>
-Trained on: [describe your dataset]
-Training steps: 1500
-LoRA rank: 32
-Learning rate: 0.0001
+**Trigger:** `<tdmp>`
+
+A LoRA for generating consistent top-down medieval pixel art game assets using FLUX.2 Klein.
 
 ## Usage
 
-Prompt format:
-<tmp> pose:front, subject:medieval granary, style:weathered stone, top-down pixel art 16x16
+```
+<tdmp> a medieval watchtower in gothic style, top-down pixel art 16x16, white background
+```
 
-## Intended use
+## Training
+- Base: `black-forest-labs/FLUX.2-klein-4B`
+- Rank-32 LoRA, 1500 steps, natural language captions
+- See [training repo](https://github.com/YOURNAME/TopDownMedievalPixelArt-Flux2-Klein-LoRa) for configs and dataset tools
 
-Top-down medieval pixel art game assets — structures, tiles, and backgrounds.
-
-## Limitations
-
-- Single fixed pose (top-down front view). Cannot generate side views or isometric angles.
-- Trained on 16x16 pixel art scale. Larger resolutions may reduce pixel-crispness.
-- Requires the trigger token <tmp> to activate.
+## License
+- LoRA weights: [Your License]
+- Requires FLUX.2 Klein base model (accept on Hugging Face)
 ```
 
 ---
 
-## 8. Publish
+## Checklist Before Publishing
 
-### Hugging Face
+- [ ] Trained checkpoint saved as `.safetensors`
+- [ ] Sample images generated and reviewed for quality
+- [ ] Trigger token verified working in inference
+- [ ] Model card includes trigger token, base model, and usage examples
+- [ ] License chosen and declared
+- [ ] No copyrighted or unlicensed training images included in public repo
 
-```zsh
-huggingface-cli upload your-username/flux2-klein-medieval-pixelart-lora ./flux2-klein-medieval-pixelart-lora .
-```
-
-Then:
-- Set the base model to `black-forest-labs/FLUX.2-klein-4B` on the model page
-- Add the tags: `flux`, `lora`, `pixel-art`, `top-down`, `game-assets`
-- Link to your dataset card if you published it
-
-### Civitai
-
-Upload the safetensors file directly. In the description paste your model card. Tag it: `Flux.2 D`, `LoRA`, `Pixel Art`, `Top-Down`, `Concept`.
-
-### GitHub (this repo)
-
-1. Add your trained LoRA weights (or a link to them) to the repo
-2. Fill in `dataset/README.md` as your dataset card
-3. Push:
-
-```zsh
-git add -A
-git commit -m "Release: medieval pixel art LoRA"
-git push
-```
-
----
-
-## 9. Sanity check before announcing
-
-```zsh
-python -m src.validate_dataset --dataset-root dataset --expected-resolution 1024
-python -m src.smoke_test
-```
-
-Make sure both still pass. Done.

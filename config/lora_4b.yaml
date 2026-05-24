@@ -1,42 +1,28 @@
----
-job: "extension"
+job: extension
 config:
-  # ── Job identity ──────────────────────────────────────────────────
-  name: "flux2_klein_4b_lora"
+  name: flux2_klein_4b_lora
   process:
-    - type: "diffusion_trainer"
-  training_folder: "./output"
-  device: "cuda"
-
-  # ── Trigger word (injected at training time by ai-toolkit) ──────
-  # Source captions should NOT contain this token — the toolkit
-  # prepends it automatically at training time (§3.1 of training-guide.md).
-  trigger_word: "<tmp>"
-
-  # ── LoRA network definition ───────────────────────────────────────
+  - type: diffusion_trainer
+  training_folder: ./output
+  device: cuda
+  trigger_word: <tdmp>
   network:
-    type: "lora"
+    type: lora
     linear: 32
     linear_alpha: 32
-
-  # ── Checkpoint saving ─────────────────────────────────────────────
   save:
-    dtype: "bf16"
+    dtype: bf16
     save_every: 500
     max_step_saves_to_keep: 10
-
-  # ── Dataset ───────────────────────────────────────────────────────
   datasets:
-    - folder_path: "./dataset/images"
-      default_caption: ""
-      caption_ext: "txt"
-      caption_dropout_rate: 0.05
-      resolution:
-        - 512
-        - 768
-        - 1024
-
-  # ── Training hyperparameters ──────────────────────────────────────
+  - folder_path: ./dataset/images
+    default_caption: ''
+    caption_ext: txt
+    caption_dropout_rate: 0.05
+    resolution:
+    - 512
+    - 768
+    - 1024
   train:
     batch_size: 1
     gradient_accumulation: 2
@@ -44,26 +30,22 @@ config:
     train_unet: true
     train_text_encoder: false
     gradient_checkpointing: true
-    noise_scheduler: "flowmatch"
-    optimizer: "adamw_8bit"
-    timestep_type: "sigmoid"
-    content_or_style: "balanced"
+    noise_scheduler: flowmatch
+    optimizer: adamw_8bit
+    timestep_type: sigmoid
+    content_or_style: balanced
     lr: 0.0001
     weight_decay: 0.01
-    dtype: "bf16"
+    dtype: bf16
     cache_text_embeddings: false
-
-  # ── Model loading ─────────────────────────────────────────────────
   model:
-    name_or_path: "black-forest-labs/FLUX.2-klein-4B"
+    name_or_path: black-forest-labs/FLUX.2-klein-4B
     quantize: true
-    qtype: "qfloat8"
-    arch: "flux2_klein_4b"
+    qtype: qfloat8
+    arch: flux2_klein_4b
     low_vram: true
-
-  # ── Sample generation during training ─────────────────────────────
   sample:
-    sampler: "flowmatch"
+    sampler: flowmatch
     sample_every: 500
     width: 1024
     height: 1024
@@ -72,5 +54,12 @@ config:
     seed: 42
     walk_seed: true
     samples:
-      - prompt: "front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. Isolate the object on a plain white background."
-      - prompt: "front view overhead shot elevated shot medium shot. One single 16x16 pixel art tile that fully fills the frame with continuous texture. Seamlessly repeatable in all directions."
+    - prompt: A medieval granary building in steampunk industrial style, with aged
+        stone masonry, dark timber bracing, and reinforced buttresses. The structure
+        has a weathered, heavily used appearance with a desaturated retro color palette.
+        Top-down front view, isolated on a white background. 16x16 pixel art, crisp
+        edges, no anti-aliasing.
+    - prompt: A lush green grass texture tile for top-down games, with dense micro-blade
+        clusters, soft color variation, and faint dithering. Seamlessly repeatable
+        in all directions with no objects or rocks near the edges. 16x16 pixel art,
+        crisp edges, readable at small scale.
