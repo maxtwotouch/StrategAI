@@ -7,7 +7,7 @@ Project for dataset generation, curation, and final export for fine-tuning.
 The pipeline has two dataset stages:
 
 1. **Raw dataset (`raw/`)**
-   - Generated images with embedded PNG metadata (prompt row + image path).
+   - Generated images with embedded PNG metadata (`asset_type`, `caption`, `palette`).
    - Used for visual review and curation (delete bad PNGs).
 
 2. **HF dataset (`hf/`)**
@@ -28,7 +28,7 @@ The pipeline has two dataset stages:
 
 - `src/prompt_generator.py` — Builds prompt-data JSONL (captions + ComfyUI positive prompts)
 - `src/dataset_generator.py` — Calls ComfyUI workflows, outputs raw images with metadata embedded in PNG tEXt chunks
-- `src/png_metadata.py` — Pillow-based PNG `generation_metadata` tEXt chunk injection/extraction
+- `src/image_metadata.py` — Pillow-based PNG `generation_metadata` tEXt chunk injection/extraction
 - `src/prepare_dataset.py` — Post-curation: extracts captions, writes `.txt` files + `metadata.jsonl`
 - `config/structure_workflow.json` — ComfyUI workflow for structure/object/terrain assets
 - `config/background_tile_workflow.json` — ComfyUI workflow for background tiles
@@ -112,7 +112,15 @@ Example captions:
 
 ### PNG embedded metadata (`generation_metadata` tEXt chunk)
 
-The full prompt row is embedded: `id`, `asset_type`, `caption`, `positive_prompt`, `palette`, plus `image_path` added at generation time.
+Only minimal metadata is embedded into each PNG:
+
+| Field | Description |
+|---|---|
+| `asset_type` | `background` / `structure` / `object` / `terrain` |
+| `caption` | Clean caption (no triggers, no style tokens) |
+| `palette` | Palette name (e.g., `earthy palette`) |
+
+The JSONL manifest records `asset_type`, `caption`, `palette`, and `image_path` (bare filename) per image.
 
 ### HF metadata.jsonl
 
@@ -126,7 +134,7 @@ The full prompt row is embedded: `id`, `asset_type`, `caption`, `positive_prompt
 ## Reproducibility and Fine-Tuning Notes
 
 - Use fixed prompt-data inputs and pinned workflow JSON files in `config/`.
-- Keep generation controls (seed/guidance) in embedded PNG metadata.
+- Generation controls (seed, guidance) are captured in the dataset manifest and run report for reproducibility.
 - Curate by deleting PNGs only, then regenerate the HF dataset from remaining assets.
 - Captions are intended for fine-tuning — trigger tokens are injected separately.
 

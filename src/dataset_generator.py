@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 import requests
 
-from png_metadata import embed_metadata_into_file
+from image_metadata import embed_metadata_into_file
 
 
 # ----------------------------
@@ -366,16 +366,23 @@ def main():
             with open(out_path, "wb") as f:
                 f.write(blob)
 
-            image_rel = str(out_path.relative_to(base_dir))
-
-            # Embed the full prompt row as metadata into the PNG
-            metadata_payload = dict(row)
-            metadata_payload["image_path"] = image_rel
-
+            # Embed only the minimal metadata into the PNG
+            metadata_payload = {
+                "asset_type": row["asset_type"],
+                "caption": row["caption"],
+                "palette": row["palette"],
+            }
             embed_metadata_into_file(out_path, metadata_payload)
             stats["metadata_embedded"] += 1
 
-            append_jsonl(dirs["manifest"], metadata_payload)
+            # Manifest records the minimal row for traceability
+            manifest_record = {
+                "asset_type": row["asset_type"],
+                "caption": row["caption"],
+                "palette": row["palette"],
+                "image_path": image_name,
+            }
+            append_jsonl(dirs["manifest"], manifest_record)
             stats["success"] += 1
 
         except Exception as e:

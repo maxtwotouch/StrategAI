@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from png_metadata import read_metadata_from_file
+from image_metadata import read_metadata_from_file
 
 
 def parse_args() -> argparse.Namespace:
