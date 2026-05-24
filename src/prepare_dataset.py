@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Post-curation step: extract captions from embedded PNG metadata and produce HF imagefolder layout.
+"""Post-curation step: scan curated PNGs, strip metadata, copy with incremental filenames,
+and produce a metadata.jsonl manifest for Hugging Face imagefolder.
 
 Usage:
     python3 src/prepare_dataset.py ./dataset/raw --out-dir ./dataset/hf
@@ -16,6 +17,14 @@ from typing import Any
 from image_metadata import read_metadata_from_file
 
 
+def strip_png_metadata(src: Path, dest: Path) -> None:
+    """Copy src PNG to dest, stripping all metadata chunks."""
+    from PIL import Image
+    with Image.open(src) as im:
+        # Save without any metadata (no pnginfo)
+        im.save(dest, "PNG")
+
+
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(
         description="Prepare final dataset from curated PNGs with embedded metadata"
@@ -30,11 +39,6 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("./dataset/hf"),
         help="Output directory for HF dataset (default: ./dataset/hf)",
-    )
-    ap.add_argument(
-        "--hardlink",
-        action="store_true",
-        help="Create hardlinks instead of copying images",
     )
     return ap.parse_args()
 
@@ -53,10 +57,9 @@ def main() -> int:
     metadata_rows: list[dict[str, Any]] = []
     processed = 0
     skipped = 0
+    counter = 0  # sequential counter for incremental filenames
 
     for png_path in sorted(images_dir.glob("*.png")):
-        stem = png_path.stem
-
         try:
             meta = read_metadata_from_file(png_path)
         except Exception as exc:
@@ -78,23 +81,16 @@ def main() -> int:
             skipped += 1
             continue
 
-        dest_png = out_dir / png_path.name
+        counter += 1
+        new_name = f"{counter:07d}.png"
+        dest_png = out_dir / new_name
 
-        if args.hardlink:
-            if dest_png.exists():
-                dest_png.unlink()
-            dest_png.hardlink_to(png_path)
-        else:
-            import shutil
-            shutil.copy2(png_path, dest_png)
-
-        # Write side-by-side .txt caption file
-        txt_path = out_dir / f"{stem}.txt"
-        txt_path.write_text(caption, encoding="utf-8")
+        # Copy as a clean PNG with no embedded metadata
+        strip_png_metadata(png_path, dest_png)
 
         # Build HF imagefolder-compatible metadata row
         metadata_rows.append({
-            "file_name": png_path.name,
+            "file_name": new_name,
             "text": caption,
             "asset_type": asset_type,
             "palette": palette,
@@ -123,11 +119,11 @@ def main() -> int:
     )
 
     print(f"Processed {processed} images, skipped {skipped}")
-    print(f"Output: {out_dir}/  ({processed} PNGs + {processed} TXTs)")
+    print(f"Output: {out_dir}/  ({processed} PNGs)")
     print(f"Metadata: {meta_path}")
     print(f"Report: {summary_path}")
 
-    return 0 if skipped == 0 else 0  # skipping is not fatal (curated out)
+    return 0
 
 
 if __name__ == "__main__":

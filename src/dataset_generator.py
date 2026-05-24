@@ -164,23 +164,21 @@ def resolve_guidance_for_row(
 # Main
 # ----------------------------
 def ensure_dirs(base_dir: Path, output_layout: str):
-    """Create output directories. All metadata goes into PNG tEXt chunks — no sidecars."""
+    """Create output directories. All metadata goes into PNG tEXt chunks — no manifest or sidecars."""
     if output_layout == "huggingface":
         dirs = {
             "images": base_dir,
-            "manifest": base_dir / "manifest.jsonl",
             "errors": base_dir / "errors.jsonl",
             "run_report": base_dir / "run_report.json",
         }
     else:
         dirs = {
             "images": base_dir / "raw",
-            "manifest": base_dir / "raw" / "dataset_manifest.jsonl",
             "errors": base_dir / "raw" / "errors.jsonl",
             "run_report": base_dir / "raw" / "run_report.json",
         }
     dirs["images"].mkdir(parents=True, exist_ok=True)
-    dirs["manifest"].parent.mkdir(parents=True, exist_ok=True)
+    dirs["errors"].parent.mkdir(parents=True, exist_ok=True)
     return dirs
 
 
@@ -374,15 +372,6 @@ def main():
             }
             embed_metadata_into_file(out_path, metadata_payload)
             stats["metadata_embedded"] += 1
-
-            # Manifest records the minimal row for traceability
-            manifest_record = {
-                "asset_type": row["asset_type"],
-                "caption": row["caption"],
-                "palette": row["palette"],
-                "image_path": image_name,
-            }
-            append_jsonl(dirs["manifest"], manifest_record)
             stats["success"] += 1
 
         except Exception as e:

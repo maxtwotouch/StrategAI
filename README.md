@@ -13,7 +13,7 @@ The pipeline has two dataset stages:
 2. **HF dataset (`hf/`)**
    - Clean export for Hugging Face `imagefolder` publishing and fine-tuning.
    - Produced only from assets whose PNGs still exist after curation.
-   - Side-by-side `.txt` caption files + `metadata.jsonl`.
+   - `metadata.jsonl` manifest.
 
 ## Asset Types
 
@@ -29,7 +29,7 @@ The pipeline has two dataset stages:
 - `src/prompt_generator.py` — Builds prompt-data JSONL (captions + ComfyUI positive prompts)
 - `src/dataset_generator.py` — Calls ComfyUI workflows, outputs raw images with metadata embedded in PNG tEXt chunks
 - `src/image_metadata.py` — Pillow-based PNG `generation_metadata` tEXt chunk injection/extraction
-- `src/prepare_dataset.py` — Post-curation: extracts captions, writes `.txt` files + `metadata.jsonl`
+- `src/prepare_dataset.py` — Post-curation: scans curated PNGs, reads metadata, copies as plain PNGs with incremental integer filenames, writes `metadata.jsonl`
 - `config/structure_workflow.json` — ComfyUI workflow for structure/object/terrain assets
 - `config/background_tile_workflow.json` — ComfyUI workflow for background tiles
 - `config/prompt_templates.json` — ComfyUI positive-prompt templates (not used for captions)
@@ -78,7 +78,6 @@ Each row: `id`, `asset_type`, `caption`, `positive_prompt`, `palette`
 
 Output:
 - `dataset/raw/*.png` (with embedded `generation_metadata` tEXt chunk)
-- `dataset/raw/dataset_manifest.jsonl`
 - `dataset/raw/run_report.json`
 - `dataset/raw/errors.jsonl`
 
@@ -94,7 +93,6 @@ python3 src/prepare_dataset.py ./dataset/raw --out-dir ./dataset/hf
 
 Output:
 - `dataset/hf/*.png` — curated PNGs
-- `dataset/hf/*.txt` — caption text files (caption field only)
 - `dataset/hf/metadata.jsonl` — HF `imagefolder`-compatible: `file_name`, `text`, `asset_type`, `palette`
 - `dataset/hf/prepare_report.json`
 
@@ -120,13 +118,11 @@ Only minimal metadata is embedded into each PNG:
 | `caption` | Clean caption (no triggers, no style tokens) |
 | `palette` | Palette name (e.g., `earthy palette`) |
 
-The JSONL manifest records `asset_type`, `caption`, `palette`, and `image_path` (bare filename) per image.
-
 ### HF metadata.jsonl
 
 | Field | Description |
 |---|---|
-| `file_name` | Image filename (e.g., `mdv_0000001.png`) |
+| `file_name` | Image filename (e.g., `0000001.png`) |
 | `text` | Clean caption (no triggers, no style tokens) |
 | `asset_type` | `background` / `structure` / `object` / `terrain` |
 | `palette` | Palette name (e.g., `earthy palette`) |
