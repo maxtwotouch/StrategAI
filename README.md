@@ -67,12 +67,15 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 ├── src/
 │   ├── validate_dataset.py   # Dataset validation (structure, images, captions, balance)
 │   ├── sync_validation_prompts.py  # Sync sample prompts from dataset captions into config
-│   └── combine_metadata.py   # Merge dataset/metadata/*.json → dataset/metadata.jsonl
+│   ├── combine_metadata.py   # Merge dataset/metadata/*.json → dataset/metadata.jsonl
+│   └── extract_training_set.py  # Ratio-controlled sampling → sidecar .txt captions
 ├── scripts/
 │   ├── validate_dataset.sh   # Wrapper for validate_dataset.py
-│   └── sync_validation_prompts.sh  # Wrapper for sync_validation_prompts.py
+│   ├── sync_validation_prompts.sh  # Wrapper for sync_validation_prompts.py
+│   └── extract_training_set.sh  # Wrapper for extract_training_set.py
 ├── tests/                    # pytest unit tests
 ├── README.md                 # This file — project overview and quick-start
+├── dataset-sampling.md       # Guide for ratio-controlled extraction
 ├── training-guide.md         # Deep reference for Ostris ai-toolkit config format
 ├── PUBLISHING.md             # Model card template and publishing checklist
 ├── LICENSE                   # MIT license for repo tooling
@@ -150,7 +153,20 @@ Outputs:
 - `dataset/validation_report.ostris.json`
 - `dataset/validation_issues.ostris.jsonl`
 
-### 3. Sync Validation Prompts
+### 3. Extract Training Set (ratio-controlled sampling)
+
+```bash
+# Use all images (no filtering)
+./scripts/extract_training_set.sh
+
+# Or sample a specific size with custom ratios
+./scripts/extract_training_set.sh --total 120 --ratios structure=0.50,terrain=0.30,object=0.20,background=0.10
+```
+
+Produces a flat `training_set/` directory of `image.png` + `image.txt` caption pairs,
+ready for the toolkit's sidecar `.txt` mode. See `dataset-sampling.md` for full details.
+
+### 4. Sync Validation Prompts
 
 The toolkit generates sample images during training using prompts from `config.sample.samples`. Keep them anchored to your actual captions:
 
@@ -162,7 +178,7 @@ This reads your dataset captions and writes them into `config/lora_4b.yaml` unde
 
 > **Note:** Sample prompts should NOT contain the trigger token. The toolkit prepends `<tdmp>` automatically, just like it does for training captions.
 
-### 4. Train
+### 5. Train
 
 ```bash
 # 4B (default)
@@ -178,7 +194,7 @@ On first run, the toolkit downloads the base model from Hugging Face (~13 GB for
 
 Checkpoints and samples are written to `./output/flux2_klein_4b_lora/` (or whatever `training_folder` is set to in the config).
 
-### 5. Resume Training
+### 6. Resume Training
 
 Re-run the same command. The toolkit resumes from the last saved checkpoint.
 
