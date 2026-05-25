@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
         help="Validation mode: metadata jsonl or sidecar .txt captions.",
     )
     parser.add_argument("--metadata-file", default="metadata.jsonl", help="Metadata JSONL filename.")
-    parser.add_argument("--image-dir", default="images", help="Image directory for sidecar_txt mode.")
+    parser.add_argument("--image-dir", default="hf", help="Image directory for sidecar_txt mode.")
     parser.add_argument("--caption-txt-extension", default=".txt", help="Caption sidecar extension.")
     parser.add_argument("--image-extensions", default="png,jpg,jpeg", help="Comma-separated image extensions.")
     parser.add_argument("--expected-resolution", type=int, default=1024, help="Expected width/height in pixels.")
@@ -219,7 +219,9 @@ def main() -> int:
     elif args.training_config is not None:
         training_cfg = _read_yaml(args.training_config.resolve())
         config_block = training_cfg.get("config", {})
-        trigger_word = str(config_block.get("trigger_word", "")).strip()
+        process_list = config_block.get("process", [])
+        process_block = process_list[0] if isinstance(process_list, list) and process_list else {}
+        trigger_word = str(process_block.get("trigger_word", "")).strip()
     if trigger_word:
         print(f"[INFO] Trigger word: '{trigger_word}' — mode: {args.trigger_mode}")
 

@@ -6,6 +6,7 @@ python3 -m src.validate_dataset \
   --dataset-root "$ROOT_DIR/dataset" \
   --training-config "$ROOT_DIR/config/lora_4b.yaml" \
   --mode sidecar_txt \
+  --image-dir hf \
   --trigger-mode expected \
   --expected-resolution 1024 \
   "$@"

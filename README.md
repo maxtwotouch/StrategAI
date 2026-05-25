@@ -45,7 +45,7 @@ Flux2's text encoders work best with natural language. Write captions as descrip
 
 **Good (natural language):**
 ```
-A medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing.
+A medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. The structure has a weathered, heavily used appearance with a desaturated retro color palette. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing.
 ```
 
 **Avoid (structured tags):**
@@ -64,7 +64,7 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 │   └── lora_9b.yaml          # Training config for FLUX.2 Klein 9B
 ├── dataset/
 │   ├── metadata.jsonl        # HF-style metadata (id, file_name, text, asset_family)
-│   ├── images/               # Image files + generated .txt sidecar captions
+│   ├── hf/                   # Image files (downloaded from HF) + generated .txt sidecar captions
 │   └── metadata/             # Optional: per-item JSON files (combined by combine_metadata.py)
 ├── src/
 │   ├── extract_training_set.py  # Generate sidecar .txt captions from JSONL, with trigger injection
@@ -77,7 +77,6 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 │   └── extract_training_set.sh  # Wrapper for extract_training_set.py
 ├── tests/                    # pytest unit tests
 ├── README.md                 # This file — project overview and quick-start
-├── dataset-sampling.md       # Guide for ratio-controlled extraction
 ├── PUBLISHING.md             # Model card template and publishing checklist
 ├── LICENSE                   # MIT license for repo tooling
 └── requirements.txt          # Python dependencies
@@ -118,7 +117,7 @@ Run the extraction tool to write `.txt` caption files alongside each image, with
 
 This produces:
 ```
-dataset/images/
+dataset/hf/
 ├── 0000001.png
 ├── 0000001.txt   ← "A medieval granary..." with [trigger] injected
 ├── 0000002.png
@@ -126,7 +125,7 @@ dataset/images/
 └── ...
 ```
 
-The configs already point at `dataset/images/` with `caption_ext: txt`, so after generating sidecar files, you're ready to train.
+The configs already point at `dataset/hf/` with `caption_ext: txt`, so after generating sidecar files, you're ready to train.
 
 If you have per-item JSON files in `dataset/metadata/`, first combine them:
 
@@ -149,7 +148,7 @@ python3 -m src.combine_metadata
 ./scripts/extract_training_set.sh --dry-run
 ```
 
-The tool reads `dataset/metadata.jsonl`, injects `[trigger]` into captions, and writes `.txt` files alongside each source image. See `dataset-sampling.md` for full details.
+The tool reads `dataset/metadata.jsonl`, injects `[trigger]` into captions, and writes `.txt` files alongside each source image.
 
 ### 2. Validate Dataset
 
@@ -201,6 +200,8 @@ On first run, the toolkit downloads the base model from Hugging Face (~13 GB for
 
 Checkpoints and samples are written to `./output/flux2_klein_4b_lora/` (or whatever `training_folder` is set to in the config).
 
+> There are many ways to run the training - I found most success in having this project as the PWD, and referencing the run.py script by location.
+
 ### 5. Resume Training
 
 Re-run the same command. The toolkit resumes from the last saved checkpoint.
@@ -222,7 +223,7 @@ Key fields in `config/lora_4b.yaml`:
 | `train.weight_decay` | `0.0001` | Prevents memorization; moderate to preserve style. |
 | `save.save_every` | `200` | Checkpoint frequency for evaluation. |
 | `train.cache_text_embeddings` | `false` | **Must be false** when using `trigger_word` or `caption_dropout_rate`. |
-| `datasets[0].folder_path` | `./dataset/images` | Point at your image directory. |
+| `datasets[0].folder_path` | `./dataset/hf` | Point at your image directory. |
 | `sample.samples` | `[...]` | Validation prompts prefixed with `[trigger]`. Synced via `sync_validation_prompts.py`.
 
 ## Inference

@@ -33,21 +33,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-root", type=Path, default=Path("dataset"))
     parser.add_argument("--mode", choices=["hf_jsonl", "sidecar_txt"], default="hf_jsonl")
     parser.add_argument("--metadata-file", default="metadata.jsonl")
-    parser.add_argument("--image-dir", default="images")
+    parser.add_argument("--image-dir", default="hf")
     parser.add_argument("--caption-txt-extension", default=".txt")
     parser.add_argument("--image-extensions", default="png,jpg,jpeg")
     parser.add_argument("--training-config", type=Path, default=Path("config/lora_4b.yaml"))
     parser.add_argument("--max-prompts", type=int, default=6)
     parser.add_argument("--max-chars", type=int, default=420)
     parser.add_argument("--caption-column", default="text")
-    parser.add_argument(
-        "--trigger-word",
-        type=str,
-        default=None,
-        help="Trigger word to prepend to sample prompts. "
-             "Use '[trigger]' for toolkit placeholder replacement. "
-             "If not set, prompts are left bare (toolkit prepends trigger_word at train time).",
-    )
     return parser.parse_args()
 
 
@@ -170,21 +162,14 @@ def main() -> int:
         print("[ERROR] No prompts collected from metadata.")
         return 1
 
-    # Apply trigger word prefix if configured
-    if args.trigger_word:
-        prefix = args.trigger_word if args.trigger_word == "[trigger]" else f"{args.trigger_word} "
-        if args.trigger_word == "[trigger]":
-            print(f"[INFO] Prepend [trigger] placeholder to sample prompts (toolkit replaces at train time)")
-        else:
-            print(f"[INFO] Prepend trigger word '{args.trigger_word}' to sample prompts")
-        prompts = [f"{prefix}{p}" for p in prompts]
-
-    config_block = training_cfg.setdefault("config", training_cfg)
-    sample_block = config_block.setdefault("sample", {})
-    sample_block["samples"] = [{"prompt": p} for p in prompts]
+    process_block = training_cfg.setdefault("config", training_cfg)
+    process_block = process_block.setdefault("process", [{}])
+    process_block = process_block[0] if isinstance(process_block, list) else process_block
+    sample_block = process_block.setdefault("sample", {})
+    sample_block["prompts"] = list(prompts)
     _write_yaml(training_cfg_path, training_cfg)
 
-    print(f"[INFO] Updated sample.samples in: {training_cfg_path}")
+    print(f"[INFO] Updated sample.prompts in: {training_cfg_path}")
     print(f"[INFO] Prompt count: {len(prompts)}")
     return 0
 
