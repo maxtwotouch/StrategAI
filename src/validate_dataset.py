@@ -57,6 +57,23 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Path to training config (e.g. config/lora_4b.yaml) to read trigger_word for caption validation.",
     )
+    parser.add_argument(
+        "--trigger-mode",
+        choices=["expected", "required", "forbidden", "ignore"],
+        default="expected",
+        help="How to validate trigger token presence in captions. "
+             "expected: warn if trigger NOT in caption (guide recommendation). "
+             "required: error if trigger NOT in caption. "
+             "forbidden: warn if trigger IS in caption (legacy behavior). "
+             "ignore: skip trigger checks entirely.",
+    )
+    parser.add_argument(
+        "--trigger-word-override",
+        type=str,
+        default=None,
+        help="Override trigger_word from training config (e.g. '<tdmp>' or '[trigger]'). "
+             "Use '[trigger]' when validating placeholder-based captions.",
+    )
     return parser.parse_args()
 
 
@@ -123,18 +140,27 @@ def validate_row(
     return issues
 
 
-def _check_trigger_in_caption(text: str, trigger_word: str, row_idx: int) -> Optional[ValidationIssue]:
-    """Warn if the trigger word appears in source captions.
+def _check_trigger_in_caption(
+    text: str, trigger_word: str, row_idx: int, trigger_mode: str
+) -> Optional[ValidationIssue]:
+    """Validate trigger token presence in captions based on trigger_mode.
 
-    Per toolkit guidelines (§3.1 of training-guide.md), trigger words should
-    NOT be baked into source captions — the toolkit injects them at training
-    time.  If a user has baked the token in anyway, the toolkit's duplicate
-    detection will prevent double-injection, but we warn that the captions
-    are less portable.
+    Captions should contain the trigger word (or [trigger] placeholder) so the
+    model learns to bind style+pose to it. The toolkit also auto-prepends
+    trigger_word at train time if not already present.
+
+    Modes:
+      expected  — warn if trigger NOT in caption (default)
+      required  — error if trigger NOT in caption
+      forbidden — warn if trigger IS in caption (legacy: want toolkit-only injection)
+      ignore    — no check
     """
-    if not trigger_word.strip():
+    if not trigger_word.strip() or trigger_mode == "ignore":
         return None
-    if trigger_word.strip() in text:
+
+    has_trigger = trigger_word.strip() in text
+
+    if trigger_mode == "forbidden" and has_trigger:
         return ValidationIssue(
             "warning",
             "trigger_in_caption",
@@ -142,6 +168,20 @@ def _check_trigger_in_caption(text: str, trigger_word: str, row_idx: int) -> Opt
             f"Caption contains trigger word '{trigger_word}'. "
             "The toolkit injects this automatically; consider removing it for cleaner, reusable captions.",
         )
+
+    if trigger_mode in ("expected", "required") and not has_trigger:
+        level = "error" if trigger_mode == "required" else "warning"
+        code = "trigger_missing" if trigger_mode == "required" else "trigger_missing_warn"
+        return ValidationIssue(
+            level,
+            code,
+            row_idx,
+            f"Caption does not contain trigger word '{trigger_word}'. "
+            "Captions should include the trigger so the model binds unexplained "
+            "pixel information (style + camera pose) to it. "
+            "Use '[trigger]' placeholder for portable captions.",
+        )
+
     return None
 
 
@@ -174,12 +214,14 @@ def main() -> int:
 
     # ── Trigger word ──────────────────────────────────────────────────────
     trigger_word: str = ""
-    if args.training_config is not None:
+    if args.trigger_word_override is not None:
+        trigger_word = args.trigger_word_override.strip()
+    elif args.training_config is not None:
         training_cfg = _read_yaml(args.training_config.resolve())
         config_block = training_cfg.get("config", {})
         trigger_word = str(config_block.get("trigger_word", "")).strip()
-        if trigger_word:
-            print(f"[INFO] Trigger word: {trigger_word} — will warn if found in captions (toolkit injects automatically)")
+    if trigger_word:
+        print(f"[INFO] Trigger word: '{trigger_word}' — mode: {args.trigger_mode}")
 
     rows_total = 0
     rows_parsed = 0
@@ -231,7 +273,7 @@ def main() -> int:
                     caption_lengths.append(len(text))
 
                     if trigger_word:
-                        tw_issue = _check_trigger_in_caption(text, trigger_word, line_number)
+                        tw_issue = _check_trigger_in_caption(text, trigger_word, line_number, args.trigger_mode)
                         if tw_issue is not None:
                             issues.append(tw_issue)
                             trigger_warnings += 1
@@ -281,7 +323,7 @@ def main() -> int:
             issues.extend(row_issues)
 
             if trigger_word:
-                tw_issue = _check_trigger_in_caption(text, trigger_word, line_number)
+                tw_issue = _check_trigger_in_caption(text, trigger_word, line_number, args.trigger_mode)
                 if tw_issue is not None:
                     issues.append(tw_issue)
                     trigger_warnings += 1

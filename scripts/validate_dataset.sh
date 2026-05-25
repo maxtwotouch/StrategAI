@@ -5,5 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 python3 -m src.validate_dataset \
   --dataset-root "$ROOT_DIR/dataset" \
   --training-config "$ROOT_DIR/config/lora_4b.yaml" \
+  --mode sidecar_txt \
+  --trigger-mode expected \
   --expected-resolution 1024 \
   "$@"

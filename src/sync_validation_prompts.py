@@ -40,6 +40,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-prompts", type=int, default=6)
     parser.add_argument("--max-chars", type=int, default=420)
     parser.add_argument("--caption-column", default="text")
+    parser.add_argument(
+        "--trigger-word",
+        type=str,
+        default=None,
+        help="Trigger word to prepend to sample prompts. "
+             "Use '[trigger]' for toolkit placeholder replacement. "
+             "If not set, prompts are left bare (toolkit prepends trigger_word at train time).",
+    )
     return parser.parse_args()
 
 
@@ -161,6 +169,15 @@ def main() -> int:
     if not prompts:
         print("[ERROR] No prompts collected from metadata.")
         return 1
+
+    # Apply trigger word prefix if configured
+    if args.trigger_word:
+        prefix = args.trigger_word if args.trigger_word == "[trigger]" else f"{args.trigger_word} "
+        if args.trigger_word == "[trigger]":
+            print(f"[INFO] Prepend [trigger] placeholder to sample prompts (toolkit replaces at train time)")
+        else:
+            print(f"[INFO] Prepend trigger word '{args.trigger_word}' to sample prompts")
+        prompts = [f"{prefix}{p}" for p in prompts]
 
     config_block = training_cfg.setdefault("config", training_cfg)
     sample_block = config_block.setdefault("sample", {})

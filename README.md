@@ -5,13 +5,10 @@ Training configs and dataset utilities for fine-tuning a FLUX.2 Klein LoRA on to
 ## What This Project Is
 
 - **Training configs** (`config/lora_4b.yaml`, `config/lora_9b.yaml`) — ready-to-run Ostris ai-toolkit YAML files
-- **Dataset validator** (`src/validate_dataset.py`) — checks your dataset before training
+- **Caption generator** (`src/extract_training_set.py`) — generates sidecar `.txt` caption files from HF JSONL metadata, with trigger token injection
+- **Dataset validator** (`src/validate_dataset.py`) — checks your dataset before training (supports both JSONL and sidecar `.txt` modes)
 - **Prompt sync tool** (`src/sync_validation_prompts.py`) — pulls sample prompts from your dataset captions
 - **Metadata combiner** (`src/combine_metadata.py`) — merges per-item JSON files into a JSONL
-
-> **⚠️ The included dataset (`dataset/images/` and `dataset/metadata/`) is a minimal example.**  
-> It demonstrates the required format and caption style but is **not** sufficient for training a production-quality LoRA.  
-> Replace it with your own curated dataset (15–100+ images depending on complexity) before training.
 
 ## What the Ostris AI Toolkit Handles
 
@@ -29,9 +26,14 @@ The toolkit does the actual training. You pass it a YAML config, it handles:
 
 ## Trigger Token: `<tdmp>`
 
-This project uses `<tdmp>` as the trigger token. The angle brackets help Flux2's text encoders treat it as a distinct concept token. The toolkit prepends `<tdmp>` to every caption at training time automatically — **do not include it in your source captions**.
+This project uses `<tdmp>` as the trigger token. The angle brackets help Flux2's text encoders treat it as a distinct concept token.
 
-At inference, always start your prompt with `<tdmp>` to activate the LoRA:
+**Captions SHOULD contain the trigger word** (or the `[trigger]` placeholder which the toolkit replaces at training time). This ensures the model binds unexplained pixel information (style + camera pose) to the token.
+
+- **Source captions** in `metadata.jsonl`: use bare natural language (no trigger)
+- **Generated sidecar `.txt` files**: `extract_training_set.py` injects `[trigger]` by default
+- **At training time**: the toolkit replaces `[trigger]` with `<tdmp>` (from `trigger_word` in config)
+- **At inference**: always start your prompt with `<tdmp>` to activate the LoRA
 
 ```
 <tdmp> a medieval granary in steampunk industrial style, top-down pixel art 16x16, white background
@@ -62,13 +64,13 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 │   └── lora_9b.yaml          # Training config for FLUX.2 Klein 9B
 ├── dataset/
 │   ├── metadata.jsonl        # HF-style metadata (id, file_name, text, asset_family)
-│   ├── images/               # Image files referenced by metadata
+│   ├── images/               # Image files + generated .txt sidecar captions
 │   └── metadata/             # Optional: per-item JSON files (combined by combine_metadata.py)
 ├── src/
+│   ├── extract_training_set.py  # Generate sidecar .txt captions from JSONL, with trigger injection
 │   ├── validate_dataset.py   # Dataset validation (structure, images, captions, balance)
 │   ├── sync_validation_prompts.py  # Sync sample prompts from dataset captions into config
-│   ├── combine_metadata.py   # Merge dataset/metadata/*.json → dataset/metadata.jsonl
-│   └── extract_training_set.py  # Ratio-controlled sampling → sidecar .txt captions
+│   └── combine_metadata.py   # Merge dataset/metadata/*.json → dataset/metadata.jsonl
 ├── scripts/
 │   ├── validate_dataset.sh   # Wrapper for validate_dataset.py
 │   ├── sync_validation_prompts.sh  # Wrapper for sync_validation_prompts.py
@@ -76,7 +78,6 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 ├── tests/                    # pytest unit tests
 ├── README.md                 # This file — project overview and quick-start
 ├── dataset-sampling.md       # Guide for ratio-controlled extraction
-├── training-guide.md         # Deep reference for Ostris ai-toolkit config format
 ├── PUBLISHING.md             # Model card template and publishing checklist
 ├── LICENSE                   # MIT license for repo tooling
 └── requirements.txt          # Python dependencies
@@ -95,9 +96,11 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 
 ## Dataset Format
 
-### Option A: HF JSONL (default)
+The standard workflow starts with a Hugging Face-style JSONL metadata file and generates sidecar `.txt` captions from it.
 
-`dataset/metadata.jsonl` with one JSON object per line:
+### Step 1: Download from Hugging Face (JSONL)
+
+Your HF dataset download gives you `metadata.jsonl` with one JSON object per line:
 
 ```json
 {"id": "0000001", "file_name": "images/0000001.png", "text": "A medieval granary building in steampunk industrial style, with aged stone masonry and dark timber bracing. Top-down front view, isolated on white. 16x16 pixel art.", "asset_family": "structure"}
@@ -105,36 +108,48 @@ The trigger token `<tdmp>` is injected by the toolkit at training time, so your 
 
 Required keys: `id`, `file_name`, `text`. Optional: `asset_family` (used for balance reporting).
 
-### Option B: Sidecar TXT
+### Step 2: Generate Sidecar Caption Files
 
-Images in `dataset/images/` with matching `.txt` caption files:
+Run the extraction tool to write `.txt` caption files alongside each image, with the trigger injected:
 
+```bash
+./scripts/extract_training_set.sh
+```
+
+This produces:
 ```
 dataset/images/
 ├── 0000001.png
-├── 0000001.txt
+├── 0000001.txt   ← "A medieval granary..." with [trigger] injected
 ├── 0000002.png
-└── 0000002.txt
+├── 0000002.txt
+└── ...
 ```
 
-To use sidecar mode, edit the `datasets` block in `config/lora_4b.yaml`:
+The configs already point at `dataset/images/` with `caption_ext: txt`, so after generating sidecar files, you're ready to train.
 
-```yaml
-datasets:
-  - folder_path: "./dataset/images"
-    caption_ext: "txt"
-    # ...
-```
-
-## Workflow
-
-### 1. Prepare Dataset
-
-If you have per-item JSON files in `dataset/metadata/`:
+If you have per-item JSON files in `dataset/metadata/`, first combine them:
 
 ```bash
 python3 -m src.combine_metadata
 ```
+
+## Workflow
+
+### 1. Generate Sidecar Captions
+
+```bash
+# Generate .txt sidecar files for all images (with [trigger] placeholder)
+./scripts/extract_training_set.sh
+
+# Or filter by ratio-controlled sampling
+./scripts/extract_training_set.sh --total 120 --ratios structure=0.50,terrain=0.30,object=0.20,background=0.10
+
+# Preview without writing files
+./scripts/extract_training_set.sh --dry-run
+```
+
+The tool reads `dataset/metadata.jsonl`, injects `[trigger]` into captions, and writes `.txt` files alongside each source image. See `dataset-sampling.md` for full details.
 
 ### 2. Validate Dataset
 
@@ -143,30 +158,22 @@ python3 -m src.combine_metadata
 ```
 
 Checks:
-- JSON structure and required keys
 - Image existence, resolution, squareness
-- Caption length warnings
-- Dataset balance (`asset_family` bucket counts)
-- Trigger token NOT baked into source captions
+- Sidecar `.txt` caption existence and length
+- Trigger token presence in captions (expected by default)
+- Dataset balance (asset family bucket counts)
 
 Outputs:
 - `dataset/validation_report.ostris.json`
 - `dataset/validation_issues.ostris.jsonl`
 
-### 3. Extract Training Set (ratio-controlled sampling)
+You can also validate the raw JSONL before generating sidecar files:
 
 ```bash
-# Use all images (no filtering)
-./scripts/extract_training_set.sh
-
-# Or sample a specific size with custom ratios
-./scripts/extract_training_set.sh --total 120 --ratios structure=0.50,terrain=0.30,object=0.20,background=0.10
+./scripts/validate_dataset.sh --mode hf_jsonl
 ```
 
-Produces a flat `training_set/` directory of `image.png` + `image.txt` caption pairs,
-ready for the toolkit's sidecar `.txt` mode. See `dataset-sampling.md` for full details.
-
-### 4. Sync Validation Prompts
+### 3. Sync Validation Prompts
 
 The toolkit generates sample images during training using prompts from `config.sample.samples`. Keep them anchored to your actual captions:
 
@@ -176,9 +183,9 @@ The toolkit generates sample images during training using prompts from `config.s
 
 This reads your dataset captions and writes them into `config/lora_4b.yaml` under `config.sample.samples`.
 
-> **Note:** Sample prompts should NOT contain the trigger token. The toolkit prepends `<tdmp>` automatically, just like it does for training captions.
+> **Note:** The `sync_validation_prompts.sh` script prepends `[trigger]` to sample prompts by default. The toolkit replaces `[trigger]` with `<tdmp>` at training time, matching caption behavior.
 
-### 5. Train
+### 4. Train
 
 ```bash
 # 4B (default)
@@ -194,7 +201,7 @@ On first run, the toolkit downloads the base model from Hugging Face (~13 GB for
 
 Checkpoints and samples are written to `./output/flux2_klein_4b_lora/` (or whatever `training_folder` is set to in the config).
 
-### 6. Resume Training
+### 5. Resume Training
 
 Re-run the same command. The toolkit resumes from the last saved checkpoint.
 
@@ -206,15 +213,17 @@ Key fields in `config/lora_4b.yaml`:
 
 | Field | Value | Notes |
 |-------|-------|-------|
-| `trigger_word` | `<tdmp>` | Bracketed token injected at training time. Use `<tdmp>` in inference prompts. |
-| `network.linear` | `32` | LoRA rank. Higher = more capacity, more VRAM. |
-| `train.steps` | `1500` | Total optimizer steps. |
-| `train.lr` | `0.0001` | Learning rate. |
+| `trigger_word` | `<tdmp>` | Bracketed token. Captions should contain `[trigger]` — toolkit replaces at train time. Use `<tdmp>` in inference. |
+| `network.linear` | `128` | LoRA rank. Higher capacity for dual-concept (style + camera pose). |
+| `network.conv` | `64` | Conv rank. Captures spatial/camera relationships. |
+| `train.steps` | `2500` | Total optimizer steps. More steps for dual-concept convergence. |
+| `train.lr` | `0.00008` | Learning rate. Slightly below default to balance gradient competition. |
+| `train.timestep_type` | `weighted` | Standard balanced training noise schedule. |
+| `train.weight_decay` | `0.0001` | Prevents memorization; moderate to preserve style. |
+| `save.save_every` | `200` | Checkpoint frequency for evaluation. |
 | `train.cache_text_embeddings` | `false` | **Must be false** when using `trigger_word` or `caption_dropout_rate`. |
 | `datasets[0].folder_path` | `./dataset/images` | Point at your image directory. |
-| `sample.samples` | `[...]` | Validation prompts. Synced from dataset captions via `sync_validation_prompts.py`. |
-
-See `training-guide.md` for the full parameter reference.
+| `sample.samples` | `[...]` | Validation prompts prefixed with `[trigger]`. Synced via `sync_validation_prompts.py`.
 
 ## Inference
 
@@ -234,18 +243,24 @@ Typical settings for FLUX.2 Klein 4B:
 
 ## Caption Guidelines
 
-For one-pose / multi-style training with Flux2:
+For top-down pixel art training with Flux2:
 
 1. **Use natural language** — write descriptive sentences, not structured tags
-2. **Keep the trigger token out of source captions** — `<tdmp>` is injected by the toolkit
+2. **Source captions are trigger-free** — `metadata.jsonl` captions are bare; `[trigger]` is injected at extraction time
 3. **Describe what you see** — subject, style, materials, condition, perspective
 4. **Include technical specs** — "16x16 pixel art", "crisp edges", "top-down view"
 5. **Keep under ~420 characters** when possible for stable conditioning
 
-Example caption:
+Example source caption (in `metadata.jsonl`):
 
 ```
 A medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. The structure has a weathered, heavily used appearance with a desaturated retro color palette. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing.
+```
+
+Generated sidecar caption (auto-generated with `[trigger]`):
+
+```
+[trigger] A medieval granary building in steampunk industrial style...
 ```
 
 At inference:

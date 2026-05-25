@@ -6,14 +6,24 @@ config:
   training_folder: ./output
   device: cuda
   trigger_word: <tdmp>
+
+  # ── LoRA network ──────────────────────────────────────────────────
+  # 128-rank for dual-concept (style + top-down camera pose).
+  # Includes conv layers to capture spatial/camera relationships.
   network:
     type: lora
-    linear: 32
-    linear_alpha: 32
+    linear: 128
+    linear_alpha: 64
+    conv: 64
+    conv_alpha: 32
+
+  # ── Checkpoint saving ─────────────────────────────────────────────
   save:
     dtype: bf16
-    save_every: 500
-    max_step_saves_to_keep: 10
+    save_every: 200
+    max_step_saves_to_keep: 15
+
+  # ── Dataset ───────────────────────────────────────────────────────
   datasets:
   - folder_path: ./dataset/images
     default_caption: ''
@@ -21,32 +31,43 @@ config:
     caption_dropout_rate: 0.05
     resolution:
     - 512
+    - 512
+    - 768
     - 768
     - 1024
+    - 1024
+
+  # ── Training ──────────────────────────────────────────────────────
   train:
     batch_size: 1
     gradient_accumulation: 2
-    steps: 1500
+    steps: 2500
     train_unet: true
     train_text_encoder: false
     gradient_checkpointing: true
     noise_scheduler: flowmatch
     optimizer: adamw_8bit
-    timestep_type: sigmoid
+    timestep_type: weighted
     content_or_style: balanced
-    lr: 0.0001
-    weight_decay: 0.01
+    lr: 0.00008
+    weight_decay: 0.0001
     dtype: bf16
     cache_text_embeddings: false
+    optimizer_params:
+      weight_decay: 0.0001
+
+  # ── Model ─────────────────────────────────────────────────────────
   model:
     name_or_path: black-forest-labs/FLUX.2-klein-4B
     quantize: true
     qtype: qfloat8
     arch: flux2_klein_4b
     low_vram: true
+
+  # ── Sample generation during training ─────────────────────────────
   sample:
     sampler: flowmatch
-    sample_every: 500
+    sample_every: 200
     width: 1024
     height: 1024
     guidance_scale: 4
@@ -54,12 +75,5 @@ config:
     seed: 42
     walk_seed: true
     samples:
-    - prompt: A medieval granary building in steampunk industrial style, with aged
-        stone masonry, dark timber bracing, and reinforced buttresses. The structure
-        has a weathered, heavily used appearance with a desaturated retro color palette.
-        Top-down front view, isolated on a white background. 16x16 pixel art, crisp
-        edges, no anti-aliasing.
-    - prompt: A lush green grass texture tile for top-down games, with dense micro-blade
-        clusters, soft color variation, and faint dithering. Seamlessly repeatable
-        in all directions with no objects or rocks near the edges. 16x16 pixel art,
-        crisp edges, readable at small scale.
+    - prompt: "[trigger] a medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing."
+    - prompt: "[trigger] a lush green grass texture tile for top-down games, with dense micro-blade clusters, soft color variation, and faint dithering. Seamlessly repeatable in all directions. 16x16 pixel art, crisp edges, readable at small scale."

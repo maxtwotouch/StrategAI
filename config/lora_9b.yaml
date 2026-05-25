@@ -9,22 +9,26 @@ config:
   device: "cuda"
 
   # ── Trigger word (injected at training time by ai-toolkit) ──────
-  # Source captions should NOT contain this token — the toolkit
-  # prepends it automatically at training time (§3.1 of training-guide.md).
-  # Using a bracketed token like <tdmp> works well with Flux2's text encoders.
+  # Captions SHOULD contain the trigger word (or [trigger] placeholder).
+  # The toolkit auto-prepends if absent but the model binds style+pose
+  # more reliably when present.
   trigger_word: "<tdmp>"
 
-  # ── LoRA network definition ───────────────────────────────────────
+  # ── LoRA network ──────────────────────────────────────────────────
+  # 128-rank for dual-concept (style + top-down camera pose).
+  # Includes conv layers to capture spatial/camera relationships.
   network:
     type: "lora"
-    linear: 32
-    linear_alpha: 32
+    linear: 128
+    linear_alpha: 64
+    conv: 64
+    conv_alpha: 32
 
   # ── Checkpoint saving ─────────────────────────────────────────────
   save:
     dtype: "bf16"
-    save_every: 500
-    max_step_saves_to_keep: 10
+    save_every: 200
+    max_step_saves_to_keep: 15
 
   # ── Dataset ───────────────────────────────────────────────────────
   datasets:
@@ -34,25 +38,30 @@ config:
       caption_dropout_rate: 0.05
       resolution:
         - 512
+        - 512
         - 768
+        - 768
+        - 1024
         - 1024
 
   # ── Training hyperparameters ──────────────────────────────────────
   train:
     batch_size: 1
     gradient_accumulation: 2
-    steps: 1500
+    steps: 2500
     train_unet: true
     train_text_encoder: false
     gradient_checkpointing: true
     noise_scheduler: "flowmatch"
     optimizer: "adamw_8bit"
-    timestep_type: "sigmoid"
+    timestep_type: "weighted"
     content_or_style: "balanced"
-    lr: 0.0001
-    weight_decay: 0.01
+    lr: 0.00008
+    weight_decay: 0.0001
     dtype: "bf16"
     cache_text_embeddings: false
+    optimizer_params:
+      weight_decay: 0.0001
 
   # ── Model loading ─────────────────────────────────────────────────
   model:
@@ -65,7 +74,7 @@ config:
   # ── Sample generation during training ─────────────────────────────
   sample:
     sampler: "flowmatch"
-    sample_every: 500
+    sample_every: 200
     width: 1024
     height: 1024
     guidance_scale: 4
@@ -73,5 +82,5 @@ config:
     seed: 42
     walk_seed: true
     samples:
-      - prompt: "A medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing."
-      - prompt: "A lush green grass texture tile for top-down games, with dense micro-blade clusters, soft color variation, and faint dithering. Seamlessly repeatable in all directions. 16x16 pixel art, crisp edges, readable at small scale."
+      - prompt: "[trigger] a medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. Top-down front view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing."
+      - prompt: "[trigger] a lush green grass texture tile for top-down games, with dense micro-blade clusters, soft color variation, and faint dithering. Seamlessly repeatable in all directions. 16x16 pixel art, crisp edges, readable at small scale."

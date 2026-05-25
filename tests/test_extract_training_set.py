@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.extract_training_set import _resolve_image, group_by_type, parse_ratios, sample
+from src.extract_training_set import _format_caption, _resolve_image, group_by_type, parse_ratios, sample, write_output
 
 
 def test_parse_ratios_basic():
@@ -91,3 +91,71 @@ def test_resolve_image_falls_back_to_basename(tmp_path):
     found = _resolve_image(root, "images/a.png")
     # images/a.png doesn't exist, falls back to root/basename
     assert found == img.resolve()
+
+
+# ── _format_caption ─────────────────────────────────────────────────────
+
+def test_format_caption_none_mode_returns_bare():
+    assert _format_caption("a caption", "<tdmp>", "none") == "a caption"
+
+
+def test_format_caption_manual_mode_prepends_trigger():
+    assert _format_caption("a caption", "<tdmp>", "manual") == "<tdmp> a caption"
+
+
+def test_format_caption_placeholder_mode_uses_brackets():
+    assert _format_caption("a caption", "<tdmp>", "placeholder") == "[trigger] a caption"
+
+
+def test_format_caption_strips_whitespace():
+    assert _format_caption("  padded caption  ", "<tdmp>", "manual") == "<tdmp> padded caption"
+
+
+def test_format_caption_none_strips_whitespace():
+    assert _format_caption("  padded caption  ", "<tdmp>", "none") == "padded caption"
+
+
+# ── write_output ─────────────────────────────────────────────────────────
+
+def test_write_output_sidecar_mode(tmp_path):
+    """Sidecar mode writes .txt alongside source images, does not copy images."""
+    root = tmp_path / "dataset"
+    root.mkdir()
+    img_dir = root / "images"
+    img_dir.mkdir(parents=True)
+    img = img_dir / "a.png"
+    img.touch()
+    out = tmp_path / "training_set"
+
+    sampled = {"structure": [{"file_name": "images/a.png", "text": "test caption"}]}
+    n = write_output(sampled, root, out,
+                     trigger_word="<tdmp>",
+                     trigger_mode="placeholder",
+                     sidecar=True)
+    assert n == 1
+    # Sidecar .txt written next to source image
+    assert (img_dir / "a.txt").read_text() == "[trigger] test caption"
+    # Output dir NOT created (sidecar mode)
+    assert not out.exists()
+
+
+def test_write_output_extract_mode(tmp_path):
+    """Extract mode copies images + .txt to output dir."""
+    root = tmp_path / "dataset"
+    root.mkdir()
+    img_dir = root / "images"
+    img_dir.mkdir(parents=True)
+    img = img_dir / "a.png"
+    img.touch()
+    out = tmp_path / "training_set"
+
+    sampled = {"structure": [{"file_name": "images/a.png", "text": "test caption"}]}
+    n = write_output(sampled, root, out,
+                     trigger_word="<tdmp>",
+                     trigger_mode="manual",
+                     sidecar=False)
+    assert n == 1
+    # Image copied to output dir
+    assert (out / "a.png").exists()
+    # .txt written in output dir with trigger
+    assert (out / "a.txt").read_text() == "<tdmp> test caption"

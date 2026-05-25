@@ -29,13 +29,16 @@ Example prompt:
 | Parameter | Value |
 |-----------|-------|
 | Method | LoRA |
-| Rank | 32 |
-| Learning rate | 1e-4 |
-| Steps | 1500 |
+| Rank (linear) | 128 |
+| Rank (conv) | 64 |
+| Learning rate | 8e-5 |
+| Steps | 2500 |
 | Optimizer | adamw_8bit |
-| Resolution buckets | 512, 768, 1024 |
-| Scheduler | flowmatch / sigmoid |
-| Captions | Natural language, no trigger token in source |
+| Timestep type | weighted |
+| Weight decay | 1e-4 |
+| Resolution buckets | 512, 768, 1024 (repeated) |
+| Scheduler | flowmatch |
+| Captions | Natural language with `[trigger]` placeholder — toolkit replaces at train time |
 
 ### Intended Use
 
@@ -98,7 +101,7 @@ A LoRA for generating consistent top-down medieval pixel art game assets using F
 
 ## Training
 - Base: `black-forest-labs/FLUX.2-klein-4B`
-- Rank-32 LoRA, 1500 steps, natural language captions
+- Rank-128 LoRA (64 conv), 2500 steps, natural language captions
 - See [training repo](https://github.com/YOURNAME/TopDownMedievalPixelArt-Flux2-Klein-LoRa) for configs and dataset tools
 
 ## License
@@ -116,4 +119,3 @@ A LoRA for generating consistent top-down medieval pixel art game assets using F
 - [ ] Model card includes trigger token, base model, and usage examples
 - [ ] License chosen and declared
 - [ ] No copyrighted or unlicensed training images included in public repo
-
