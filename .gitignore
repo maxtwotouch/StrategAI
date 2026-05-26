@@ -1,0 +1,36 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Generated content (git tracks these folders but not their contents)
+generated_assets/
+mock_assets/
+splash_assets/
+
+# Database
+tilemap.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (large files)
+*.safetensors
+*.ckpt
+*.pt
+*.bin
+

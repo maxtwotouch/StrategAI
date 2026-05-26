@@ -1,0 +1,91 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "sd_xl_turbo_1.0.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {"title": "Load Checkpoint"}
+  },
+  "2": {
+    "inputs": {
+      "image": "base_image.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {"title": "Load Image"}
+  },
+  "3": {
+    "inputs": {
+      "image": "mask.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {"title": "Load Mask"}
+  },
+  "4": {
+    "inputs": {
+      "text": "PLACEHOLDER_POSITIVE",
+      "clip": ["1", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Positive)"}
+  },
+  "5": {
+    "inputs": {
+      "text": "PLACEHOLDER_NEGATIVE",
+      "clip": ["1", 1]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Negative)"}
+  },
+  "6": {
+    "inputs": {
+      "pixels": ["2", 0],
+      "vae": ["1", 2]
+    },
+    "class_type": "VAEEncodeForInpaint",
+    "_meta": {"title": "VAE Encode (for Inpainting)"}
+  },
+  "7": {
+    "inputs": {
+      "pixels": ["3", 0],
+      "vae": ["1", 2]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {"title": "VAE Encode (Mask)"}
+  },
+  "8": {
+    "inputs": {
+      "seed": 0,
+      "steps": 8,
+      "cfg": 3.5,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 0.99,
+      "model": ["1", 0],
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "latent_image": ["6", 0],
+      "mask": ["7", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": {"title": "KSampler"}
+  },
+  "9": {
+    "inputs": {
+      "samples": ["8", 0],
+      "vae": ["1", 2]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {"title": "VAE Decode"}
+  },
+  "10": {
+    "inputs": {
+      "filename_prefix": "inpaint",
+      "images": ["9", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": {"title": "Save Image"}
+  }
+}
+

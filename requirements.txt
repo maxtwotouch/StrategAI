@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+Pillow
+numpy
+sqlalchemy
+websocket-client
+httpx
+requests
