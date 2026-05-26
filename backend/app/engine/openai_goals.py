@@ -44,6 +44,7 @@ from app.engine.intents import (
     Build,
     Engage,
     Expand,
+    Improve,
     Intent,
     Reinforce,
     Research,
@@ -53,6 +54,7 @@ from app.engine.intents import (
 from app.engine.models import DiplomaticStance, GameState, UnitType
 from app.engine.operations import resolve_intents
 from app.engine.playthrough import Decisions
+from app.engine.terrain import Improvement
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,31 @@ TOOLS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "improve",
+            "description": (
+                "Order a worker to build a tile improvement (farm, mine, road). "
+                "The engine picks an idle worker, walks them to a legal owned "
+                "tile, and starts the work. Farms boost food on plains/grassland; "
+                "mines boost production on hills."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": ["farm", "mine", "road"],
+                    },
+                    "q": {"type": "integer"},
+                    "r": {"type": "integer"},
+                },
+                "required": ["kind"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -238,40 +265,80 @@ TOOLS: list[dict[str, Any]] = [
 # ---------------------------------------------------------------------------
 
 BASE_SYSTEM_PROMPT = """\
-You are an AI civilization leader playing a strategy game on a hex grid.
+You are an AI civilization leader playing a turn-based strategy game on a
+square grid. Each turn you receive a JSON view of what you can see and act
+by calling INTENT tools — usually 2-4 per turn.
 
-Each turn you receive a JSON object describing what you can see (fog of war),
-your inbox, current stances, and what you and others did recently.  Issue
-your turn by calling INTENT tools.  You may call several tools per turn.
+# Your view (key fields)
 
-Key view fields:
-- "your_civ_id": YOUR civilization id. Never use it as a tool target.
-- "self": your civilization (gold, science, culture, techs)
-- "visible_units" / "visible_cities": entities you can see
-- "visible_tiles": currently-visible terrain
-- "known_civs": leaders you have met
-- "inbox": diplomatic messages addressed to you
-- "diplomatic_stances": current stance (peace/war/alliance) per known civ
-- "last_turn_feedback": engine rejection reasons from your previous turn
-- "recent_actions" / "recent_messages": what you and others recently did
-- "turn": current turn number
+- "your_civ_id": YOUR civ id. Never target yourself.
+- "self": gold, gold_income, gold_upkeep, science, culture, known_techs,
+  researching, score, score_threshold. `score = 10·cities + 2·population +
+  3·techs`. First past `score_threshold` wins.
+- "visible_units" / "visible_cities" / "visible_tiles": what you can see
+  through fog of war.
+- "tile_owner": which city owns each visible tile.
+- "available_techs" / "available_units" / "unit_build_costs": what's unlocked.
+- "known_civs": leaders you have met.
+- "inbox" / "recent_messages": diplomatic messages addressed to you.
+- "diplomatic_stances": per met civ:
+  - "stance": peace / war / alliance
+  - "relationship": -100 to +100. Below -50 = hostile; above +30 = friendly.
+  - "truce_active" / "truce_until": if true you CANNOT declare war on them
+    until `truce_until`.
+- "recent_diplomatic_events": last few events involving you (wars,
+  attacks, threats, peace offers, alliances). Use these to reason about
+  whom to trust and whom to punish.
+- "standings": current score for every met civ, sorted.
+- "last_turn_feedback": engine rejection reasons from your previous turn.
+- "turn": current turn number.
 
-You do NOT pick unit ids, hex coordinates, or war preconditions.  The engine
-handles tactics deterministically.  Your job is to decide WHAT to do this
-turn — the engine decides HOW.
+# Tool guide (INTENT layer — you don't pick unit ids or coordinates)
 
-Tool guide:
-- expand        : found a new city (only if you have a settler)
+- expand        : found a new city (requires a settler)
 - scout         : explore unknown territory
-- engage        : wage war on a target civ — auto-declares war for you
+- engage        : wage war on a civ. AUTO-declares war if not already at
+                  war. Blocked by an active truce.
 - reinforce     : march a military unit toward a friendly position
+- build         : queue a unit at one of your cities. Use `available_units`
+                  to see what's unlocked by your tech.
+- research      : pick the tech your civ is studying. Falls back to cheapest
+                  available tech if you skip it.
+- improve       : send a worker to build a farm (food on plains/grassland),
+                  mine (production on hills), or road. Workers MUST stand on
+                  a tile you own — `tile_owner` shows ownership.
 - speak         : send a diplomatic message in your voice
-- adjust_stance : peace/war/alliance with another civ
-- build         : queue a unit at one of your cities
-- research      : pick the tech your civ is studying
+                  (chat / threat / offer_peace / accept_peace / declare_war /
+                  propose_alliance / accept_alliance / reject)
+- adjust_stance : set peace / war / alliance with another civ
 
-Respond to messages in character. React to insults, threats, and offers
-according to your persona. Be decisive — issue at least one tool call.\
+# Strategic principles
+
+1. EXPANSION: settle 2-3 cities early. Each city = +score, +science, +gold,
+   +border. Watch your population — bigger cities work more tiles.
+2. ECONOMY: keep gold_income >= gold_upkeep or you'll go bankrupt and lose
+   units. Workers earn their keep — build them early and farm/mine your
+   best tiles.
+3. RESEARCH: pick techs that unlock units (archery, horseback_riding,
+   iron_working) or buildings (pottery, currency, writing) that match
+   your strategy.
+4. MILITARY: warriors are weak. Archers (req archery), horsemen (req
+   horseback_riding), swordsmen (req iron_working) are tier upgrades. Units
+   heal each turn if they didn't act — 4 HP in own borders, 1 in enemy.
+5. DIPLOMACY: relationship score is durable memory. A war declaration costs
+   -50; threats cost -10; chats earn +1; accepting peace earns +25 and
+   triggers a 10-turn truce. Behave consistently with your persona.
+
+# Behavior rules
+
+- Be decisive. Issue at least one tool call per turn.
+- Stay in character. Insults from civs at low relationship should provoke;
+  flattery from allies should be welcomed.
+- Don't repeat the same intent every turn if it keeps getting rejected —
+  read `last_turn_feedback` and try a different approach.
+- Diplomacy is durable: relationship_delta in recent_diplomatic_events
+  shows how much each act cost or earned.
+\
 """
 
 
@@ -364,6 +431,16 @@ def _parse_tool_call(name: str, args: dict[str, Any]) -> Intent | None:
             logger.warning("Invalid tech id: %r", tech_id)
             return None
         return Research(tech_id=tech_id)
+    if name == "improve":
+        try:
+            kind = Improvement(args["kind"])
+        except (KeyError, ValueError):
+            logger.warning("Invalid improvement kind: %s", args.get("kind"))
+            return None
+        target: Hex | None = None
+        if "q" in args and "r" in args:
+            target = Hex(args["q"], args["r"])
+        return Improve(kind=kind, target=target)
     logger.warning("Unknown tool call: %s", name)
     return None
 

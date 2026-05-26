@@ -18,6 +18,7 @@ from typing import Union
 from app.engine.diplomacy import MessageKind
 from app.engine.hex import Hex
 from app.engine.models import DiplomaticStance, UnitType
+from app.engine.terrain import Improvement
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +86,20 @@ class Research:
     tech_id: str
 
 
-Intent = Union[Expand, Scout, Engage, Reinforce, Speak, AdjustStance, Build, Research]
+@dataclass(frozen=True, slots=True)
+class Improve:
+    """Build a tile improvement.
+
+    Ops layer picks an idle worker (closest to *target* if provided). The
+    worker must be (or move to) a tile the civ owns whose terrain matches
+    the improvement.
+    """
+
+    kind: Improvement
+    target: Hex | None = None
+
+
+Intent = Union[Expand, Scout, Engage, Reinforce, Speak, AdjustStance, Build, Research, Improve]
 
 
 class IntentKind(str, Enum):
@@ -97,3 +111,4 @@ class IntentKind(str, Enum):
     ADJUST_STANCE = "adjust_stance"
     BUILD = "build"
     RESEARCH = "research"
+    IMPROVE = "improve"

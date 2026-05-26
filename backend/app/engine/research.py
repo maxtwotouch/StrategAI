@@ -53,6 +53,10 @@ UNIT_TECH_REQUIREMENTS: dict[UnitType, str | None] = {
     UnitType.SETTLER: None,
     UnitType.WARRIOR: None,
     UnitType.SCOUT: None,
+    UnitType.WORKER: None,
+    UnitType.ARCHER: "archery",
+    UnitType.HORSEMAN: "horseback_riding",
+    UnitType.SWORDSMAN: "iron_working",
 }
 
 

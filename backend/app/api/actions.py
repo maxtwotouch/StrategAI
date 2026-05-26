@@ -11,13 +11,14 @@ from dataclasses import dataclass
 from typing import Union
 
 from app.engine.hex import Hex, hex_distance
+from app.engine.improvements import can_improve
 from app.engine.models import (
     DiplomaticStance,
     GameState,
     Unit,
     UnitType,
 )
-from app.engine.terrain import Terrain, is_passable
+from app.engine.terrain import Improvement, Terrain, is_passable
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +55,12 @@ class EndTurnAction:
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class BuildImprovementAction:
+    unit_id: int
+    improvement: Improvement
+
+
 Action = Union[
     MoveAction,
     FoundCityAction,
@@ -61,6 +68,7 @@ Action = Union[
     ResearchAction,
     AttackAction,
     EndTurnAction,
+    BuildImprovementAction,
 ]
 
 
@@ -228,6 +236,38 @@ def _validate_end_turn(
     return ValidationOk(action)
 
 
+def _validate_build_improvement(
+    state: GameState, civ_id: int, action: BuildImprovementAction
+) -> ValidationResult:
+    unit = _unit(state, action.unit_id)
+    if unit is None:
+        return ValidationError(
+            f"unknown unit id {action.unit_id}", "unknown_unit"
+        )
+    if unit.owner != civ_id:
+        return ValidationError(
+            f"unit {action.unit_id} is not owned by civ {civ_id}", "not_owner"
+        )
+    if unit.type is not UnitType.WORKER:
+        return ValidationError(
+            f"unit {action.unit_id} is not a worker", "not_worker"
+        )
+    if unit.work_order is not None:
+        return ValidationError(
+            f"unit {action.unit_id} is already building an improvement",
+            "worker_already_busy",
+        )
+    tile = state.map.get(unit.location)
+    if tile is None:
+        return ValidationError("worker is off map", "off_map")
+    err = can_improve(state, tile, action.improvement, civ_id)
+    if err is not None:
+        return ValidationError(
+            f"cannot build {action.improvement.value} here: {err}", err
+        )
+    return ValidationOk(action)
+
+
 def validate(action: Action, state: GameState, civ_id: int) -> ValidationResult:
     turn_err = _check_turn(state, civ_id)
     if turn_err is not None:
@@ -245,4 +285,6 @@ def validate(action: Action, state: GameState, civ_id: int) -> ValidationResult:
         return _validate_attack(state, civ_id, action)
     if isinstance(action, EndTurnAction):
         return _validate_end_turn(state, civ_id, action)
+    if isinstance(action, BuildImprovementAction):
+        return _validate_build_improvement(state, civ_id, action)
     return ValidationError(f"unknown action type {type(action).__name__}", "unknown_action")

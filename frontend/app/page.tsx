@@ -52,16 +52,34 @@ const TECHS: TechDef[] = [
   { id: "astronomy", name: "Astronomy", cost: 130, prerequisites: ["mathematics", "sailing"] },
 ];
 
-const BUILDABLE_UNITS = [
-  { id: "warrior", label: "Warrior", cost: 10 },
-  { id: "scout", label: "Scout", cost: 8 },
-  { id: "settler", label: "Settler", cost: 15 },
+type BuildableUnit = {
+  id: string;
+  label: string;
+  cost: number;
+  requires: string | null;
+};
+
+const BUILDABLE_UNITS: BuildableUnit[] = [
+  { id: "warrior", label: "Warrior", cost: 10, requires: null },
+  { id: "scout", label: "Scout", cost: 8, requires: null },
+  { id: "settler", label: "Settler", cost: 15, requires: null },
+  { id: "worker", label: "Worker", cost: 10, requires: null },
+  { id: "archer", label: "Archer", cost: 15, requires: "archery" },
+  { id: "horseman", label: "Horseman", cost: 22, requires: "horseback_riding" },
+  { id: "swordsman", label: "Swordsman", cost: 30, requires: "iron_working" },
+];
+
+const IMPROVEMENT_OPTIONS = [
+  { id: "farm", label: "Farm", desc: "+1 food on plains / grassland" },
+  { id: "mine", label: "Mine", desc: "+1 production on hills" },
+  { id: "road", label: "Road", desc: "Connect tiles" },
 ];
 
 const MESSAGE_KINDS = [
   { id: "chat", label: "Chat" },
   { id: "threat", label: "Threat" },
   { id: "offer_peace", label: "Offer Peace" },
+  { id: "accept_peace", label: "Accept Peace" },
   { id: "declare_war", label: "Declare War" },
   { id: "propose_alliance", label: "Propose Alliance" },
   { id: "accept_alliance", label: "Accept Alliance" },
@@ -229,6 +247,12 @@ export default function HomePage() {
     );
   }, [humanCiv]);
 
+  const buildableUnits = useMemo(() => {
+    if (!humanCiv) return [];
+    const known = new Set(humanCiv.known_techs);
+    return BUILDABLE_UNITS.filter((u) => u.requires === null || known.has(u.requires));
+  }, [humanCiv]);
+
   const currentResearch = useMemo(() => {
     if (!humanCiv?.researching) return null;
     return TECHS.find((tech) => tech.id === humanCiv.researching) ?? null;
@@ -353,6 +377,11 @@ export default function HomePage() {
   const queueProduction = async (cityId: number, unitType: string) => {
     if (!state || !humanCiv || !isHumanTurn) return;
     await run(() => api.build(state.id, humanCiv.id, cityId, unitType));
+  };
+
+  const startImprovement = async (unitId: number, improvement: string) => {
+    if (!state || !humanCiv || !isHumanTurn) return;
+    await run(() => api.improve(state.id, unitId, improvement));
   };
 
   const sendMessage = async () => {
@@ -506,11 +535,21 @@ export default function HomePage() {
         </div>
 
         <div className="war-room__metrics">
-          <TopMetric label="Science" value={humanCiv?.science ?? 0} delta="+6 / t" />
-          <TopMetric label="Gold" value={humanCiv?.gold ?? 0} delta="+8 / t" />
-          <TopMetric label="Culture" value={humanCiv?.culture ?? 0} delta="+2 / t" />
+          <TopMetric label="Science" value={humanCiv?.science ?? 0} />
+          <TopMetric
+            label="Gold"
+            value={humanCiv?.gold ?? 0}
+            delta={formatNetDelta(
+              (humanCiv?.gold_income ?? 0) - (humanCiv?.gold_upkeep ?? 0),
+            )}
+          />
+          <TopMetric label="Culture" value={humanCiv?.culture ?? 0} />
+          <TopMetric
+            label="Score"
+            value={humanCiv?.score ?? 0}
+            delta={`/ ${state.score_threshold}`}
+          />
           <TopMetric label="Cities" value={humanCities.length} />
-          <TopMetric label="Units" value={humanUnits.length} />
         </div>
 
         <div className="war-room__turnbox">
@@ -575,7 +614,10 @@ export default function HomePage() {
                 </div>
 
                 <div className="stat-grid">
-                  <MetricStat label="Health" value={`${selectedUnit.health}/20`} />
+                  <MetricStat
+                    label="Health"
+                    value={`${selectedUnit.health}/${maxHealthFor(selectedUnit.type)}`}
+                  />
                   <MetricStat label="Moves" value={selectedUnit.moves_remaining} />
                   <MetricStat label="Owner" value={state.civs[selectedUnit.owner]?.name ?? "Unknown"} />
                 </div>
@@ -603,6 +645,33 @@ export default function HomePage() {
                   >
                     Found City
                   </button>
+                )}
+
+                {selectedUnit.type === "worker" && (
+                  <div className="selection-stack">
+                    <div className="plate-label">Build Improvement</div>
+                    {selectedUnit.work_order ? (
+                      <EmptyCopy>
+                        Building {selectedUnit.work_order.improvement} —{" "}
+                        {selectedUnit.work_order.turns_remaining} turn(s) left.
+                      </EmptyCopy>
+                    ) : (
+                      <div className="list-stack">
+                        {IMPROVEMENT_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.id}
+                            className="list-row"
+                            onClick={() => startImprovement(selectedUnit.id, opt.id)}
+                            disabled={busy || !isHumanTurn}
+                            title={opt.desc}
+                          >
+                            <span>{opt.label}</span>
+                            <span>{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (
@@ -733,9 +802,20 @@ export default function HomePage() {
                 <div className="city-brief">
                   <MetricStat label="Population" value={selectedProductionCity.population} />
                   <MetricStat label="Queue" value={selectedProductionCity.production_queue[0] ?? "Idle"} />
+                  <MetricStat label="Border" value={`R${selectedProductionCity.border_radius ?? 1}`} />
+                  <MetricStat
+                    label="Culture"
+                    value={
+                      selectedProductionCity.border_radius >= 3
+                        ? `${selectedProductionCity.culture_stored ?? 0} / max`
+                        : `${selectedProductionCity.culture_stored ?? 0} / ${
+                            selectedProductionCity.border_radius >= 2 ? 30 : 10
+                          }`
+                    }
+                  />
                 </div>
                 <div className="list-stack">
-                  {BUILDABLE_UNITS.map((unit) => (
+                  {buildableUnits.map((unit) => (
                     <button
                       key={unit.id}
                       className="list-row"
@@ -759,8 +839,13 @@ export default function HomePage() {
                 <EmptyCopy>No rival leaders discovered yet.</EmptyCopy>
               ) : (
                 otherCivs.map((civ) => {
-                  const stance =
-                    state.stances.find((item) => item.other_civ_id === civ.id)?.stance ?? "peace";
+                  const stanceEntry = state.stances.find(
+                    (item) => item.other_civ_id === civ.id,
+                  );
+                  const stance = stanceEntry?.stance ?? "peace";
+                  const relationship = stanceEntry?.relationship ?? 0;
+                  const truceActive = stanceEntry?.truce_active ?? false;
+                  const truceUntil = stanceEntry?.truce_until;
                   const inboxCount = inboxCounts.get(civ.id) ?? 0;
                   return (
                     <button
@@ -782,13 +867,41 @@ export default function HomePage() {
                         <strong>{civ.name}</strong>
                         <span>
                           {civ.leader_name} · {capitalize(stance)}
+                          {truceActive ? ` · Truce → T${truceUntil}` : ""}
                           {inboxCount > 0 ? ` · ${inboxCount} new` : ""}
+                        </span>
+                        <span style={{ color: relationshipColor(relationship) }}>
+                          Rel {relationship >= 0 ? "+" : ""}
+                          {relationship} · {relationshipLabel(relationship)}
                         </span>
                       </span>
                     </button>
                   );
                 })
               )}
+            </div>
+          </Panel>
+
+          <Panel label="Standings" title={`Goal · ${state.score_threshold}`}>
+            <div className="list-stack">
+              {state.standings.map((entry) => {
+                const isMe = humanCiv?.id === entry.civ_id;
+                return (
+                  <div
+                    key={entry.civ_id}
+                    className="list-row"
+                    style={{ cursor: "default", fontWeight: isMe ? 700 : 400 }}
+                  >
+                    <span>
+                      {entry.name}
+                      {isMe ? " (you)" : ""}
+                    </span>
+                    <span>
+                      {entry.score} / {state.score_threshold}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </Panel>
         </aside>
@@ -1118,6 +1231,45 @@ function MessageCard({
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
+}
+
+function formatNetDelta(net: number): string {
+  if (net > 0) return `+${net} / t`;
+  if (net < 0) return `${net} / t`;
+  return "0 / t";
+}
+
+// Mirrors UNIT_STATS.max_health from the backend. Keep in sync with
+// backend/app/engine/models.py.
+const UNIT_MAX_HEALTH: Record<string, number> = {
+  settler: 10,
+  warrior: 20,
+  scout: 10,
+  worker: 10,
+  archer: 20,
+  horseman: 20,
+  swordsman: 25,
+};
+
+function maxHealthFor(type: string): number {
+  return UNIT_MAX_HEALTH[type] ?? 20;
+}
+
+function relationshipLabel(score: number): string {
+  if (score <= -60) return "Furious";
+  if (score <= -30) return "Hostile";
+  if (score <= -10) return "Cold";
+  if (score < 10) return "Neutral";
+  if (score < 30) return "Warm";
+  if (score < 60) return "Friendly";
+  return "Devoted";
+}
+
+function relationshipColor(score: number): string {
+  if (score <= -30) return "#d97a6a";
+  if (score < 10) return "#bba27a";
+  if (score < 30) return "#dfca85";
+  return "#8fcf7a";
 }
 
 function formatError(e: unknown): string {

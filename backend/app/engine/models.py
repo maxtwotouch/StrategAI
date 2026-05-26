@@ -7,16 +7,20 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from app.engine.hex import Hex
-from app.engine.terrain import Feature, Resource, Terrain
+from app.engine.terrain import Feature, Improvement, Resource, Terrain
 
 if TYPE_CHECKING:
-    from app.engine.diplomacy import DiplomaticMessage
+    from app.engine.diplomacy import DiplomaticEvent, DiplomaticMessage
 
 
 class UnitType(str, Enum):
     SETTLER = "settler"
     WARRIOR = "warrior"
     SCOUT = "scout"
+    WORKER = "worker"
+    ARCHER = "archer"
+    HORSEMAN = "horseman"
+    SWORDSMAN = "swordsman"
 
 
 class BuildingType(str, Enum):
@@ -24,6 +28,7 @@ class BuildingType(str, Enum):
     MONUMENT = "monument"
     LIBRARY = "library"
     BARRACKS = "barracks"
+    MARKET = "market"
 
 
 class BuildKind(str, Enum):
@@ -44,6 +49,10 @@ UNIT_STATS: dict[UnitType, UnitStats] = {
     UnitType.SETTLER: UnitStats(max_health=10, attack=0, defense=1, moves=2, sight=2),
     UnitType.WARRIOR: UnitStats(max_health=20, attack=4, defense=3, moves=2, sight=2),
     UnitType.SCOUT: UnitStats(max_health=10, attack=1, defense=1, moves=4, sight=3),
+    UnitType.WORKER: UnitStats(max_health=10, attack=0, defense=1, moves=2, sight=1),
+    UnitType.ARCHER: UnitStats(max_health=20, attack=5, defense=2, moves=2, sight=2),
+    UnitType.HORSEMAN: UnitStats(max_health=20, attack=6, defense=3, moves=4, sight=2),
+    UnitType.SWORDSMAN: UnitStats(max_health=25, attack=7, defense=5, moves=2, sight=2),
 }
 
 
@@ -51,6 +60,21 @@ UNIT_BUILD_COST: dict[UnitType, int] = {
     UnitType.SETTLER: 15,
     UnitType.WARRIOR: 10,
     UnitType.SCOUT: 8,
+    UnitType.WORKER: 10,
+    UnitType.ARCHER: 15,
+    UnitType.HORSEMAN: 22,
+    UnitType.SWORDSMAN: 30,
+}
+
+
+UNIT_UPKEEP: dict[UnitType, int] = {
+    UnitType.SETTLER: 1,
+    UnitType.WARRIOR: 1,
+    UnitType.SCOUT: 1,
+    UnitType.WORKER: 1,
+    UnitType.ARCHER: 1,
+    UnitType.HORSEMAN: 2,
+    UnitType.SWORDSMAN: 2,
 }
 
 
@@ -78,6 +102,7 @@ class Tile:
     resource: Resource | None = None
     feature: Feature | None = None
     river: bool = False
+    improvement: Improvement | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +125,9 @@ class Unit:
     location: Hex
     health: int
     moves_remaining: int
+    acted_this_turn: bool = False
+    work_order: tuple[Hex, Improvement] | None = None
+    work_turns_remaining: int = 0
 
     @property
     def stats(self) -> UnitStats:
@@ -126,6 +154,9 @@ class City:
     is_capital: bool = False
     buildings: frozenset[BuildingType] = field(default_factory=frozenset)
     production_queue: tuple[BuildItem, ...] = ()
+    border_radius: int = 1
+    culture_stored: int = 0
+    worked_tiles: frozenset[Hex] = field(default_factory=frozenset)
 
     def growth_threshold(self) -> int:
         return 10 * self.population
@@ -166,6 +197,10 @@ class GameState:
     diplomacy: dict[tuple[int, int], DiplomaticStance] = field(default_factory=dict)
     visibility: dict[int, frozenset[Hex]] = field(default_factory=dict)
     messages: tuple["DiplomaticMessage", ...] = ()
+    tile_owner: dict[Hex, int] = field(default_factory=dict)
+    relationships: dict[tuple[int, int], int] = field(default_factory=dict)
+    truces: dict[tuple[int, int], int] = field(default_factory=dict)
+    diplomatic_events: tuple["DiplomaticEvent", ...] = ()
 
     def units_for(self, civ_id: int) -> tuple[Unit, ...]:
         return tuple(u for u in self.units if u.owner == civ_id)

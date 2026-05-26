@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from app.engine.borders import auto_assign_workers, recompute_claims
 from app.engine.hex import Hex, hex_distance
 from app.engine.models import City, GameState, Unit
 from app.engine.terrain import is_passable
@@ -48,7 +49,12 @@ def move_unit(state: GameState, unit_id: int, destination: Hex) -> GameState:
         if other.id != unit_id and other.location == destination:
             raise MoveError(f"destination {destination} is occupied")
 
-    moved = unit.with_location(destination).with_moves(unit.moves_remaining - 1)
+    moved = replace(
+        unit.with_location(destination).with_moves(unit.moves_remaining - 1),
+        acted_this_turn=True,
+        work_order=None,
+        work_turns_remaining=0,
+    )
     new_units = tuple(moved if u.id == unit_id else u for u in state.units)
     city = _city_at(state, destination)
     if city is None or city.owner == unit.owner:
@@ -65,6 +71,8 @@ def move_unit(state: GameState, unit_id: int, destination: Hex) -> GameState:
         production_stored=0,
         is_capital=False,
         production_queue=(),
+        culture_stored=0,
+        worked_tiles=frozenset({city.location}),
     )
     replacement_cities = [
         replace(captured_city, is_capital=not any(
@@ -83,4 +91,7 @@ def move_unit(state: GameState, unit_id: int, destination: Hex) -> GameState:
             replace(c, is_capital=True) if c.id == promote_id else c
             for c in replacement_cities
         ]
-    return replace(state, units=new_units, cities=tuple(replacement_cities))
+    captured_state = replace(state, units=new_units, cities=tuple(replacement_cities))
+    captured_state = recompute_claims(captured_state)
+    captured_state = auto_assign_workers(captured_state)
+    return captured_state

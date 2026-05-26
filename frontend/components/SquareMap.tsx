@@ -13,6 +13,7 @@ import { CityDTO, UnitDTO } from "@/lib/api";
 import {
   CIV_COLORS,
   FEATURE_GLYPH,
+  IMPROVEMENT_GLYPH,
   RESOURCE_GLYPH,
   TERRAIN_COLORS,
   TILE_SIZE,
@@ -136,17 +137,48 @@ export function SquareMap(props: StrategyMapProps) {
     return map;
   }, [props.state.cities]);
 
+  // Owner color per tile derived from authoritative tile_owner map.
+  // tile_owner maps tile → city_id; we look the city up to find its civ owner.
+  const tileOwnerByCiv = useMemo(() => {
+    const byCiv = new Map<number, Set<string>>();
+    const cityToCiv = new Map<number, number>();
+    for (const city of props.state.cities) cityToCiv.set(city.id, city.owner);
+    for (const entry of props.state.tile_owner ?? []) {
+      const civId = cityToCiv.get(entry.city_id);
+      if (civId === undefined) continue;
+      const key = tileKey(entry.q, entry.r);
+      let set = byCiv.get(civId);
+      if (!set) {
+        set = new Set<string>();
+        byCiv.set(civId, set);
+      }
+      set.add(key);
+    }
+    return byCiv;
+  }, [props.state.cities, props.state.tile_owner]);
+
   const humanOwnedKeys = useMemo(() => {
+    if (props.humanCivId === null || props.humanCivId === undefined) {
+      return new Set<string>();
+    }
+    return tileOwnerByCiv.get(props.humanCivId) ?? new Set<string>();
+  }, [tileOwnerByCiv, props.humanCivId]);
+
+  // Worked-tile highlight when the selected unit is on a city center.
+  const workedHighlight = useMemo(() => {
     const keys = new Set<string>();
-    if (props.humanCivId === null || props.humanCivId === undefined) return keys;
-    for (const city of props.state.cities) {
-      if (city.owner === props.humanCivId) keys.add(tileKey(city.q, city.r));
+    if (props.selectedUnitId === null || props.selectedUnitId === undefined) {
+      return keys;
     }
-    for (const unit of props.state.units) {
-      if (unit.owner === props.humanCivId) keys.add(tileKey(unit.q, unit.r));
-    }
+    const selected = props.state.units.find((u) => u.id === props.selectedUnitId);
+    if (!selected) return keys;
+    const city = props.state.cities.find(
+      (c) => c.q === selected.q && c.r === selected.r && c.owner === selected.owner,
+    );
+    if (!city) return keys;
+    for (const t of city.worked_tiles ?? []) keys.add(tileKey(t.q, t.r));
     return keys;
-  }, [props.state.cities, props.state.units, props.humanCivId]);
+  }, [props.selectedUnitId, props.state.units, props.state.cities]);
 
   const bounds = useMemo(() => {
     if (pixels.length === 0) return null;
@@ -540,6 +572,64 @@ export function SquareMap(props: StrategyMapProps) {
             )}
           </g>
 
+          {/* Improvements (farm, mine, road) */}
+          <g
+            pointerEvents="none"
+            style={{
+              fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
+              fontWeight: 700,
+            }}
+            textAnchor="middle"
+            dominantBaseline="central"
+          >
+            {pixels.map(({ tile, x, y }) =>
+              tile.improvement ? (
+                <g key={tileKey(tile.q, tile.r) + ":imp"}>
+                  <circle
+                    cx={x - half + TILE_SIZE * 0.22}
+                    cy={y + half - TILE_SIZE * 0.22}
+                    r={TILE_SIZE * 0.18}
+                    fill="#f5eedb"
+                    fillOpacity={0.9}
+                    stroke="#0a0f14"
+                    strokeWidth={strokeWidth * 0.8}
+                  />
+                  <text
+                    x={x - half + TILE_SIZE * 0.22}
+                    y={y + half - TILE_SIZE * 0.22}
+                    fontSize={TILE_SIZE * 0.3}
+                    fill="#2b1d08"
+                  >
+                    {IMPROVEMENT_GLYPH[tile.improvement] ?? "?"}
+                  </text>
+                </g>
+              ) : null,
+            )}
+          </g>
+
+          {/* Worked-tile markers for the selected city */}
+          {workedHighlight.size > 0 && (
+            <g pointerEvents="none">
+              {[...workedHighlight].map((key) => {
+                const [qStr, rStr] = key.split(",");
+                const q = Number(qStr);
+                const r = Number(rStr);
+                const { x, y } = hexToPixel({ q, r });
+                return (
+                  <circle
+                    key={key + ":worked"}
+                    cx={x + half - TILE_SIZE * 0.18}
+                    cy={y + half - TILE_SIZE * 0.18}
+                    r={TILE_SIZE * 0.08}
+                    fill="#f0c76a"
+                    stroke="#0a0f14"
+                    strokeWidth={strokeWidth * 0.6}
+                  />
+                );
+              })}
+            </g>
+          )}
+
           {/* Grid lines */}
           <g
             pointerEvents="none"
@@ -804,6 +894,24 @@ export function SquareMap(props: StrategyMapProps) {
                   >
                     {UNIT_GLYPH[unit.type] ?? unit.type[0]?.toUpperCase() ?? "?"}
                   </text>
+                  {unit.work_order && (
+                    <text
+                      x={x}
+                      y={y + half - 2}
+                      textAnchor="middle"
+                      dominantBaseline="alphabetic"
+                      fontSize={Math.max(7, TILE_SIZE * 0.22)}
+                      fontWeight={700}
+                      fill="#f5eedb"
+                      stroke="#0a0f14"
+                      strokeWidth={1.2}
+                      paintOrder="stroke"
+                    >
+                      {(IMPROVEMENT_GLYPH[unit.work_order.improvement] ?? "·") +
+                        " " +
+                        unit.work_order.turns_remaining}
+                    </text>
+                  )}
                 </g>
               );
             })}

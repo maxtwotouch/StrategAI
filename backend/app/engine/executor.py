@@ -16,12 +16,13 @@ from typing import Union
 from app.api.actions import (
     Action,
     AttackAction,
+    BuildImprovementAction,
     FoundCityAction,
     MoveAction,
 )
 from app.engine.hex import Hex, hex_distance, hex_neighbors
 from app.engine.models import GameState, Unit, UnitType
-from app.engine.terrain import is_passable
+from app.engine.terrain import Improvement, is_passable
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +44,15 @@ class AttackUnit:
     target_id: int
 
 
-Goal = Union[MoveTo, FoundCityNear, AttackUnit]
+@dataclass(frozen=True, slots=True)
+class BuildImprovementGoal:
+    """Walk a worker to *target* (if needed) then start building."""
+    unit_id: int
+    target: Hex
+    improvement: Improvement
+
+
+Goal = Union[MoveTo, FoundCityNear, AttackUnit, BuildImprovementGoal]
 
 
 def _unit(state: GameState, uid: int) -> Unit | None:
@@ -181,6 +190,24 @@ def _execute_attack_unit(state: GameState, goal: AttackUnit) -> list[Action]:
     return actions
 
 
+def _execute_build_improvement(state: GameState, goal: BuildImprovementGoal) -> list[Action]:
+    unit = _unit(state, goal.unit_id)
+    if unit is None or unit.type is not UnitType.WORKER:
+        return []
+    actions: list[Action] = []
+    location = unit.location
+    if location != goal.target:
+        moves, location = _walk_budget(
+            state, unit, goal.target, unit.moves_remaining
+        )
+        actions.extend(moves)
+    if location == goal.target:
+        actions.append(
+            BuildImprovementAction(unit_id=goal.unit_id, improvement=goal.improvement)
+        )
+    return actions
+
+
 def execute_goal(state: GameState, civ_id: int, goal: Goal) -> list[Action]:
     """Translate a single goal into primitive actions for the given civ."""
     if isinstance(goal, MoveTo):
@@ -189,4 +216,6 @@ def execute_goal(state: GameState, civ_id: int, goal: Goal) -> list[Action]:
         return _execute_found_city_near(state, goal)
     if isinstance(goal, AttackUnit):
         return _execute_attack_unit(state, goal)
+    if isinstance(goal, BuildImprovementGoal):
+        return _execute_build_improvement(state, goal)
     return []

@@ -17,6 +17,7 @@ class BuildingDef:
     production_bonus: int = 0
     science_bonus: int = 0
     culture_bonus: int = 0
+    gold_bonus: int = 0
     trained_unit_health_bonus: int = 0
 
 
@@ -50,6 +51,13 @@ BUILDINGS: dict[BuildingType, BuildingDef] = {
             prerequisite="bronze_working",
             trained_unit_health_bonus=3,
         ),
+        BuildingDef(
+            id=BuildingType.MARKET,
+            name="Market",
+            cost=24,
+            prerequisite="currency",
+            gold_bonus=2,
+        ),
     )
 }
 
@@ -68,6 +76,10 @@ def city_science_bonus(city: City) -> int:
 
 def city_culture_bonus(city: City) -> int:
     return sum(BUILDINGS[b].culture_bonus for b in city.buildings if b in BUILDINGS)
+
+
+def city_gold_bonus(city: City) -> int:
+    return sum(BUILDINGS[b].gold_bonus for b in city.buildings if b in BUILDINGS)
 
 
 def trained_unit_health_bonus(city: City) -> int:

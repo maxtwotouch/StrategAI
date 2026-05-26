@@ -16,6 +16,7 @@ from typing import Callable, Protocol
 from app.api.actions import (
     Action,
     AttackAction,
+    BuildImprovementAction,
     EndTurnAction,
     FoundCityAction,
     MoveAction,
@@ -39,11 +40,13 @@ from app.engine.directives import (
 )
 from app.engine.executor import (
     AttackUnit,
+    BuildImprovementGoal,
     FoundCityNear,
     Goal,
     MoveTo,
     execute_goal,
 )
+from app.engine.improvements import start_improvement
 from app.engine.hex import Hex, hex_neighbors
 from app.engine.models import GameState, UnitType
 from app.engine.movement import move_unit
@@ -84,6 +87,12 @@ def _describe_goal(goal: Goal) -> str:
         )
     if isinstance(goal, AttackUnit):
         return f"AttackUnit attacker={goal.attacker_id} target={goal.target_id}"
+    if isinstance(goal, BuildImprovementGoal):
+        return (
+            f"BuildImprovementGoal unit={goal.unit_id} "
+            f"target=({goal.target.q},{goal.target.r}) "
+            f"improvement={goal.improvement.value}"
+        )
     return repr(goal)
 
 
@@ -272,6 +281,8 @@ def apply_action(state: GameState, action: Action, civ_id: int) -> GameState:
         return found_city(state, action.unit_id, action.name)
     if isinstance(action, AttackAction):
         return attack(state, action.attacker_id, action.target_id)
+    if isinstance(action, BuildImprovementAction):
+        return start_improvement(state, action.unit_id, action.improvement)
     if isinstance(action, EndTurnAction):
         return state  # Handled by the loop's turn-advance step.
     return state

@@ -215,4 +215,6 @@ def test_city_with_monument_adds_culture_each_tick():
     )
     state = _base_state(city)
     new_state = process_cities(state)
-    assert new_state.civs[0].culture == 1
+    # Each city contributes a baseline +1 culture; Monument adds +1 more.
+    assert new_state.civs[0].culture == 2
+    assert new_state.cities[0].culture_stored == 2

@@ -4,9 +4,18 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app.engine.diplomacy import DiplomaticMessage, MessageKind, met_civs
+from app.engine.diplomacy import (
+    DiplomaticEvent,
+    DiplomaticMessage,
+    MessageKind,
+    met_civs,
+    relationship_between,
+    truce_active,
+)
+from app.engine.economy import civ_gold_income, civ_gold_upkeep
 from app.engine.fog_of_war import visible_tiles
 from app.engine.models import DiplomaticStance
+from app.engine.victory import SCORE_THRESHOLD, civ_score
 from app.engine.models import (
     City,
     Civilization,
@@ -29,9 +38,17 @@ class TileOut(BaseModel):
     resource: str | None = None
     feature: str | None = None
     river: bool = False
+    improvement: str | None = None
     food: int = 0
     production: int = 0
     gold: int = 0
+
+
+class WorkOrderOut(BaseModel):
+    q: int
+    r: int
+    improvement: str
+    turns_remaining: int
 
 
 class UnitOut(BaseModel):
@@ -42,6 +59,7 @@ class UnitOut(BaseModel):
     r: int
     health: int
     moves_remaining: int
+    work_order: WorkOrderOut | None = None
 
 
 class CityOut(BaseModel):
@@ -58,6 +76,9 @@ class CityOut(BaseModel):
     is_capital: bool
     buildings: list[str]
     production_queue: list[str]
+    border_radius: int
+    culture_stored: int
+    worked_tiles: list[dict[str, int]] = Field(default_factory=list)
 
 
 class CivOut(BaseModel):
@@ -66,10 +87,13 @@ class CivOut(BaseModel):
     leader_name: str
     is_human: bool
     gold: int
+    gold_income: int = 0
+    gold_upkeep: int = 0
     science: int
     culture: int
     known_techs: list[str]
     researching: str | None
+    score: int = 0
 
 
 class MessageOut(BaseModel):
@@ -83,6 +107,30 @@ class MessageOut(BaseModel):
 class StanceOut(BaseModel):
     other_civ_id: int
     stance: str
+    relationship: int = 0
+    truce_active: bool = False
+    truce_until: int | None = None
+
+
+class DiplomaticEventOut(BaseModel):
+    turn: int
+    kind: str
+    actor_civ_id: int
+    target_civ_id: int
+    summary: str
+    relationship_delta: int
+
+
+class StandingOut(BaseModel):
+    civ_id: int
+    name: str
+    score: int
+
+
+class TileOwnerOut(BaseModel):
+    q: int
+    r: int
+    city_id: int
 
 
 class GameStateOut(BaseModel):
@@ -99,6 +147,10 @@ class GameStateOut(BaseModel):
     inbox: list[MessageOut]
     stances: list[StanceOut]
     visible_tile_keys: list[str] = Field(default_factory=list)
+    tile_owner: list[TileOwnerOut] = Field(default_factory=list)
+    diplomatic_events: list[DiplomaticEventOut] = Field(default_factory=list)
+    standings: list[StandingOut] = Field(default_factory=list)
+    score_threshold: int = 200
 
 
 def tile_to_out(t: Tile) -> TileOut:
@@ -110,6 +162,7 @@ def tile_to_out(t: Tile) -> TileOut:
         resource=t.resource.value if t.resource else None,
         feature=t.feature.value if t.feature else None,
         river=t.river,
+        improvement=t.improvement.value if t.improvement else None,
         food=y.food,
         production=y.production,
         gold=y.gold,
@@ -117,6 +170,15 @@ def tile_to_out(t: Tile) -> TileOut:
 
 
 def unit_to_out(u: Unit) -> UnitOut:
+    work_order_out: WorkOrderOut | None = None
+    if u.work_order is not None:
+        coord, improvement = u.work_order
+        work_order_out = WorkOrderOut(
+            q=coord.q,
+            r=coord.r,
+            improvement=improvement.value,
+            turns_remaining=u.work_turns_remaining,
+        )
     return UnitOut(
         id=u.id,
         owner=u.owner,
@@ -125,6 +187,7 @@ def unit_to_out(u: Unit) -> UnitOut:
         r=u.location.r,
         health=u.health,
         moves_remaining=u.moves_remaining,
+        work_order=work_order_out,
     )
 
 
@@ -143,20 +206,40 @@ def city_to_out(c: City) -> CityOut:
         is_capital=c.is_capital,
         buildings=sorted(b.value for b in c.buildings),
         production_queue=[item.id for item in c.production_queue],
+        border_radius=c.border_radius,
+        culture_stored=c.culture_stored,
+        worked_tiles=sorted(
+            ({"q": h.q, "r": h.r} for h in c.worked_tiles),
+            key=lambda d: (d["q"], d["r"]),
+        ),
     )
 
 
-def civ_to_out(civ: Civilization) -> CivOut:
+def civ_to_out(civ: Civilization, state: GameState | None = None) -> CivOut:
     return CivOut(
         id=civ.id,
         name=civ.name,
         leader_name=civ.leader_name,
         is_human=civ.is_human,
         gold=civ.gold,
+        gold_income=civ_gold_income(state, civ.id) if state is not None else 0,
+        gold_upkeep=civ_gold_upkeep(state, civ.id) if state is not None else 0,
         science=civ.science,
         culture=civ.culture,
         known_techs=sorted(civ.known_techs),
         researching=civ.researching,
+        score=civ_score(state, civ) if state is not None else 0,
+    )
+
+
+def diplomatic_event_to_out(event: DiplomaticEvent) -> DiplomaticEventOut:
+    return DiplomaticEventOut(
+        turn=event.turn,
+        kind=event.kind.value,
+        actor_civ_id=event.actor_civ_id,
+        target_civ_id=event.target_civ_id,
+        summary=event.summary,
+        relationship_delta=event.relationship_delta,
     )
 
 
@@ -183,10 +266,16 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         for civ in state.civs:
             if civ.id == human_civ.id or civ.id not in known_ids:
                 continue
+            truce_until = state.truces.get(
+                tuple(sorted((human_civ.id, civ.id)))
+            )
             stances.append(
                 StanceOut(
                     other_civ_id=civ.id,
                     stance=state.stance_between(human_civ.id, civ.id).value,
+                    relationship=relationship_between(state, human_civ.id, civ.id),
+                    truce_active=truce_active(state, human_civ.id, civ.id),
+                    truce_until=truce_until,
                 )
             )
     if human_civ is not None:
@@ -195,13 +284,38 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         )
     else:
         visible_keys = []
+    tile_owner_list = sorted(
+        (
+            TileOwnerOut(q=coord.q, r=coord.r, city_id=city_id)
+            for coord, city_id in state.tile_owner.items()
+        ),
+        key=lambda t: (t.q, t.r),
+    )
+    # Recent diplomatic events involving the human civ (last 20).
+    if human_civ is not None:
+        relevant_events = [
+            e for e in state.diplomatic_events
+            if e.actor_civ_id == human_civ.id or e.target_civ_id == human_civ.id
+        ]
+        event_list = [diplomatic_event_to_out(e) for e in relevant_events[-20:]]
+    else:
+        event_list = []
+
+    standings = sorted(
+        (
+            StandingOut(civ_id=c.id, name=c.name, score=civ_score(state, c))
+            for c in state.civs
+        ),
+        key=lambda s: (-s.score, s.civ_id),
+    )
+
     return GameStateOut(
         id=game_id,
         turn=state.turn,
         current_civ_id=state.current_civ().id,
         map_radius=state.map.radius,
         tiles=[tile_to_out(t) for t in state.map.tiles.values()],
-        civs=[civ_to_out(c) for c in state.civs],
+        civs=[civ_to_out(c, state) for c in state.civs],
         cities=[city_to_out(c) for c in state.cities],
         units=[unit_to_out(u) for u in state.units],
         known_civ_ids=known_ids,
@@ -209,6 +323,10 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         inbox=inbox,
         stances=stances,
         visible_tile_keys=visible_keys,
+        tile_owner=tile_owner_list,
+        diplomatic_events=event_list,
+        standings=standings,
+        score_threshold=SCORE_THRESHOLD,
     )
 
 
@@ -257,3 +375,8 @@ class MessageRequest(BaseModel):
     to_civ_id: int
     kind: str = Field(default=MessageKind.CHAT.value)
     text: str
+
+
+class BuildImprovementRequest(BaseModel):
+    unit_id: int
+    improvement: str

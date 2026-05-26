@@ -23,14 +23,22 @@ from app.engine.diplomacy import (
     met_civs,
 )
 from app.engine.directives import Directive, QueueProduction, StartResearch
-from app.engine.executor import AttackUnit, FoundCityNear, Goal, MoveTo
+from app.engine.executor import (
+    AttackUnit,
+    BuildImprovementGoal,
+    FoundCityNear,
+    Goal,
+    MoveTo,
+)
 from app.engine.fog_of_war import visible_tiles
 from app.engine.hex import Hex, hex_distance, hex_neighbors, hex_range
+from app.engine.improvements import can_improve
 from app.engine.intents import (
     AdjustStance,
     Build,
     Engage,
     Expand,
+    Improve,
     Intent,
     Reinforce,
     Research,
@@ -45,8 +53,8 @@ from app.engine.models import (
     Unit,
     UnitType,
 )
-from app.engine.research import TECHS
-from app.engine.terrain import is_passable
+from app.engine.research import TECHS, can_build_unit
+from app.engine.terrain import Improvement as ImprovementKind, is_passable
 
 
 # ---------------------------------------------------------------------------
@@ -317,15 +325,72 @@ def _do_build(state: GameState, civ_id: int, intent: Build) -> _Out:
     cities = state.cities_for(civ_id)
     if not cities:
         return out
+    civ = next((c for c in state.civs if c.id == civ_id), None)
+    if civ is None or not can_build_unit(civ, intent.unit_type):
+        # Tech not researched — drop silently rather than generating rejected
+        # directives that pollute the LLM feedback channel.
+        return out
     if intent.city_id is not None:
         city = next((c for c in cities if c.id == intent.city_id), None)
         if city is None:
-            # City unknown or not owned — drop silently.
             return out
     else:
         city = cities[0]
     out.directives.append(
         QueueProduction(city_id=city.id, item=BuildItem.unit(intent.unit_type))
+    )
+    return out
+
+
+def _workers(state: GameState, civ_id: int) -> list[Unit]:
+    return [u for u in state.units if u.owner == civ_id and u.type is UnitType.WORKER]
+
+
+def _improvable_tile_near(
+    state: GameState,
+    civ_id: int,
+    improvement: ImprovementKind,
+    hint: Hex | None,
+) -> Hex | None:
+    """Pick a tile this civ owns where the improvement is legal.
+
+    Prefers the hint tile if it's legal, otherwise the first legal tile in
+    deterministic coordinate order.
+    """
+    owned_tiles = sorted(
+        (coord for coord, city_id in state.tile_owner.items()),
+        key=lambda c: (c.q, c.r),
+    )
+    candidates: list[Hex] = []
+    for coord in owned_tiles:
+        tile = state.map.get(coord)
+        if tile is None:
+            continue
+        if can_improve(state, tile, improvement, civ_id) is not None:
+            continue
+        candidates.append(coord)
+    if not candidates:
+        return None
+    if hint is not None and hint in candidates:
+        return hint
+    if hint is not None:
+        return min(candidates, key=lambda c: (hex_distance(c, hint), c.q, c.r))
+    return candidates[0]
+
+
+def _do_improve(state: GameState, civ_id: int, intent: Improve) -> _Out:
+    out = _Out()
+    workers = [w for w in _workers(state, civ_id) if w.work_order is None]
+    if not workers:
+        return out
+    target = _improvable_tile_near(state, civ_id, intent.kind, intent.target)
+    if target is None:
+        return out
+    worker = _closest(workers, target)
+    if worker is None:
+        return out
+    out.goals.append(
+        BuildImprovementGoal(unit_id=worker.id, target=target, improvement=intent.kind)
     )
     return out
 
@@ -370,6 +435,8 @@ def resolve_intent(
         out = _do_build(state, civ_id, intent)
     elif isinstance(intent, Research):
         out = _do_research(state, civ_id, intent)
+    elif isinstance(intent, Improve):
+        out = _do_improve(state, civ_id, intent)
     else:
         out = _Out()
     return out.goals, out.diplomacy, out.directives

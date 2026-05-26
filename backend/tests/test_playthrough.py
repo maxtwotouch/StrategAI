@@ -58,8 +58,8 @@ def _two_civ_state(
     """Minimal two-civ state on a flat map."""
     gm = _flat_map(radius)
     civs = (
-        Civilization(id=0, name="Alpha", leader_name="A", is_human=False),
-        Civilization(id=1, name="Beta", leader_name="B", is_human=False),
+        Civilization(id=0, name="Alpha", leader_name="A", is_human=False, gold=50),
+        Civilization(id=1, name="Beta", leader_name="B", is_human=False, gold=50),
     )
     settler_stats = UNIT_STATS[UnitType.SETTLER]
     warrior_stats = UNIT_STATS[UnitType.WARRIOR]

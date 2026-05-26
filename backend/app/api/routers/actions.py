@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.api.schemas import (
     AttackRequest,
     AttackCityRequest,
+    BuildImprovementRequest,
     BuildRequest,
     FoundCityRequest,
     GameStateOut,
@@ -19,9 +20,11 @@ from app.engine.directives import DirectiveError, QueueProduction, apply_directi
 from app.engine.city_founding import FoundError, found_city
 from app.engine.combat import CombatError, attack, attack_city
 from app.engine.hex import Hex
+from app.engine.improvements import ImprovementError, start_improvement
 from app.engine.models import BuildItem, BuildKind, BuildingType, UnitType
 from app.engine.movement import MoveError, move_unit
 from app.engine.research import ResearchError, set_research
+from app.engine.terrain import Improvement
 
 router = APIRouter(prefix="/games/{game_id}/actions", tags=["actions"])
 
@@ -109,6 +112,18 @@ def action_build(game_id: int, req: BuildRequest) -> GameStateOut:
             QueueProduction(city_id=req.city_id, item=item),
         )
     except (DirectiveError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    store.put(game_id, new_state)
+    return state_to_out(game_id, new_state)
+
+
+@router.post("/improve", response_model=GameStateOut)
+def action_improve(game_id: int, req: BuildImprovementRequest) -> GameStateOut:
+    state = _load(game_id)
+    try:
+        improvement = Improvement(req.improvement)
+        new_state = start_improvement(state, req.unit_id, improvement)
+    except (ImprovementError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     store.put(game_id, new_state)
     return state_to_out(game_id, new_state)

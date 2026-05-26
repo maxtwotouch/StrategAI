@@ -9,8 +9,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.engine.diplomacy import DiplomaticMessage, inbox_for, met_civs
+from app.engine.diplomacy import (
+    DiplomaticEvent,
+    DiplomaticMessage,
+    inbox_for,
+    met_civs,
+    relationship_between,
+    truce_active,
+)
+from app.engine.economy import civ_gold_income, civ_gold_upkeep
 from app.engine.fog_of_war import visible_tiles
+from app.engine.victory import SCORE_THRESHOLD, civ_score
 from app.engine.hex import Hex
 from app.engine.models import (
     UNIT_BUILD_COST,
@@ -19,8 +28,9 @@ from app.engine.models import (
     GameState,
     Tile,
     Unit,
+    UnitType,
 )
-from app.engine.research import TECHS
+from app.engine.research import TECHS, can_build_unit
 
 
 def _serialize_tile(tile: Tile) -> dict[str, Any]:
@@ -34,10 +44,20 @@ def _serialize_tile(tile: Tile) -> dict[str, Any]:
         "resource": tile.resource.value if tile.resource else None,
         "feature": tile.feature.value if tile.feature else None,
         "river": tile.river,
+        "improvement": tile.improvement.value if tile.improvement else None,
     }
 
 
 def _serialize_unit(unit: Unit) -> dict[str, Any]:
+    work_order: dict[str, Any] | None = None
+    if unit.work_order is not None:
+        coord, improvement = unit.work_order
+        work_order = {
+            "q": coord.q,
+            "r": coord.r,
+            "improvement": improvement.value,
+            "turns_remaining": unit.work_turns_remaining,
+        }
     return {
         "id": unit.id,
         "owner": unit.owner,
@@ -50,6 +70,8 @@ def _serialize_unit(unit: Unit) -> dict[str, Any]:
         "attack": unit.stats.attack,
         "defense": unit.stats.defense,
         "sight": unit.stats.sight,
+        "acted_this_turn": unit.acted_this_turn,
+        "work_order": work_order,
     }
 
 
@@ -67,9 +89,15 @@ def _serialize_city(city: City, *, owned: bool = False) -> dict[str, Any]:
         "max_health": city.max_health,
         "is_capital": city.is_capital,
         "buildings": sorted(b.value for b in city.buildings),
+        "border_radius": city.border_radius,
+        "culture_stored": city.culture_stored,
     }
     if owned:
         out["production_queue"] = [item.id for item in city.production_queue]
+        out["worked_tiles"] = sorted(
+            [{"q": h.q, "r": h.r} for h in city.worked_tiles],
+            key=lambda d: (d["q"], d["r"]),
+        )
     return out
 
 
@@ -93,7 +121,7 @@ def _serialize_message(m: DiplomaticMessage) -> dict[str, Any]:
     }
 
 
-def _serialize_self(civ: Civilization) -> dict[str, Any]:
+def _serialize_self(civ: Civilization, state: GameState) -> dict[str, Any]:
     return {
         "id": civ.id,
         "name": civ.name,
@@ -101,10 +129,25 @@ def _serialize_self(civ: Civilization) -> dict[str, Any]:
         "color": civ.color,
         "traits": list(civ.traits),
         "gold": civ.gold,
+        "gold_income": civ_gold_income(state, civ.id),
+        "gold_upkeep": civ_gold_upkeep(state, civ.id),
         "science": civ.science,
         "culture": civ.culture,
         "known_techs": sorted(civ.known_techs),
         "researching": civ.researching,
+        "score": civ_score(state, civ),
+        "score_threshold": SCORE_THRESHOLD,
+    }
+
+
+def _serialize_diplomatic_event(event: DiplomaticEvent) -> dict[str, Any]:
+    return {
+        "turn": event.turn,
+        "kind": event.kind.value,
+        "actor_civ_id": event.actor_civ_id,
+        "target_civ_id": event.target_civ_id,
+        "summary": event.summary,
+        "relationship_delta": event.relationship_delta,
     }
 
 
@@ -144,10 +187,40 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
 
     stances: list[dict[str, Any]] = []
     for other_id in sorted(met_ids - {civ_id}):
+        truce_until = state.truces.get(
+            tuple(sorted((civ_id, other_id)))
+        )
         stances.append({
             "civ_id": other_id,
             "stance": state.stance_between(civ_id, other_id).value,
+            "relationship": relationship_between(state, civ_id, other_id),
+            "truce_active": truce_active(state, civ_id, other_id),
+            "truce_until": truce_until,
         })
+
+    # Recent diplomatic events involving this civ (last 12). Filtered so the
+    # LLM sees a focused narrative rather than the full append-only log.
+    relevant_events = [
+        e for e in state.diplomatic_events
+        if e.actor_civ_id == civ_id or e.target_civ_id == civ_id
+    ]
+    recent_events = [
+        _serialize_diplomatic_event(e) for e in relevant_events[-12:]
+    ]
+
+    # Standings — score for every known civ + self.
+    standings_civs = [c for c in state.civs if c.id in met_ids]
+    standings = sorted(
+        (
+            {
+                "civ_id": c.id,
+                "name": c.name,
+                "score": civ_score(state, c),
+            }
+            for c in standings_civs
+        ),
+        key=lambda d: (-d["score"], d["civ_id"]),
+    )
 
     available_techs = sorted(
         (
@@ -165,19 +238,34 @@ def local_view(state: GameState, civ_id: int) -> dict[str, Any]:
     )
 
     unit_costs = {ut.value: cost for ut, cost in UNIT_BUILD_COST.items()}
+    available_units = sorted(ut.value for ut in UnitType if can_build_unit(civ, ut))
+
+    tile_owner_out = sorted(
+        (
+            {"q": coord.q, "r": coord.r, "city_id": city_id}
+            for coord, city_id in state.tile_owner.items()
+            if coord in visible
+        ),
+        key=lambda d: (d["q"], d["r"]),
+    )
 
     return {
         "turn": state.turn,
         "seed": state.seed,
         "current_civ_id": state.current_civ().id,
         "map_radius": state.map.radius,
-        "self": _serialize_self(civ),
+        "self": _serialize_self(civ, state),
         "known_civs": known_civs,
         "visible_tiles": tiles_out,
         "visible_units": units_out,
         "visible_cities": cities_out,
+        "tile_owner": tile_owner_out,
         "inbox": inbox,
         "diplomatic_stances": stances,
         "available_techs": available_techs,
+        "available_units": available_units,
         "unit_build_costs": unit_costs,
+        "recent_diplomatic_events": recent_events,
+        "standings": standings,
+        "score_threshold": SCORE_THRESHOLD,
     }

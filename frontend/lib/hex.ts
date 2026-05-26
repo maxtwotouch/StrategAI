@@ -78,6 +78,32 @@ export const UNIT_GLYPH: Record<string, string> = {
   warrior: "⚔",
   settler: "⌂",
   scout: "◉",
+  worker: "⚙",
+  archer: "↟",
+  horseman: "♞",
+  swordsman: "✦",
+};
+
+export const UNIT_LABEL: Record<string, string> = {
+  warrior: "Warrior",
+  settler: "Settler",
+  scout: "Scout",
+  worker: "Worker",
+  archer: "Archer",
+  horseman: "Horseman",
+  swordsman: "Swordsman",
+};
+
+export const IMPROVEMENT_GLYPH: Record<string, string> = {
+  farm: "≈",
+  mine: "⛏",
+  road: "═",
+};
+
+export const IMPROVEMENT_LABEL: Record<string, string> = {
+  farm: "Farm",
+  mine: "Mine",
+  road: "Road",
 };
 
 export const RESOURCE_GLYPH: Record<string, string> = {

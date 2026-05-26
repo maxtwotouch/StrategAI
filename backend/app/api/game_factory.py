@@ -129,6 +129,9 @@ def _fallback_starting_tiles(state_map, count: int) -> list[Hex]:
     )
 
 
+STARTING_GOLD = 20
+
+
 def _build_civ(idx: int, spec: tuple) -> Civilization:
     name, leader, is_human, color, traits, persona = spec
     return Civilization(
@@ -139,6 +142,7 @@ def _build_civ(idx: int, spec: tuple) -> Civilization:
         color=color,
         traits=traits,
         persona=persona,
+        gold=STARTING_GOLD,
     )
 
 

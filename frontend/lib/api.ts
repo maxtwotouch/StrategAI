@@ -5,9 +5,16 @@ export type TileDTO = {
   resource: string | null;
   feature: string | null;
   river: boolean;
+  improvement: string | null;
   food: number;
   production: number;
   gold: number;
+};
+export type WorkOrderDTO = {
+  q: number;
+  r: number;
+  improvement: string;
+  turns_remaining: number;
 };
 export type UnitDTO = {
   id: number;
@@ -17,7 +24,9 @@ export type UnitDTO = {
   r: number;
   health: number;
   moves_remaining: number;
+  work_order: WorkOrderDTO | null;
 };
+export type WorkedTileDTO = { q: number; r: number };
 export type CityDTO = {
   id: number;
   owner: number;
@@ -27,7 +36,14 @@ export type CityDTO = {
   population: number;
   food_stored: number;
   production_stored: number;
+  health: number;
+  max_health: number;
+  is_capital: boolean;
+  buildings: string[];
   production_queue: string[];
+  border_radius: number;
+  culture_stored: number;
+  worked_tiles: WorkedTileDTO[];
 };
 export type CivDTO = {
   id: number;
@@ -35,10 +51,18 @@ export type CivDTO = {
   leader_name: string;
   is_human: boolean;
   gold: number;
+  gold_income: number;
+  gold_upkeep: number;
   science: number;
   culture: number;
   known_techs: string[];
   researching: string | null;
+  score: number;
+};
+export type TileOwnerDTO = {
+  q: number;
+  r: number;
+  city_id: number;
 };
 export type MessageDTO = {
   from_civ_id: number;
@@ -50,6 +74,24 @@ export type MessageDTO = {
 export type StanceDTO = {
   other_civ_id: number;
   stance: string;
+  relationship: number;
+  truce_active: boolean;
+  truce_until: number | null;
+};
+
+export type DiplomaticEventDTO = {
+  turn: number;
+  kind: string;
+  actor_civ_id: number;
+  target_civ_id: number;
+  summary: string;
+  relationship_delta: number;
+};
+
+export type StandingDTO = {
+  civ_id: number;
+  name: string;
+  score: number;
 };
 export type GameStateDTO = {
   id: number;
@@ -65,6 +107,10 @@ export type GameStateDTO = {
   inbox: MessageDTO[];
   stances: StanceDTO[];
   visible_tile_keys: string[];
+  tile_owner: TileOwnerDTO[];
+  diplomatic_events: DiplomaticEventDTO[];
+  standings: StandingDTO[];
+  score_threshold: number;
 };
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -117,6 +163,11 @@ export const api = {
     req<GameStateDTO>(`/games/${id}/actions/build`, {
       method: "POST",
       body: JSON.stringify({ civ_id, city_id, unit_type }),
+    }),
+  improve: (id: number, unit_id: number, improvement: string) =>
+    req<GameStateDTO>(`/games/${id}/actions/improve`, {
+      method: "POST",
+      body: JSON.stringify({ unit_id, improvement }),
     }),
   sendMessage: (
     id: number,

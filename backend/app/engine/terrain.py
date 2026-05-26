@@ -30,6 +30,12 @@ class Feature(str, Enum):
     OASIS = "oasis"
 
 
+class Improvement(str, Enum):
+    FARM = "farm"
+    MINE = "mine"
+    ROAD = "road"
+
+
 class ResourceCategory(str, Enum):
     STRATEGIC = "strategic"
     LUXURY = "luxury"
@@ -91,6 +97,29 @@ FEATURE_YIELDS: dict[Feature, Yields] = {
 }
 
 
+IMPROVEMENT_YIELDS: dict[Improvement, Yields] = {
+    Improvement.FARM: Yields(food=1),
+    Improvement.MINE: Yields(production=1),
+    Improvement.ROAD: Yields(),  # Movement effects land in Tier 2.
+}
+
+
+# Allowed terrain per improvement type.
+IMPROVEMENT_TERRAIN: dict[Improvement, frozenset[Terrain]] = {
+    Improvement.FARM: frozenset({Terrain.PLAINS, Terrain.GRASSLAND}),
+    Improvement.MINE: frozenset({Terrain.HILLS}),
+    Improvement.ROAD: frozenset(),  # populated below
+}
+
+
+# Build turns per improvement.
+IMPROVEMENT_TURNS: dict[Improvement, int] = {
+    Improvement.FARM: 3,
+    Improvement.MINE: 4,
+    Improvement.ROAD: 2,
+}
+
+
 RESOURCES: dict[Resource, ResourceInfo] = {
     Resource.IRON: ResourceInfo(
         ResourceCategory.STRATEGIC,
@@ -146,6 +175,9 @@ IMPASSABLE_TERRAIN: frozenset[Terrain] = frozenset(
 
 PASSABLE: frozenset[Terrain] = frozenset(t for t in Terrain if t not in IMPASSABLE_TERRAIN)
 
+# Roads may be built on any passable land tile.
+IMPROVEMENT_TERRAIN[Improvement.ROAD] = PASSABLE
+
 
 def yields_for(terrain: Terrain) -> Yields:
     return TERRAIN_YIELDS[terrain]
@@ -167,4 +199,6 @@ def tile_yields(tile: "Tile") -> Yields:
         total = total + RESOURCES[tile.resource].bonus
     if tile.river:
         total = total + Yields(gold=1)
+    if tile.improvement is not None:
+        total = total + IMPROVEMENT_YIELDS[tile.improvement]
     return total

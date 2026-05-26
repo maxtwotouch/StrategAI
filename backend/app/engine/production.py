@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from app.engine.borders import working_yields
 from app.engine.buildings import (
     BUILDINGS,
     city_culture_bonus,
@@ -23,11 +24,13 @@ from app.engine.models import (
     Unit,
     UnitType,
 )
-from app.engine.terrain import is_passable, yields_for
+from app.engine.terrain import is_passable
 
 # Base yields a city produces beyond its terrain (keeps new cities viable).
 CITY_BASE_FOOD = 2
 CITY_BASE_PRODUCTION = 1
+# Base culture every city contributes per turn (feeds border growth).
+CITY_BASE_CULTURE = 1
 # Food consumed per population unit per turn.
 FOOD_UPKEEP_PER_POP = 1
 # Population threshold a city must reach before defaults will queue a settler.
@@ -57,13 +60,7 @@ def _spawn_location(state: GameState, city: City):  # type: ignore[no-untyped-de
 
 
 def _city_tile_yields(state: GameState, city: City) -> tuple[int, int]:
-    tile = state.map.get(city.location)
-    if tile is None:
-        return (
-            CITY_BASE_FOOD + city_food_bonus(city),
-            CITY_BASE_PRODUCTION + city_production_bonus(city),
-        )
-    y = yields_for(tile.terrain)
+    y = working_yields(state, city)
     return (
         CITY_BASE_FOOD + y.food + city_food_bonus(city),
         CITY_BASE_PRODUCTION + y.production + city_production_bonus(city),
@@ -106,7 +103,7 @@ def default_unit_for(state: GameState, city: City) -> UnitType:
     return UnitType.WARRIOR
 
 
-def _tick_city(state: GameState, city: City) -> tuple[GameState, City]:
+def _tick_city(state: GameState, city: City) -> tuple[GameState, City, int]:
     food_yield, prod_yield = _city_tile_yields(state, city)
     net_food = food_yield - FOOD_UPKEEP_PER_POP * city.population
     new_food = max(0, city.food_stored + net_food)
@@ -150,14 +147,16 @@ def _tick_city(state: GameState, city: City) -> tuple[GameState, City]:
                 new_prod -= cost
                 new_queue = new_queue[1:]
 
+    culture_added = CITY_BASE_CULTURE + city_culture_bonus(city)
     updated = replace(
         city,
         food_stored=new_food,
         production_stored=new_prod,
         production_queue=new_queue,
+        culture_stored=city.culture_stored + culture_added,
     )
     updated = _grow(updated)
-    return working_state, updated
+    return working_state, updated, culture_added
 
 
 def process_cities(state: GameState) -> GameState:
@@ -165,10 +164,10 @@ def process_cities(state: GameState) -> GameState:
     working = state
     culture_by_owner: dict[int, int] = {}
     for city in state.cities:
-        working, updated = _tick_city(working, city)
+        working, updated, culture_added = _tick_city(working, city)
         new_cities.append(updated)
         culture_by_owner[updated.owner] = (
-            culture_by_owner.get(updated.owner, 0) + city_culture_bonus(updated)
+            culture_by_owner.get(updated.owner, 0) + culture_added
         )
 
     new_civs = []

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from app.engine.borders import auto_assign_workers, recompute_claims
 from app.engine.models import City, GameState, Unit, UnitType
 from app.engine.terrain import Terrain
 
@@ -50,7 +51,11 @@ def found_city(state: GameState, unit_id: int, name: str) -> GameState:
         location=unit.location,
         population=1,
         is_capital=not state.cities_for(unit.owner),
+        worked_tiles=frozenset({unit.location}),
     )
     new_cities = state.cities + (new_city,)
     new_units = tuple(u for u in state.units if u.id != unit_id)
-    return replace(state, cities=new_cities, units=new_units)
+    new_state = replace(state, cities=new_cities, units=new_units)
+    new_state = recompute_claims(new_state)
+    new_state = auto_assign_workers(new_state)
+    return new_state
