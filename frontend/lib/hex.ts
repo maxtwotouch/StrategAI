@@ -3,7 +3,7 @@
 
 export type Hex = { q: number; r: number };
 
-export const TILE_SIZE = 28;
+export const TILE_SIZE = 22;
 // Alias retained so other files can import either name.
 export const HEX_SIZE = TILE_SIZE;
 

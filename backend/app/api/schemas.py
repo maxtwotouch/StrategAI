@@ -147,6 +147,7 @@ class GameStateOut(BaseModel):
     inbox: list[MessageOut]
     stances: list[StanceOut]
     visible_tile_keys: list[str] = Field(default_factory=list)
+    explored_tile_keys: list[str] = Field(default_factory=list)
     tile_owner: list[TileOwnerOut] = Field(default_factory=list)
     diplomatic_events: list[DiplomaticEventOut] = Field(default_factory=list)
     standings: list[StandingOut] = Field(default_factory=list)
@@ -257,6 +258,12 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
     human_civ = next((c for c in state.civs if c.is_human), None)
     known_ids = sorted(met_civs(state, human_civ.id) - {human_civ.id}) if human_civ is not None else []
     visible = visible_tiles(state, human_civ.id) if human_civ is not None else frozenset()
+    # Explored = ever-seen ∪ currently-visible. Lazy union covers tiles
+    # revealed mid-turn before end_turn accumulates them.
+    if human_civ is not None:
+        explored = state.explored.get(human_civ.id, frozenset()) | visible
+    else:
+        explored = frozenset(state.map.tiles.keys())
     visible_civ_ids = set(known_ids)
     if human_civ is not None:
         visible_civ_ids.add(human_civ.id)
@@ -290,6 +297,7 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
                 )
             )
     visible_keys = sorted(f"{c.q},{c.r}" for c in visible)
+    explored_keys = sorted(f"{c.q},{c.r}" for c in explored)
     tile_owner_list = sorted(
         (
             TileOwnerOut(q=coord.q, r=coord.r, city_id=city_id)
@@ -322,7 +330,11 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         turn=state.turn,
         current_civ_id=state.current_civ().id,
         map_radius=state.map.radius,
-        tiles=[tile_to_out(t) for t in state.map.tiles.values()],
+        tiles=[
+            tile_to_out(t)
+            for coord, t in state.map.tiles.items()
+            if coord in explored
+        ],
         civs=[civ_to_out(c, state) for c in state.civs if c.id in visible_civ_ids],
         cities=[
             city_to_out(c)
@@ -339,6 +351,7 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         inbox=inbox,
         stances=stances,
         visible_tile_keys=visible_keys,
+        explored_tile_keys=explored_keys,
         tile_owner=tile_owner_list,
         diplomatic_events=event_list,
         standings=standings,

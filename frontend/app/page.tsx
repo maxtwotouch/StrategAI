@@ -105,7 +105,8 @@ export default function HomePage() {
   const [activeConversationCivId, setActiveConversationCivId] = useState<number | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>("log");
-  const [mapViewMode, setMapViewMode] = useState<MapViewMode>("global");
+  const [chronicleCollapsed, setChronicleCollapsed] = useState(false);
+  const [mapViewMode, setMapViewMode] = useState<MapViewMode>("local");
   const [bannerEvents, setBannerEvents] = useState<TurnEvent[] | null>(null);
   const [eventLog, setEventLog] = useState<TurnEvent[]>([]);
   const prevStateRef = useRef<GameStateDTO | null>(null);
@@ -130,7 +131,7 @@ export default function HomePage() {
       setMessageText("");
       setActiveConversationCivId(null);
       setHasStarted(true);
-      setMapViewMode("global");
+      setMapViewMode("local");
       setBannerEvents(null);
       setEventLog([]);
       prevStateRef.current = next;
@@ -576,7 +577,10 @@ export default function HomePage() {
           <div className="empire-badge__copy">
             <div className="empire-badge__name">{humanCiv?.name ?? "Civilization"}</div>
             <div className="empire-badge__sub">
-              {humanCiv?.leader_name ?? "Unknown Leader"} · Classical Era
+              {humanCiv?.leader_name ?? "Unknown Leader"}
+            </div>
+            <div className="empire-badge__sub empire-badge__objective">
+              {nextObjective}
             </div>
           </div>
         </div>
@@ -671,31 +675,19 @@ export default function HomePage() {
 
                 <div className="selection-actions">
                   <button onClick={() => setSelectedUnit(null)}>Clear</button>
-                  <button
-                    className="button-danger"
-                    disabled={!isHumanTurn || selectedUnit.moves_remaining <= 0}
-                  >
-                    Attack
-                  </button>
+                  {selectedUnit.type === "settler" && (
+                    <button
+                      className="button-primary"
+                      onClick={openFoundCity}
+                      disabled={busy || !isHumanTurn}
+                    >
+                      Found City
+                    </button>
+                  )}
                 </div>
-
-                <div className="selection-actions">
-                  <button disabled={!isHumanTurn || selectedUnit.moves_remaining <= 0}>Move</button>
-                  <button disabled={!isHumanTurn}>Fortify</button>
-                </div>
-
-                {selectedUnit.type === "settler" && (
-                  <button
-                    className="button-primary"
-                    onClick={openFoundCity}
-                    disabled={busy || !isHumanTurn}
-                  >
-                    Found City
-                  </button>
-                )}
 
                 {selectedUnit.type === "worker" && (
-                  <div className="selection-stack">
+                  <>
                     <div className="plate-label">Build Improvement</div>
                     {selectedUnit.work_order ? (
                       <EmptyCopy>
@@ -718,7 +710,7 @@ export default function HomePage() {
                         ))}
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             ) : (
@@ -791,18 +783,6 @@ export default function HomePage() {
         </section>
 
         <aside className="war-room__rail war-room__rail--right">
-          <Panel label="Turn Objective" title={nextObjective}>
-            <p className="panel-copy">
-              {needsResearch
-                ? "Your scholars await direction. Lock the next advance before ending the round."
-                : needsProduction
-                  ? "A city queue is idle. Use your industrial output before rival expansion accelerates."
-                  : totalInbox > 0
-                    ? "A foreign court has answered. Messages can shift the tempo of the frontier."
-                    : "The current board favors expansion. Keep pressure on the map while your lead holds."}
-            </p>
-          </Panel>
-
           <Panel
             label={`Research · ${currentResearch ? currentResearch.name : "Awaiting Order"}`}
             title={currentResearch ? `${researchProgress} / ${currentResearch.cost}` : "Choose Technology"}
@@ -817,11 +797,11 @@ export default function HomePage() {
                 />
               </div>
             )}
-            <div className="list-stack">
+            <div className="list-stack scroll-list">
               {availableTechs.length === 0 ? (
                 <EmptyCopy>No available technologies. Expand prerequisites or finish the current research.</EmptyCopy>
               ) : (
-                availableTechs.slice(0, 4).map((tech) => (
+                availableTechs.map((tech) => (
                   <button
                     key={tech.id}
                     className="list-row"
@@ -861,7 +841,7 @@ export default function HomePage() {
                     }
                   />
                 </div>
-                <div className="list-stack">
+                <div className="list-stack scroll-list">
                   {buildableUnits.map((unit) => (
                     <button
                       key={unit.id}
@@ -913,13 +893,14 @@ export default function HomePage() {
                       <span className="leader-row__body">
                         <strong>{civ.name}</strong>
                         <span>
-                          {civ.leader_name} · {capitalize(stance)}
-                          {truceActive ? ` · Truce → T${truceUntil}` : ""}
+                          {capitalize(stance)}
+                          {" · "}
+                          <span style={{ color: relationshipColor(relationship) }}>
+                            {relationship >= 0 ? "+" : ""}
+                            {relationship} {relationshipLabel(relationship)}
+                          </span>
+                          {truceActive ? ` · Truce T${truceUntil}` : ""}
                           {inboxCount > 0 ? ` · ${inboxCount} new` : ""}
-                        </span>
-                        <span style={{ color: relationshipColor(relationship) }}>
-                          Rel {relationship >= 0 ? "+" : ""}
-                          {relationship} · {relationshipLabel(relationship)}
                         </span>
                       </span>
                     </button>
@@ -954,25 +935,42 @@ export default function HomePage() {
         </aside>
       </section>
 
-      <section className="war-room__chronicle">
+      <section
+        className={`war-room__chronicle${chronicleCollapsed ? " is-collapsed" : ""}`}
+      >
         <div className="chronicle-tabs">
           <button
             type="button"
             className={`chronicle-tab${bottomTab === "log" ? " is-active" : ""}`}
-            onClick={() => setBottomTab("log")}
+            onClick={() => {
+              setBottomTab("log");
+              if (chronicleCollapsed) setChronicleCollapsed(false);
+            }}
           >
             Events
           </button>
           <button
             type="button"
             className={`chronicle-tab${bottomTab === "diplomacy" ? " is-active" : ""}`}
-            onClick={() => setBottomTab("diplomacy")}
+            onClick={() => {
+              setBottomTab("diplomacy");
+              if (chronicleCollapsed) setChronicleCollapsed(false);
+            }}
           >
             Diplomacy {totalInbox > 0 ? `(${totalInbox})` : ""}
           </button>
+          <button
+            type="button"
+            className="chronicle-collapse"
+            onClick={() => setChronicleCollapsed((c) => !c)}
+            aria-label={chronicleCollapsed ? "Expand chronicle" : "Collapse chronicle"}
+            title={chronicleCollapsed ? "Expand" : "Collapse"}
+          >
+            {chronicleCollapsed ? "▴ Show" : "▾ Hide"}
+          </button>
         </div>
 
-        {bottomTab === "log" ? (
+        {!chronicleCollapsed && (bottomTab === "log" ? (
           <div className="chronicle-grid">
             {eventLog.length === 0 ? (
               <EmptyCopy>No events recorded yet. Resolve a turn to populate the chronicle.</EmptyCopy>
@@ -1028,20 +1026,25 @@ export default function HomePage() {
               </div>
 
               {activeConversationCiv && activeStance && (
-                <div className="city-brief">
-                  <MetricStat
-                    label="Relationship"
-                    value={`${activeStance.relationship >= 0 ? "+" : ""}${activeStance.relationship} · ${relationshipLabel(activeStance.relationship)}`}
-                  />
-                  <MetricStat label="Status" value={capitalize(activeStance.stance)} />
-                  <MetricStat
-                    label="Truce"
-                    value={
-                      activeStance.truce_active
-                        ? `Until T${activeStance.truce_until}`
-                        : "None"
-                    }
-                  />
+                <div className="thread-pills">
+                  <span className="thread-pill">
+                    <span className="thread-pill__label">Status</span>
+                    {capitalize(activeStance.stance)}
+                  </span>
+                  <span
+                    className="thread-pill"
+                    style={{ color: relationshipColor(activeStance.relationship) }}
+                  >
+                    <span className="thread-pill__label">Rel</span>
+                    {activeStance.relationship >= 0 ? "+" : ""}
+                    {activeStance.relationship} {relationshipLabel(activeStance.relationship)}
+                  </span>
+                  {activeStance.truce_active && (
+                    <span className="thread-pill">
+                      <span className="thread-pill__label">Truce</span>
+                      until T{activeStance.truce_until}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -1104,11 +1107,11 @@ export default function HomePage() {
                 </button>
               </div>
 
-              <div className="selection-stack">
-                <div className="plate-label">Recent Incidents</div>
-                {activeDiplomaticEvents.length === 0 ? (
-                  <EmptyCopy>No recent diplomatic incidents with this civilization.</EmptyCopy>
-                ) : (
+              {activeDiplomaticEvents.length > 0 && (
+                <details className="incidents-details">
+                  <summary>
+                    Recent Incidents ({activeDiplomaticEvents.length})
+                  </summary>
                   <div className="list-stack">
                     {[...activeDiplomaticEvents].reverse().slice(0, 6).map((event, index) => (
                       <div
@@ -1126,11 +1129,11 @@ export default function HomePage() {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </details>
+              )}
             </div>
           </div>
-        )}
+        ))}
       </section>
 
       {pending?.kind === "found" && (

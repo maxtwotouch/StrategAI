@@ -13,6 +13,7 @@ from app.engine.models import (
     BuildItem,
     City,
     Civilization,
+    DiplomaticStance,
     GameMap,
     GameState,
     Tile,
@@ -46,13 +47,21 @@ def _civs(known: frozenset[str] = frozenset()) -> tuple[Civilization, ...]:
     )
 
 
-def _state(*, civ_known: frozenset[str] = frozenset(), cities=(), units=()) -> GameState:
+def _state(
+    *,
+    civ_known: frozenset[str] = frozenset(),
+    cities=(),
+    units=(),
+    at_war: bool = False,
+) -> GameState:
+    diplomacy = {(0, 1): DiplomaticStance.WAR} if at_war else {}
     return GameState(
         turn=1,
         map=_flat_map(),
         civs=_civs(civ_known),
         cities=tuple(cities),
         units=tuple(units),
+        diplomacy=diplomacy,
     )
 
 
@@ -126,13 +135,13 @@ def test_swordsman_outdamages_warrior():
     defender = _unit(3, 1, Hex(1, 0), UnitType.WARRIOR)
 
     # Warrior vs warrior
-    state_w = _state(units=(a_warrior, defender))
+    state_w = _state(units=(a_warrior, defender), at_war=True)
     after_w = attack(state_w, 1, 3)
     after_w_def = next(u for u in after_w.units if u.id == 3)
 
     # Swordsman vs warrior
     a_sword_real = _unit(1, 0, Hex(0, 0), UnitType.SWORDSMAN)
-    state_s = _state(units=(a_sword_real, defender))
+    state_s = _state(units=(a_sword_real, defender), at_war=True)
     after_s = attack(state_s, 1, 3)
     after_s_def = next((u for u in after_s.units if u.id == 3), None)
 

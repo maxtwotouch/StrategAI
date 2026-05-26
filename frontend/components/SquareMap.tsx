@@ -3,6 +3,7 @@
 import React, {
   PointerEvent as ReactPointerEvent,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -205,6 +206,13 @@ export function SquareMap(props: StrategyMapProps) {
     applyViewBox(camera);
   }, [camera]);
 
+  // After every render, reassert the viewBox from the live ref. Without this,
+  // a parent re-render (e.g., hover state updates) during a drag would snap
+  // the SVG back to the pre-drag camera state in React, causing visible jitter.
+  useLayoutEffect(() => {
+    if (cameraRef.current) applyViewBox(cameraRef.current);
+  });
+
   const focusPoint = useMemo(() => {
     if (props.focusHex) return hexToPixel(props.focusHex);
     const firstCity =
@@ -230,6 +238,37 @@ export function SquareMap(props: StrategyMapProps) {
     const scale = initialScale(props.state.map_radius);
     setCamera(buildCamera(bounds, stageSize, scale, homeFocusRef.current));
   }, [bounds, props.state.map_radius, stageSize.height, stageSize.width]);
+
+  // When the parent updates focusHex (e.g., a unit was selected), pan the
+  // camera so the focused point is visible. Doesn't change zoom; if the
+  // point is already in view, do nothing. Skipped while the user is
+  // actively dragging.
+  useEffect(() => {
+    if (!props.focusHex || !bounds) return;
+    const cam = cameraRef.current;
+    if (!cam) return;
+    if (dragRef.current?.moved) return;
+    const target = hexToPixel(props.focusHex);
+    const margin = TILE_SIZE * 1.5;
+    const insideX =
+      target.x >= cam.x + margin && target.x <= cam.x + cam.width - margin;
+    const insideY =
+      target.y >= cam.y + margin && target.y <= cam.y + cam.height - margin;
+    if (insideX && insideY) return;
+    const nextX = clampCameraStart(
+      target.x - cam.width / 2,
+      bounds.minX,
+      bounds.width,
+      cam.width,
+    );
+    const nextY = clampCameraStart(
+      target.y - cam.height / 2,
+      bounds.minY,
+      bounds.height,
+      cam.height,
+    );
+    setCamera({ ...cam, x: nextX, y: nextY });
+  }, [props.focusHex?.q, props.focusHex?.r, bounds]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -326,7 +365,16 @@ export function SquareMap(props: StrategyMapProps) {
 
       const totalDx = event.clientX - drag.startX;
       const totalDy = event.clientY - drag.startY;
-      if (Math.abs(totalDx) > 3 || Math.abs(totalDy) > 3) drag.moved = true;
+      if (Math.abs(totalDx) > 5 || Math.abs(totalDy) > 5) {
+        // Only mark as a real drag (and dirty the camera) after the pointer
+        // has moved past a noise threshold.
+        if (!drag.moved) {
+          drag.moved = true;
+          userCameraDirtyRef.current = true;
+        }
+      }
+
+      if (!drag.moved) return;
 
       const dx = event.clientX - drag.lastX;
       const dy = event.clientY - drag.lastY;
@@ -375,7 +423,9 @@ export function SquareMap(props: StrategyMapProps) {
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !camera || !bounds) return;
-    userCameraDirtyRef.current = true;
+    // Don't mark camera dirty here — wait until actual drag movement is
+    // detected so that simple clicks still allow auto-recentering on focus
+    // changes (e.g., selecting a unit).
     dragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
@@ -432,12 +482,6 @@ export function SquareMap(props: StrategyMapProps) {
 
   const visibleAll = props.visibleTiles.size === 0;
   const ownedKeys = humanOwnedKeys;
-  const shouldRenderPresence = (key: string, owner: number) =>
-    visibleAll ||
-    props.visibleTiles.has(key) ||
-    props.humanCivId === null ||
-    props.humanCivId === undefined ||
-    owner !== props.humanCivId;
 
   return (
     <div className="map-shell">
@@ -469,6 +513,7 @@ export function SquareMap(props: StrategyMapProps) {
           height={stageSize.height}
           viewBox={viewBox}
           preserveAspectRatio="xMidYMid slice"
+          onPointerLeave={() => setHover(null)}
           style={{
             display: "block",
             background: "#0a0f14",
@@ -730,6 +775,52 @@ export function SquareMap(props: StrategyMapProps) {
             })}
           </g>
 
+          {/* Rival territory borders — thinner, civ-colored */}
+          {[...tileOwnerByCiv.entries()].map(([civId, keys]) => {
+            if (civId === props.humanCivId) return null;
+            const color = CIV_COLORS[civId % CIV_COLORS.length];
+            return (
+              <g
+                key={`rival-borders-${civId}`}
+                pointerEvents="none"
+                stroke={color}
+                strokeOpacity={0.7}
+                strokeWidth={borderWidth * 0.55}
+                fill="none"
+                strokeLinecap="square"
+              >
+                {[...keys].flatMap((key) => {
+                  const [qStr, rStr] = key.split(",");
+                  const q = Number(qStr);
+                  const r = Number(rStr);
+                  const { x, y } = hexToPixel({ q, r });
+                  const lines: React.ReactElement[] = [];
+                  if (!keys.has(tileKey(q, r - 1))) {
+                    lines.push(
+                      <line key={`${key}:rt`} x1={x - half} y1={y - half} x2={x + half} y2={y - half} />,
+                    );
+                  }
+                  if (!keys.has(tileKey(q, r + 1))) {
+                    lines.push(
+                      <line key={`${key}:rb`} x1={x - half} y1={y + half} x2={x + half} y2={y + half} />,
+                    );
+                  }
+                  if (!keys.has(tileKey(q - 1, r))) {
+                    lines.push(
+                      <line key={`${key}:rl`} x1={x - half} y1={y - half} x2={x - half} y2={y + half} />,
+                    );
+                  }
+                  if (!keys.has(tileKey(q + 1, r))) {
+                    lines.push(
+                      <line key={`${key}:rr`} x1={x + half} y1={y - half} x2={x + half} y2={y + half} />,
+                    );
+                  }
+                  return lines;
+                })}
+              </g>
+            );
+          })}
+
           {/* Reachable range */}
           {props.reachable.size > 0 && (
             <g pointerEvents="none">
@@ -811,7 +902,6 @@ export function SquareMap(props: StrategyMapProps) {
           <g pointerEvents="none">
             {props.state.cities.map((city) => {
               const key = tileKey(city.q, city.r);
-              if (!shouldRenderPresence(key, city.owner)) return null;
               const { x, y } = hexToPixel({ q: city.q, r: city.r });
               const color = CIV_COLORS[city.owner % CIV_COLORS.length];
               return (
@@ -856,7 +946,6 @@ export function SquareMap(props: StrategyMapProps) {
           <g pointerEvents="none">
             {props.state.units.map((unit) => {
               const key = tileKey(unit.q, unit.r);
-              if (!shouldRenderPresence(key, unit.owner)) return null;
               const { x, y } = hexToPixel({ q: unit.q, r: unit.r });
               const color = CIV_COLORS[unit.owner % CIV_COLORS.length];
               const isSelected = unit.id === props.selectedUnitId;
@@ -960,8 +1049,10 @@ export function SquareMap(props: StrategyMapProps) {
               );
             })()}
 
-          {/* Hit zones — transparent, topmost, sole owner of pointer events */}
-          <g>
+          {/* Hit zones — transparent, topmost, sole owner of pointer events.
+              Disabled during drag so cursor sweeps don't spam hover updates
+              (which would re-render the parent and cause viewBox jitter). */}
+          <g style={{ pointerEvents: dragging ? "none" : "auto" }}>
             {pixels.map(({ tile, x, y }) => {
               const key = tileKey(tile.q, tile.r);
               return (

@@ -10,6 +10,7 @@ from app.engine.hex import Hex
 from app.engine.models import (
     City,
     Civilization,
+    DiplomaticStance,
     GameMap,
     GameState,
     Tile,
@@ -59,13 +60,22 @@ def _civs(*ids: int) -> tuple[Civilization, ...]:
     )
 
 
-def _state(*, cities=(), units=(), terrain: Terrain = Terrain.GRASSLAND, radius: int = 4) -> GameState:
+def _state(
+    *,
+    cities=(),
+    units=(),
+    terrain: Terrain = Terrain.GRASSLAND,
+    radius: int = 4,
+    at_war: bool = True,
+) -> GameState:
+    diplomacy = {(0, 1): DiplomaticStance.WAR} if at_war else {}
     state = GameState(
         turn=1,
         map=_flat_map(radius, terrain),
         civs=_civs(0, 1),
         cities=tuple(cities),
         units=tuple(units),
+        diplomacy=diplomacy,
     )
     return recompute_claims(state)
 

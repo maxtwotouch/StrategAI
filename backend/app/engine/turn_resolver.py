@@ -9,6 +9,7 @@ from dataclasses import replace
 
 from app.engine.borders import auto_assign_workers, grow_borders
 from app.engine.economy import tick_economy
+from app.engine.fog_of_war import visible_tiles
 from app.engine.improvements import tick_improvements
 from app.engine.models import GameState, Unit
 from app.engine.production import process_cities
@@ -42,6 +43,20 @@ def _heal_amount(state: GameState, unit: Unit) -> int:
     return HEAL_UNOWNED
 
 
+def accumulate_explored(state: GameState) -> GameState:
+    """Union each civ's currently-visible tiles into `state.explored`.
+
+    Called from `end_turn` and lazily by the serializer so a tile a unit
+    just saw stays remembered next turn.
+    """
+    new_explored = dict(state.explored)
+    for civ in state.civs:
+        current = visible_tiles(state, civ.id)
+        prior = new_explored.get(civ.id, frozenset())
+        new_explored[civ.id] = prior | current
+    return replace(state, explored=new_explored)
+
+
 def _heal_units(state: GameState) -> GameState:
     new_units: list[Unit] = []
     for unit in state.units:
@@ -62,6 +77,7 @@ def end_turn(state: GameState) -> GameState:
     state = auto_assign_workers(state)
     state = _heal_units(state)
     state = tick_research(state)
+    state = accumulate_explored(state)
     refreshed_units = tuple(
         replace(u.with_moves(u.stats.moves), acted_this_turn=False)
         for u in state.units

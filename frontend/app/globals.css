@@ -475,7 +475,7 @@ select:focus {
 .war-room__layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 280px;
+  grid-template-columns: 260px minmax(0, 1fr) 260px;
   gap: var(--space-sm);
 }
 
@@ -488,6 +488,22 @@ select:focus {
 
 .war-room__rail--left {
   grid-template-rows: 214px minmax(0, 1fr);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.war-room__rail--right {
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.war-room__rail::-webkit-scrollbar {
+  width: 6px;
+}
+
+.war-room__rail::-webkit-scrollbar-thumb {
+  background: rgba(203, 166, 88, 0.18);
+  border-radius: 3px;
 }
 
 .war-room__mapstage {
@@ -596,6 +612,27 @@ select:focus {
 .leader-stack {
   display: grid;
   gap: var(--space-sm);
+}
+
+.scroll-list {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.scroll-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-list::-webkit-scrollbar-thumb {
+  background: rgba(203, 166, 88, 0.18);
+  border-radius: 3px;
+}
+
+.empire-badge__objective {
+  color: rgba(245, 238, 219, 0.65);
+  font-size: 0.78rem;
+  font-style: italic;
 }
 
 .selection-hero {
@@ -794,15 +831,44 @@ select:focus {
 }
 
 .war-room__chronicle {
-  min-height: 150px;
+  min-height: 0;
+  max-height: 32vh;
   display: grid;
-  gap: var(--space-md);
-  padding: 0.9rem 1rem 1rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: 0.7rem 1rem 0.9rem;
+  overflow: hidden;
+  transition: max-height 0.18s ease;
+}
+
+.war-room__chronicle.is-collapsed {
+  max-height: 56px;
+  grid-template-rows: auto;
+  padding-bottom: 0.4rem;
 }
 
 .chronicle-tabs {
   display: flex;
   gap: var(--space-xs);
+  align-items: center;
+}
+
+.chronicle-collapse {
+  margin-left: auto;
+  padding: 0.32rem 0.8rem;
+  background: transparent;
+  border: 1px solid rgba(203, 166, 88, 0.22);
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.chronicle-collapse:hover {
+  color: var(--ink);
+  border-color: rgba(203, 166, 88, 0.45);
 }
 
 .chronicle-tab {
@@ -815,6 +881,8 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-sm);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .log-row {
@@ -876,8 +944,14 @@ select:focus {
 .diplomacy-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: var(--space-md);
+  overflow: hidden;
+}
+
+.diplomacy-list {
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .diplomacy-list {
@@ -888,9 +962,61 @@ select:focus {
 
 .diplomacy-thread {
   min-width: 0;
+  min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: var(--space-md);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: var(--space-sm);
+  overflow: hidden;
+}
+
+.thread-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  font-size: 0.8rem;
+}
+
+.thread-pill {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(203, 166, 88, 0.18);
+  background: rgba(10, 14, 19, 0.5);
+  letter-spacing: 0.05em;
+  border-radius: 2px;
+}
+
+.thread-pill__label {
+  color: var(--ink-muted);
+  margin-right: 0.4rem;
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+}
+
+.incidents-details > summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.3rem 0;
+  user-select: none;
+  list-style: none;
+}
+
+.incidents-details > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.12s ease;
+}
+
+.incidents-details[open] > summary::before {
+  content: "▾ ";
+}
+
+.incidents-details > .list-stack {
+  margin-top: var(--space-xs);
+  max-height: 140px;
+  overflow-y: auto;
 }
 
 .diplomacy-thread__header {
@@ -912,7 +1038,6 @@ select:focus {
   display: grid;
   gap: var(--space-xs);
   align-content: start;
-  max-height: 220px;
   overflow: auto;
   padding-right: 2px;
 }

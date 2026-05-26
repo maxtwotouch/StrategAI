@@ -125,7 +125,9 @@ def test_threat_drops_relationship():
 def test_attack_drops_relationship_and_logs_event():
     a = _warrior(1, 0, Hex(0, 0))
     d = _warrior(2, 1, Hex(1, 0))
-    state = _state(units=(a, d))
+    state = _state(units=(a, d), diplomacy={(0, 1): DiplomaticStance.WAR})
+    # Declare-war event from initial diplomacy isn't logged (it's seeded);
+    # the attack should add the only ATTACK event and drop relationship by 20.
     new_state = attack(state, a.id, d.id)
     assert relationship_between(new_state, 0, 1) == REL_ATTACK
     kinds = [e.kind for e in new_state.diplomatic_events]

@@ -201,6 +201,7 @@ class GameState:
     relationships: dict[tuple[int, int], int] = field(default_factory=dict)
     truces: dict[tuple[int, int], int] = field(default_factory=dict)
     diplomatic_events: tuple["DiplomaticEvent", ...] = ()
+    explored: dict[int, frozenset[Hex]] = field(default_factory=dict)
 
     def units_for(self, civ_id: int) -> tuple[Unit, ...]:
         return tuple(u for u in self.units if u.owner == civ_id)
