@@ -277,6 +277,31 @@ export default function HomePage() {
     [otherCivs, activeConversationCivId],
   );
 
+  const activeStance = useMemo(
+    () =>
+      activeConversationCivId === null
+        ? null
+        : state?.stances.find((item) => item.other_civ_id === activeConversationCivId) ?? null,
+    [state?.stances, activeConversationCivId],
+  );
+
+  const activeDiplomaticEvents = useMemo(() => {
+    if (activeConversationCivId === null) return [];
+    return (state?.diplomatic_events ?? []).filter(
+      (event) =>
+        event.actor_civ_id === activeConversationCivId ||
+        event.target_civ_id === activeConversationCivId,
+    );
+  }, [state?.diplomatic_events, activeConversationCivId]);
+
+  const availableMessageKinds = useMemo(() => {
+    const truceBlocksHostility = activeStance?.truce_active ?? false;
+    return MESSAGE_KINDS.filter((kind) => {
+      if (!truceBlocksHostility) return true;
+      return kind.id !== "declare_war" && kind.id !== "threat";
+    });
+  }, [activeStance]);
+
   const inboxCounts = useMemo(() => {
     const counts = new Map<number, number>();
     for (const message of state?.inbox ?? []) {
@@ -286,6 +311,11 @@ export default function HomePage() {
   }, [state?.inbox]);
 
   const totalInbox = useMemo(() => state?.inbox.length ?? 0, [state?.inbox]);
+
+  useEffect(() => {
+    if (availableMessageKinds.some((kind) => kind.id === messageKind)) return;
+    setMessageKind(availableMessageKinds[0]?.id ?? "chat");
+  }, [availableMessageKinds, messageKind]);
 
   const mapFocusHex = useMemo(() => {
     if (selectedUnit) return { q: selectedUnit.q, r: selectedUnit.r };
@@ -386,6 +416,15 @@ export default function HomePage() {
 
   const sendMessage = async () => {
     if (!state || !humanCiv || !messageTargetId || !messageText.trim() || !isHumanTurn) return;
+    if (
+      activeStance?.truce_active &&
+      (messageKind === "declare_war" || messageKind === "threat")
+    ) {
+      setError(
+        `Truce in force until turn ${activeStance.truce_until}. Hostile messages are blocked.`,
+      );
+      return;
+    }
     const text = messageText.trim();
     await run(() =>
       api.sendMessage(state.id, humanCiv.id, messageTargetId, messageKind, text),
@@ -399,6 +438,10 @@ export default function HomePage() {
     if (hexDistance(here, { q, r }) !== 1) return;
     const occupant = state.units.find((u) => u.q === q && u.r === r);
     if (occupant && occupant.owner !== selectedUnit.owner) {
+      if (!canAttackOwner(state, selectedUnit.owner, occupant.owner)) {
+        setError("You must declare war before attacking this civilization.");
+        return;
+      }
       run(() => api.attack(state.id, selectedUnit.id, occupant.id));
       return;
     }
@@ -414,6 +457,10 @@ export default function HomePage() {
     if (selectedUnit && u.id !== selectedUnit.id && u.owner !== selectedUnit.owner) {
       const here = { q: selectedUnit.q, r: selectedUnit.r };
       if (hexDistance(here, { q: u.q, r: u.r }) === 1) {
+        if (!canAttackOwner(state, selectedUnit.owner, u.owner)) {
+          setError("You must declare war before attacking this civilization.");
+          return;
+        }
         run(() => api.attack(state.id, selectedUnit.id, u.id));
         return;
       }
@@ -975,14 +1022,28 @@ export default function HomePage() {
                 </div>
                 {activeConversationCiv && (
                   <span className="thread-stance">
-                    {capitalize(
-                      state.stances.find(
-                        (item) => item.other_civ_id === activeConversationCiv.id,
-                      )?.stance ?? "peace",
-                    )}
+                    {capitalize(activeStance?.stance ?? "peace")}
                   </span>
                 )}
               </div>
+
+              {activeConversationCiv && activeStance && (
+                <div className="city-brief">
+                  <MetricStat
+                    label="Relationship"
+                    value={`${activeStance.relationship >= 0 ? "+" : ""}${activeStance.relationship} · ${relationshipLabel(activeStance.relationship)}`}
+                  />
+                  <MetricStat label="Status" value={capitalize(activeStance.stance)} />
+                  <MetricStat
+                    label="Truce"
+                    value={
+                      activeStance.truce_active
+                        ? `Until T${activeStance.truce_until}`
+                        : "None"
+                    }
+                  />
+                </div>
+              )}
 
               <div className="diplomacy-thread__messages">
                 {activeConversation.length === 0 ? (
@@ -1003,7 +1064,7 @@ export default function HomePage() {
                 <label className="field">
                   <span className="field-label">Tone</span>
                   <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
-                    {MESSAGE_KINDS.map((kind) => (
+                    {availableMessageKinds.map((kind) => (
                       <option key={kind.id} value={kind.id}>
                         {kind.label}
                       </option>
@@ -1023,6 +1084,12 @@ export default function HomePage() {
                     }
                   />
                 </label>
+                {activeStance?.truce_active && (
+                  <div className="empty-copy">
+                    Truce is active until turn {activeStance.truce_until}. Threats and war
+                    declarations are disabled.
+                  </div>
+                )}
                 <button
                   className="button-primary"
                   onClick={sendMessage}
@@ -1035,6 +1102,31 @@ export default function HomePage() {
                 >
                   Send
                 </button>
+              </div>
+
+              <div className="selection-stack">
+                <div className="plate-label">Recent Incidents</div>
+                {activeDiplomaticEvents.length === 0 ? (
+                  <EmptyCopy>No recent diplomatic incidents with this civilization.</EmptyCopy>
+                ) : (
+                  <div className="list-stack">
+                    {[...activeDiplomaticEvents].reverse().slice(0, 6).map((event, index) => (
+                      <div
+                        key={`${event.turn}-${event.kind}-${index}`}
+                        className="list-row"
+                        style={{ cursor: "default" }}
+                      >
+                        <span>
+                          T{event.turn} · {capitalize(event.kind)}
+                        </span>
+                        <span>
+                          {event.relationship_delta >= 0 ? "+" : ""}
+                          {event.relationship_delta}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1253,6 +1345,16 @@ const UNIT_MAX_HEALTH: Record<string, number> = {
 
 function maxHealthFor(type: string): number {
   return UNIT_MAX_HEALTH[type] ?? 20;
+}
+
+function canAttackOwner(
+  state: GameStateDTO,
+  attackerOwner: number,
+  defenderOwner: number,
+): boolean {
+  if (attackerOwner === defenderOwner) return false;
+  const stance = state.stances.find((entry) => entry.other_civ_id === defenderOwner);
+  return stance?.stance === "war";
 }
 
 function relationshipLabel(score: number): string {

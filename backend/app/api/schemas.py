@@ -256,10 +256,21 @@ def message_to_out(message: DiplomaticMessage) -> MessageOut:
 def state_to_out(game_id: int, state: GameState) -> GameStateOut:
     human_civ = next((c for c in state.civs if c.is_human), None)
     known_ids = sorted(met_civs(state, human_civ.id) - {human_civ.id}) if human_civ is not None else []
+    visible = visible_tiles(state, human_civ.id) if human_civ is not None else frozenset()
+    visible_civ_ids = set(known_ids)
+    if human_civ is not None:
+        visible_civ_ids.add(human_civ.id)
     inbox = [
         message_to_out(message)
         for message in state.messages
         if human_civ is not None and message.to_civ_id == human_civ.id
+    ]
+    messages = [
+        message_to_out(message)
+        for message in state.messages
+        if human_civ is not None
+        and {message.from_civ_id, message.to_civ_id}.issubset(visible_civ_ids)
+        and human_civ.id in (message.from_civ_id, message.to_civ_id)
     ]
     stances: list[StanceOut] = []
     if human_civ is not None:
@@ -278,16 +289,12 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
                     truce_until=truce_until,
                 )
             )
-    if human_civ is not None:
-        visible_keys = sorted(
-            f"{c.q},{c.r}" for c in visible_tiles(state, human_civ.id)
-        )
-    else:
-        visible_keys = []
+    visible_keys = sorted(f"{c.q},{c.r}" for c in visible)
     tile_owner_list = sorted(
         (
             TileOwnerOut(q=coord.q, r=coord.r, city_id=city_id)
             for coord, city_id in state.tile_owner.items()
+            if coord in visible
         ),
         key=lambda t: (t.q, t.r),
     )
@@ -305,6 +312,7 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         (
             StandingOut(civ_id=c.id, name=c.name, score=civ_score(state, c))
             for c in state.civs
+            if c.id in visible_civ_ids
         ),
         key=lambda s: (-s.score, s.civ_id),
     )
@@ -315,11 +323,19 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
         current_civ_id=state.current_civ().id,
         map_radius=state.map.radius,
         tiles=[tile_to_out(t) for t in state.map.tiles.values()],
-        civs=[civ_to_out(c, state) for c in state.civs],
-        cities=[city_to_out(c) for c in state.cities],
-        units=[unit_to_out(u) for u in state.units],
+        civs=[civ_to_out(c, state) for c in state.civs if c.id in visible_civ_ids],
+        cities=[
+            city_to_out(c)
+            for c in state.cities
+            if c.owner == human_civ.id or c.location in visible
+        ] if human_civ is not None else [city_to_out(c) for c in state.cities],
+        units=[
+            unit_to_out(u)
+            for u in state.units
+            if u.owner == human_civ.id or u.location in visible
+        ] if human_civ is not None else [unit_to_out(u) for u in state.units],
         known_civ_ids=known_ids,
-        messages=[message_to_out(message) for message in state.messages],
+        messages=messages,
         inbox=inbox,
         stances=stances,
         visible_tile_keys=visible_keys,

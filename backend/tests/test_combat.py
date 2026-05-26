@@ -8,6 +8,7 @@ from app.engine.map_generator import generate_map
 from app.engine.models import (
     City,
     Civilization,
+    DiplomaticStance,
     GameState,
     Unit,
     UnitType,
@@ -38,6 +39,7 @@ def _state(units: tuple[Unit, ...]) -> GameState:
         civs=civs,
         cities=(),
         units=units,
+        diplomacy={(0, 1): DiplomaticStance.WAR},
     )
 
 
@@ -52,6 +54,7 @@ def _state_with_city(units: tuple[Unit, ...], city: City) -> GameState:
         civs=civs,
         cities=(city,),
         units=units,
+        diplomacy={(0, 1): DiplomaticStance.WAR},
     )
 
 
@@ -108,6 +111,21 @@ def test_attack_non_adjacent_raises():
         attack(state, 1, 2)
 
 
+def test_attack_requires_war_stance():
+    a = _unit(1, 0, UnitType.WARRIOR, Hex(0, 0))
+    d = _unit(2, 1, UnitType.WARRIOR, Hex(1, 0))
+    state = _state((a, d))
+    state = GameState(
+        turn=state.turn,
+        map=state.map,
+        civs=state.civs,
+        cities=state.cities,
+        units=state.units,
+    )
+    with pytest.raises(CombatError, match="not at war"):
+        attack(state, 1, 2)
+
+
 def test_attack_with_no_moves_raises():
     a = _unit(1, 0, UnitType.WARRIOR, Hex(0, 0)).with_moves(0)
     d = _unit(2, 1, UnitType.WARRIOR, Hex(1, 0))
@@ -139,3 +157,18 @@ def test_attack_city_unknown_city_raises():
     state = _state((a,))
     with pytest.raises(CombatError, match="unknown city"):
         attack_city(state, 1, 99)
+
+
+def test_attack_city_requires_war_stance():
+    a = _unit(1, 0, UnitType.WARRIOR, Hex(0, 0))
+    city = City(id=9, owner=1, name="Enemy", location=Hex(1, 0))
+    state = _state_with_city((a,), city)
+    state = GameState(
+        turn=state.turn,
+        map=state.map,
+        civs=state.civs,
+        cities=state.cities,
+        units=state.units,
+    )
+    with pytest.raises(CombatError, match="not at war"):
+        attack_city(state, 1, 9)

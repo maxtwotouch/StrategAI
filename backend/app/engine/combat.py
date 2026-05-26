@@ -11,7 +11,7 @@ from app.engine.diplomacy import (
     record_event,
 )
 from app.engine.hex import hex_distance
-from app.engine.models import City, GameState, Unit
+from app.engine.models import City, DiplomaticStance, GameState, Unit
 from app.engine.terrain import Feature, Terrain
 
 # Stacking multipliers cap to avoid runaway defense on heavy terrain.
@@ -28,6 +28,13 @@ def _find(state: GameState, unit_id: int) -> Unit:
         if u.id == unit_id:
             return u
     raise CombatError(f"unknown unit id {unit_id}")
+
+
+def _ensure_war(state: GameState, attacker_owner: int, defender_owner: int) -> None:
+    if state.stance_between(attacker_owner, defender_owner) is not DiplomaticStance.WAR:
+        raise CombatError(
+            f"civs {attacker_owner} and {defender_owner} are not at war"
+        )
 
 
 def _terrain_defense_multiplier(state: GameState, defender: Unit) -> float:
@@ -79,6 +86,7 @@ def attack_city(state: GameState, attacker_id: int, city_id: int) -> GameState:
 
     if attacker.owner == city.owner:
         raise CombatError("cannot attack own city")
+    _ensure_war(state, attacker.owner, city.owner)
     if attacker.moves_remaining <= 0:
         raise CombatError(f"attacker {attacker_id} has no moves")
     if hex_distance(attacker.location, city.location) != 1:
@@ -129,6 +137,7 @@ def attack(state: GameState, attacker_id: int, defender_id: int) -> GameState:
 
     if attacker.owner == defender.owner:
         raise CombatError("cannot attack own unit")
+    _ensure_war(state, attacker.owner, defender.owner)
     if attacker.moves_remaining <= 0:
         raise CombatError(f"attacker {attacker_id} has no moves")
     if hex_distance(attacker.location, defender.location) != 1:
