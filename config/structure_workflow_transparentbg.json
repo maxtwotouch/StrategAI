@@ -154,7 +154,7 @@
   },
   "91": {
     "inputs": {
-      "filename_prefix": "DATASET_PIX_BG",
+      "filename_prefix": "",
       "images": [
         "112",
         0
