@@ -5,6 +5,5 @@ pydantic-settings
 Pillow
 numpy
 sqlalchemy
-websocket-client
 httpx
-requests
+websockets

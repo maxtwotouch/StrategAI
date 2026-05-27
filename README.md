@@ -1,6 +1,6 @@
 # Medieval Pixel Art Image Service
 
-An on-demand generative AI microservice that produces pixel art game assets for a top-down medieval game. Built with **FastAPI**, **HuggingFace Diffusers**, and a **mock-first** architecture so the game client can integrate immediately — before GPU compute is provisioned.
+An on-demand generative AI microservice that produces pixel art game assets for a top-down medieval game. Built with **FastAPI** and **ComfyUI** as the inference backend. Generation modes are configurable per asset family via environment variables — no code changes needed.
 
 ---
 
@@ -13,11 +13,13 @@ The service accepts structured requests describing *what* to generate and return
 | `structure` | castle, blacksmith | Buildings and constructed objects |
 | `nature_object` | tree, boulder | Organic world decorations |
 | `background_tile` | grass, dirt, water | Repeatable terrain tiles |
-| `character_sprite` | knight, archer | Animated-sprite sheets (placeholder) |
+| `character_sprite` | knight, archer | Character sprites |
 | `story` | "The dragon attacks" | Epic 16:9 cinematic concept art |
 | `splash` | "King Aldric" | Leader portrait / profile card |
 
-It also supports **Copy-on-Write inpainting**: take an existing background tile, specify a bounding box (e.g., a river cutting across the tile), and the service fills only that region — leaving the rest of the tile untouched.
+It also supports:
+- **Copy-on-Write inpainting**: take an existing background tile, specify a bounding box (e.g., a river cutting across the tile), and the service fills only that region — leaving the rest untouched.
+- **Leader pipeline**: three-stage generation (splash → profile → action) with img2img character consistency via reference images.
 
 ---
 
@@ -30,18 +32,21 @@ Game Client
 ┌──────────────────────────────────────────┐
 │  FastAPI (main.py)                       │
 │  POST /generate   POST /splash           │
-│  GET  /assets/... GET /health            │
+│  POST /leader     GET  /assets/...       │
+│  GET  /health     GET  /catalog          │
 ├──────────────────────────────────────────┤
 │  Pydantic Models (models.py)             │
 │  GenerationRequest, SplashRequest, etc.  │
-├──────────────┬───────────────────────────┤
-│  Generator   │  Factory                  │
-│  (generators.py)                         │
-│  ├─ MockGenerator      ← mock_mode=True  │
-│  ├─ Flux2Generator     ← terrain/chars   │
-│  ├─ ZImageTurboGenerator ← story scenes  │
-│  └─ SplashGenerator    ← portraits       │
-├──────────────┴───────────────────────────┤
+├──────────────────┬───────────────────────┤
+│  Generator       │  Leader Engine        │
+│  (generators.py) │  (leader_engine.py)   │
+│  ├ ComfyUI       │  ├ Splash (txt2img)   │
+│  ├ StaticTile    │  ├ Profile (img2img)  │
+│  └ Placeholder   │  └ Action (img2img)   │
+├──────────────────┴───────────────────────┤
+│  ComfyUIClient (comfyui_client.py)       │
+│  Async HTTP+WS: httpx + websockets       │
+├──────────────────────────────────────────┤
 │  Inpainting Engine (inpainting.py)       │
 │  Mask creation + prompt translation      │
 ├──────────────────────────────────────────┤
@@ -49,18 +54,21 @@ Game Client
 │  In-memory LRU cache + disk fallback     │
 ├──────────────────────────────────────────┤
 │  SQLite DB (database.py)                 │
-│  AssetRecord: id, family, inpaints, etc. │
+│  AssetRecord + LeaderRecord              │
 └──────────────────────────────────────────┘
 ```
 
-### Mock Mode vs Production Mode
+### Generation Modes
 
-The entire service starts in **mock mode** (`mock_mode=True` in `.env`). Every endpoint returns procedurally generated placeholder images (coloured rectangles with text overlays) so the game client can integrate end-to-end without any GPU.
+Each asset family can be independently configured to one of three modes:
 
-Flip `mock_mode=False` and the service loads real diffusion models:
+| Mode | Behaviour |
+|---|---|
+| `comfyui` | Delegates to an external ComfyUI server |
+| `static`  | Serves pre-made PNGs from `static_tiles/` directory |
+| `random`  | Coin-flip per request between `comfyui` and `static` |
 
-- **Stable Diffusion Inpainting** (`runwayml/stable-diffusion-inpainting`) for terrain tile editing
-- **SDXL Turbo** (`stabilityai/sdxl-turbo`) for fast text-to-image generation of characters, structures, and story art
+Set in `.env` — no code changes. The game client never knows which mode produced the image.
 
 ---
 
@@ -69,20 +77,36 @@ Flip `mock_mode=False` and the service loads real diffusion models:
 ```
 .
 ├── src/
-│   ├── main.py           # FastAPI application, endpoints, CORS, lifecycle
-│   ├── models.py         # Pydantic request/response schemas
-│   ├── generators.py     # ImageGenerator ABC + concrete generators
-│   ├── inpainting.py     # Mask creation, prompt mapping, mock inpainting
-│   ├── storage.py        # AssetStore: in-memory LRU cache + disk I/O
-│   ├── database.py       # SQLAlchemy + SQLite AssetRecord table
-│   └── config.py         # Pydantic Settings (mock_mode, paths, ports)
-├── requirements.txt      # Python dependencies
-├── architecture.md       # Detailed architecture documentation
-├── inpainting_workflow.md # ComfyUI prototyping → diffusers production guide
-├── next_steps.md         # Checklist for going from mock → live AI
-├── generated_assets/     # Output directory for generated PNGs
-├── mock_assets/          # Pre-made mock tiles (optional)
-└── splash_assets/        # Output directory for splash portraits
+│   ├── main.py               # FastAPI application, endpoints, CORS, lifecycle
+│   ├── models.py             # Pydantic request/response schemas
+│   ├── config.py             # Pydantic Settings (modes, paths, ComfyUI URL)
+│   ├── generators.py         # ImageGenerator ABC + ComfyUIGenerator + StaticTileGenerator
+│   ├── comfyui_client.py    # HTTP + WebSocket client for ComfyUI
+│   ├── inpainting.py         # Mask creation, prompt mapping
+│   ├── storage.py            # AssetStore: in-memory LRU cache + disk I/O
+│   ├── database.py           # SQLAlchemy + SQLite (AssetRecord, LeaderRecord)
+│   ├── static_catalog.py     # Scans static_tiles/ for available PNGs
+│   ├── leader_models.py      # Leader enums + Pydantic schemas
+│   ├── leader_prompts.py     # Enum injection maps + prompt builders
+│   ├── leader_registry.py    # SQLite-backed leader CRUD
+│   ├── leader_engine.py      # Splash → profile → action orchestrator
+│   └── workflows/            # ComfyUI API-format workflow JSONs
+│       ├── txt2img.json
+│       ├── inpaint.json
+│       ├── story.json
+│       ├── splash.json
+│       └── leader/
+│           ├── leader_splash.json
+│           ├── leader_profile.json
+│           └── leader_action.json
+├── static_tiles/             # Pre-made PNG assets (used in static mode)
+├── leader_references/        # Runtime reference images for leader pipeline
+├── generated_assets/         # Output directory (runtime)
+├── splash_assets/            # Splash output directory (runtime)
+├── .env.example              # Configuration reference
+├── requirements.txt          # Python dependencies
+├── tilemap.db                # SQLite database (runtime)
+└── docs/                     # Architecture, plans, guides
 ```
 
 ---
@@ -92,7 +116,8 @@ Flip `mock_mode=False` and the service loads real diffusion models:
 ### Prerequisites
 
 - Python 3.10+
-- (Optional) CUDA-capable GPU for production mode
+- A running [ComfyUI](https://github.com/comfyanonymous/ComfyUI) instance (for `comfyui` mode)
+- (Optional) Pre-made PNGs in `static_tiles/` (for `static` mode)
 
 ### Install
 
@@ -101,26 +126,27 @@ cd TopDownMedievalPixelArt-Prod
 pip install -r requirements.txt
 ```
 
-### Run (Mock Mode — No GPU Required)
+### Run (Static Mode — No GPU Required)
 
 ```bash
-# Create .env file
-echo "mock_mode=true" > .env
+# Copy and configure .env
+cp .env.example .env
+# Edit .env: set all modes to "static"
 
 # Start the server
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-The service is now live at `http://localhost:8000`.
+The service is now live at `http://localhost:8000`. All endpoints work with pre-made static PNGs and procedural placeholders.
 
-### Run (Production Mode — Requires GPU)
+### Run (ComfyUI Mode — Requires ComfyUI Server)
 
 ```bash
-echo "mock_mode=false" > .env
+cp .env.example .env
+# Edit .env: set modes to "comfyui" and COMFYUI_BASE_URL to your ComfyUI server
+
 uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
-
-On first launch, the service downloads ~10 GB of model weights from HuggingFace.
 
 ---
 
@@ -128,10 +154,35 @@ On first launch, the service downloads ~10 GB of model weights from HuggingFace.
 
 ### `GET /health`
 
-Returns service status and current mode.
+Returns service status, generation modes, ComfyUI connectivity, and registered leader count.
 
 ```json
-{ "status": "ok", "mock_mode": true }
+{
+  "status": "ok",
+  "comfyui_connected": true,
+  "modes": {
+    "background_tile": "comfyui",
+    "structure": "static",
+    "nature_object": "comfyui",
+    "character_sprite": "comfyui",
+    "story": "comfyui",
+    "splash": "comfyui"
+  },
+  "leaders_registered": 3
+}
+```
+
+### `GET /catalog`
+
+Returns available tile types and structure subtypes from `static_tiles/`.
+
+```json
+{
+  "background_tile": { "tile_types": ["water", "grass", "sand", "stone"] },
+  "structure": { "subtypes": ["fortification", "production", "civilian", "religious"] },
+  "nature_object": { "available": true },
+  "character_sprite": { "available": true }
+}
 ```
 
 ### `POST /generate`
@@ -143,7 +194,8 @@ Generate a new game asset.
 ```json
 {
   "asset_family": "background_tile",
-  "prompt": "medieval village grass with flowers",
+  "tile_type": "water",
+  "prompt": null,
   "base_image_id": null,
   "inpaints": [
     {
@@ -151,15 +203,18 @@ Generate a new game asset.
       "point_b": { "x": 400, "y": 300 },
       "fill_type": "water"
     }
-  ]
+  ],
+  "structure_subtype": null
 }
 ```
 
 | Field | Required | Description |
 |---|---|---|
 | `asset_family` | ✅ | One of: `structure`, `nature_object`, `background_tile`, `character_sprite`, `story`, `splash` |
+| `tile_type` | Required for `background_tile` | `"water"`, `"grass"`, `"sand"`, `"stone"` |
+| `structure_subtype` | Optional (`structure` only) | `"fortification"`, `"production"`, `"civilian"`, `"religious"` |
 | `prompt` | — | Text description for text-to-image generation |
-| `base_image_id` | — | UUID of an existing tile to apply Copy-on-Write inpainting to |
+| `base_image_id` | — | UUID of an existing tile for Copy-on-Write inpainting |
 | `inpaints` | — | List of bounding-box regions to inpaint with a fill type |
 
 **Fill types:** `water`, `gravel_road`, `grass`, `dirt`, `stone_floor`, `lava`
@@ -170,6 +225,8 @@ Generate a new game asset.
 {
   "url": "/assets/a1b2c3d4-...png",
   "asset_family": "background_tile",
+  "tile_type": "water",
+  "generation_mode": "comfyui",
   "status": "completed"
 }
 ```
@@ -202,6 +259,58 @@ Generate a character portrait / splash art.
 }
 ```
 
+### `POST /leader`
+
+Generate a leader asset through the splash → profile → action pipeline.
+
+**Request (splash):**
+
+```json
+{
+  "asset_type": "splash",
+  "leader_name": "Cleopatra VII",
+  "leader_description": "a tall warrior queen with bronze skin and sharp amber eyes, long black hair in tight braids bound with gold rings, wearing engraved bronze scale armor over a crimson linen tunic, a lion-pelt cape fastened at her left shoulder, a healed slash scar across her right cheekbone, expression of calm authority",
+  "archetype": "warrior_queen",
+  "culture": "ancient_egyptian",
+  "time_of_day": "golden_hour",
+  "mood": "triumphant"
+}
+```
+
+**Response:**
+
+```json
+{
+  "url": "/assets/leader_cleopatra_vii_a1b2c3_splash.png",
+  "asset_type": "splash",
+  "leader_name": "Cleopatra VII",
+  "leader_id": "leader_cleopatra_vii_a1b2c3",
+  "seed": 847291034857201,
+  "generation_mode": "comfyui",
+  "status": "completed",
+  "prompt_used": "epic cinematic wide composition of a tall warrior queen..., ...",
+  "resolution": "1920x1088",
+  "generation_time_ms": 45230
+}
+```
+
+Chain calls using the returned `leader_id`:
+1. `POST /leader` with `asset_type: "splash"` → get `leader_id`
+2. `POST /leader` with `asset_type: "profile"` + `leader_id`
+3. `POST /leader` with `asset_type: "action"` + `leader_id` + `action_category` + `action_description`
+
+### `GET /leader`
+
+List all registered leaders.
+
+### `GET /leader/{leader_id}`
+
+Get a specific leader's info and asset URLs.
+
+### `DELETE /leader/{leader_id}`
+
+Remove a leader and their reference image.
+
 ### `GET /assets/{filename}`
 
 Download a previously generated asset. Returns `image/png`.
@@ -215,7 +324,7 @@ Download a previously generated asset. Returns `image/png`.
 3. The service loads the base image (Copy-on-Write — the original is never mutated)
 4. A binary mask is created from the bounding box (with optional Gaussian blur for softer edges)
 5. The `fill_type` is translated to a rich diffusion prompt (e.g., `"water"` → `"sparkling blue pixel art river water texture, seamless, top-down 2d game"`)
-6. In production mode, `stable-diffusion-inpainting` fills the masked region; in mock mode, a solid colour overlay is applied
+6. The base image + mask are uploaded to ComfyUI, which runs the inpainting workflow
 7. Each inpaint is applied sequentially to the same canvas
 8. The final image is saved and its URL returned
 
@@ -223,23 +332,15 @@ Download a previously generated asset. Returns `image/png`.
 
 ## Design Decisions
 
-- **Mock-first**: The game client integrates immediately. GPU costs only kick in when you flip `mock_mode=false`.
+- **ComfyUI as inference backend**: The FastAPI server never loads model weights — it delegates all generation to an external ComfyUI instance. The web server stays lightweight at ~200MB RAM.
+- **Fully async ComfyUI client**: Uses ``httpx`` + ``websockets`` for non-blocking I/O. Generation runs directly on the asyncio event loop — no thread-pool needed, enabling high concurrency without worker saturation.
+- **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, or `random` mode via environment variables. Ops, not code.
+- **Drop-in static injection**: Adding a new pre-made asset is creating a PNG in the right `static_tiles/` folder and restarting.
+- **Workflows as version-controlled assets**: ComfyUI workflow JSONs live in `src/workflows/` alongside code.
 - **In-memory caching**: `AssetStore` uses an LRU-backed `OrderedDict` for zero-latency asset serving. Falls back to disk reads transparently.
-- **SQLite**: No external database dependency. `AssetRecord` tracks every generation for future tile-map integration.
+- **SQLite**: No external database dependency. `AssetRecord` and `LeaderRecord` track every generation.
 - **Prompt enrichment happens server-side**: The game client says `"water"`; the service handles making it sound good to the diffusion model.
 - **Copy-on-Write**: Inpainting never mutates the original asset, enabling safe concurrent modifications.
-
----
-
-## Roadmap
-
-See [`next_steps.md`](next_steps.md) for the detailed checklist. High-level priorities:
-
-- [ ] Integrate real HuggingFace diffusers pipelines (replace `time.sleep()` stubs)
-- [ ] Add LRU cap and background disk flushing to `AssetStore`
-- [ ] Expand `AssetRecord` with world-grid coordinates for full tile-map DB integration
-- [ ] Phase 2: Celery + Redis task queue for non-blocking generation at scale
-- [ ] Phase 2: S3/R2 object storage for multi-node deployments
 
 ---
 
@@ -247,13 +348,9 @@ See [`next_steps.md`](next_steps.md) for the detailed checklist. High-level prio
 
 | File | Purpose |
 |---|---|
-| [`architecture.md`](architecture.md) | Full system architecture, component breakdown, and scaling strategy |
-| [`inpainting_workflow.md`](inpainting_workflow.md) | Guide for prototyping inpainting with ComfyUI and deploying with diffusers |
-| [`next_steps.md`](next_steps.md) | Checklist for transitioning from mock to production AI microservice |
-
----
-
-## License
-
-*To be determined.*
-
+| [`docs/architecture.md`](docs/architecture.md) | Full system architecture, component breakdown |
+| [`docs/migration_plan.md`](docs/migration_plan.md) | Plan and rationale for ComfyUI migration |
+| [`docs/leader_pipeline_plan.md`](docs/leader_pipeline_plan.md) | Leader pipeline implementation plan + checklist |
+| [`docs/client-api-leader-guide.md`](docs/client-api-leader-guide.md) | Original leader API design reference (FLUX-focused) |
+| [`docs/inpainting_workflow.md`](docs/inpainting_workflow.md) | Inpainting prototyping with ComfyUI vs diffusers |
+| [`docs/next_steps.md`](docs/next_steps.md) | Future roadmap items |

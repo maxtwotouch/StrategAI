@@ -19,6 +19,7 @@ env/
 generated_assets/
 mock_assets/
 splash_assets/
+leader_references/
 
 # Database
 tilemap.db
@@ -33,4 +34,3 @@ Thumbs.db
 *.ckpt
 *.pt
 *.bin
-

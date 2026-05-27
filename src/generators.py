@@ -1,8 +1,11 @@
 """Image generators -- routes requests to ComfyUI, static PNGs, or procedural placeholders.
 
-The factory function `get_generator()` inspects the per-family generation mode
+The factory function ``get_generator()`` inspects the per-family generation mode
 set in the environment and returns the appropriate generator.  The caller never
 needs to know which one was chosen.
+
+All generators expose an **async** ``generate()`` method that can be awaited
+directly from async FastAPI endpoints -- no thread-pool required.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from .storage import store
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-#  Singleton ComfyUI client (lazily created on first use)
+#  Singleton ComfyUI client (lazily created)
 # ---------------------------------------------------------------------------
 
 _comfyui_client: ComfyUIClient | None = None
@@ -33,18 +36,22 @@ _comfyui_available: bool | None = None  # None = unchecked, True/False = known
 
 
 def _get_comfyui_client() -> ComfyUIClient | None:
-    """Return a ComfyUIClient if the server is reachable, else None."""
+    """Return a ComfyUIClient instance. The caller is responsible for
+    performing an async health check separately if needed."""
     global _comfyui_client, _comfyui_available
     if _comfyui_available is None:
-        client = ComfyUIClient()
-        if client.health_check():
-            _comfyui_client = client
-            _comfyui_available = True
-            logger.info("ComfyUI server reachable at %s", client.base_url)
-        else:
-            _comfyui_available = False
-            logger.warning("ComfyUI server unreachable -- comfyui-mode families will return 503")
+        _comfyui_client = ComfyUIClient()
+        _comfyui_available = True
     return _comfyui_client if _comfyui_available else None
+
+
+async def close_comfyui_client() -> None:
+    """Shut down the singleton ComfyUI client (called during app shutdown)."""
+    global _comfyui_client, _comfyui_available
+    if _comfyui_client is not None:
+        await _comfyui_client.close()
+        _comfyui_client = None
+    _comfyui_available = None
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +61,7 @@ def _get_comfyui_client() -> ComfyUIClient | None:
 
 class ImageGenerator(ABC):
     @abstractmethod
-    def generate(self, request: GenerationRequest | SplashRequest) -> str:
+    async def generate(self, request: GenerationRequest | SplashRequest) -> str:
         """Produce an image, save it, return the filename."""
         ...
 
@@ -70,7 +77,7 @@ class ComfyUIGenerator(ImageGenerator):
     Parameters
     ----------
     workflow_file : str
-        Basename of the workflow JSON (e.g. 'txt2img.json').
+        Basename of the workflow JSON (e.g. ``'txt2img.json'``).
     """
 
     _WORKFLOW_MAP = {
@@ -86,24 +93,24 @@ class ComfyUIGenerator(ImageGenerator):
         self._client = client
         self._workflow_path = os.path.join(settings.workflow_dir, workflow_file)
 
-    def generate(self, request: GenerationRequest | SplashRequest) -> str:
+    async def generate(self, request: GenerationRequest | SplashRequest) -> str:
         if isinstance(request, SplashRequest):
-            return self._generate_splash(request)
-        return self._generate_generic(request)
+            return await self._generate_splash(request)
+        return await self._generate_generic(request)
 
     # ------------------------------------------------------------------
     #  Generic (txt2img / story / inpainting)
     # ------------------------------------------------------------------
 
-    def _generate_generic(self, request: GenerationRequest) -> str:
+    async def _generate_generic(self, request: GenerationRequest) -> str:
         positive = self._build_positive_prompt(request)
         width, height = self._dimensions_for(request.asset_family)
 
         # --- Handle inpainting (CoW) ---
         if request.asset_family == "background_tile" and request.inpaints:
-            return self._generate_inpaint(request, positive, width, height)
+            return await self._generate_inpaint(request, positive, width, height)
 
-        img = self._client.generate(
+        img = await self._client.generate(
             self._workflow_path,
             positive_prompt=positive,
             width=width,
@@ -113,7 +120,7 @@ class ComfyUIGenerator(ImageGenerator):
         store.save_image(filename, img)
         return filename
 
-    def _generate_inpaint(
+    async def _generate_inpaint(
         self,
         request: GenerationRequest,
         positive: str,
@@ -134,9 +141,11 @@ class ComfyUIGenerator(ImageGenerator):
                 blur_radius=2,
             )
             fill_prompt = get_inpaint_prompt(patch.fill_type)
-            logger.info("Inpainting feature '%s' with prompt: %s", patch.fill_type, fill_prompt)
+            logger.info(
+                "Inpainting feature '%s' with prompt: %s", patch.fill_type, fill_prompt
+            )
 
-            current_img = self._client.generate(
+            current_img = await self._client.generate(
                 self._workflow_path,
                 positive_prompt=fill_prompt,
                 width=current_img.width,
@@ -155,11 +164,11 @@ class ComfyUIGenerator(ImageGenerator):
     #  Splash
     # ------------------------------------------------------------------
 
-    def _generate_splash(self, request: SplashRequest) -> str:
+    async def _generate_splash(self, request: SplashRequest) -> str:
         prompt = self._build_splash_prompt(request)
         w, h = settings.splash_width, settings.splash_height
 
-        img = self._client.generate(
+        img = await self._client.generate(
             self._workflow_path,
             positive_prompt=prompt,
             width=512,
@@ -243,12 +252,12 @@ class ComfyUIGenerator(ImageGenerator):
 
 
 class StaticTileGenerator(ImageGenerator):
-    """Serves pre-made PNGs from static_tiles/."""
+    """Serves pre-made PNGs from ``static_tiles/``."""
 
     def __init__(self, family: str) -> None:
         self._family = family
 
-    def generate(self, request: GenerationRequest | SplashRequest) -> str:
+    async def generate(self, request: GenerationRequest | SplashRequest) -> str:
         if isinstance(request, SplashRequest):
             return _PlaceholderSplash.generate(request)
 
@@ -274,7 +283,7 @@ class StaticTileGenerator(ImageGenerator):
             return _load_and_save(path, f"{uuid.uuid4()}.png")
 
         # Fallback: procedural placeholder
-        return _PlaceholderGenerator(self._family).generate(request)
+        return await _PlaceholderGenerator(self._family).generate(request)
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +306,7 @@ class _PlaceholderGenerator(ImageGenerator):
     def __init__(self, family: str) -> None:
         self._family = family
 
-    def generate(self, request: GenerationRequest | SplashRequest) -> str:
+    async def generate(self, request: GenerationRequest | SplashRequest) -> str:
         color = self._COLORS.get(self._family, (128, 128, 128, 255))
         w, h = (512, 512)
         if self._family == "story":
@@ -309,14 +318,19 @@ class _PlaceholderGenerator(ImageGenerator):
         draw = ImageDraw.Draw(img)
 
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18
+            )
         except (OSError, IOError):
             font = ImageFont.load_default()
 
         label = request.asset_family if isinstance(request, GenerationRequest) else "splash"
         draw.text((10, 10), f"[placeholder] {label}", fill=(255, 255, 255, 255), font=font)
         if isinstance(request, GenerationRequest) and request.tile_type:
-            draw.text((10, 36), f"tile: {request.tile_type}", fill=(220, 220, 220, 255), font=font)
+            draw.text(
+                (10, 36), f"tile: {request.tile_type}",
+                fill=(220, 220, 220, 255), font=font,
+            )
 
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
@@ -371,22 +385,39 @@ class _PlaceholderSplash:
         if request.title:
             badge_y = cy + portrait_size + 10
             badge_text = request.title.upper()
-            draw.rectangle([cx - 40, badge_y - 6, cx + 40, badge_y + 10], fill=(80, 60, 40, 255))
+            draw.rectangle(
+                [cx - 40, badge_y - 6, cx + 40, badge_y + 10],
+                fill=(80, 60, 40, 255),
+            )
             try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+                font = ImageFont.truetype(
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12
+                )
             except (OSError, IOError):
                 font = ImageFont.load_default()
             text_w = draw.textlength(badge_text, font=font)
-            draw.text((cx - text_w // 2, badge_y - 4), badge_text, fill=(220, 200, 160, 255), font=font)
+            draw.text(
+                (cx - text_w // 2, badge_y - 4),
+                badge_text,
+                fill=(220, 200, 160, 255),
+                font=font,
+            )
 
         # Name at bottom
         name_y = h - 24
         try:
-            name_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+            name_font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14
+            )
         except (OSError, IOError):
             name_font = ImageFont.load_default()
         name_w = draw.textlength(request.character_name, font=name_font)
-        draw.text((cx - name_w // 2, name_y), request.character_name, fill=(240, 230, 210, 255), font=name_font)
+        draw.text(
+            (cx - name_w // 2, name_y),
+            request.character_name,
+            fill=(240, 230, 210, 255),
+            font=name_font,
+        )
 
         filename = f"{uuid.uuid4()}_splash.png"
         store.save_image(filename, img)
@@ -412,7 +443,10 @@ def _load_and_save(src_path: str, filename: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def get_generator(asset_family: str, request: GenerationRequest | SplashRequest | None = None) -> ImageGenerator:
+def get_generator(
+    asset_family: str,
+    request: GenerationRequest | SplashRequest | None = None,
+) -> ImageGenerator:
     """Return the appropriate generator based on server-side generation mode.
 
     The client never influences this decision -- it's entirely driven by

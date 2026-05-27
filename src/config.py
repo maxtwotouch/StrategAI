@@ -9,9 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # --- Legacy / general ---
-    mock_mode: bool = True
     output_dir: str = os.path.join(BASE_DIR, "generated_assets")
-    mock_dir: str = os.path.join(BASE_DIR, "mock_assets")
     splash_dir: str = os.path.join(BASE_DIR, "splash_assets")
     host: str = "0.0.0.0"
     port: int = 8000
@@ -27,6 +25,19 @@ class Settings(BaseSettings):
 
     # --- Workflows ---
     workflow_dir: str = os.path.join(os.path.dirname(__file__), "workflows")
+
+    # --- Leader generation ---
+    leader_workflow_dir: str = os.path.join(os.path.dirname(__file__), "workflows", "leader")
+    leader_reference_dir: str = os.path.join(BASE_DIR, "leader_references")
+
+    # Prompt components (overridable via .env for rapid iteration)
+    leader_negative_prompt: str = (
+        "blurry, low quality, distorted, ugly, deformed face, bad hands, "
+        "missing fingers, text, watermark, signature, logo, cartoon, 3D render, "
+        "photograph, selfie, modern clothing, jeans, t-shirt, plastic, "
+        "oversaturated colors, bad anatomy, extra limbs, cloned face, disfigured, "
+        "jpeg artifacts"
+    )
 
     # --- Per-family generation modes ---
     # Valid per-family: "comfyui" | "static" | "random"
@@ -49,7 +60,8 @@ settings = Settings()
 
 # Ensure directories exist
 os.makedirs(settings.output_dir, exist_ok=True)
-os.makedirs(settings.mock_dir, exist_ok=True)
 os.makedirs(settings.splash_dir, exist_ok=True)
 os.makedirs(settings.static_tiles_dir, exist_ok=True)
 os.makedirs(settings.workflow_dir, exist_ok=True)
+os.makedirs(settings.leader_workflow_dir, exist_ok=True)
+os.makedirs(settings.leader_reference_dir, exist_ok=True)

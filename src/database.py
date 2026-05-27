@@ -27,6 +27,32 @@ class AssetRecord(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class LeaderRecord(Base):
+    __tablename__ = "leader_records"
+
+    leader_id = Column(String, primary_key=True, index=True)
+    leader_name = Column(String, nullable=False)
+    archetype = Column(String, nullable=False)
+    culture = Column(String, nullable=False)
+    time_of_day = Column(String, nullable=False)
+    mood = Column(String, nullable=False)
+
+    # Canonical identity
+    splash_image_id = Column(String, nullable=False)         # FK → asset_records.id
+    splash_seed = Column(Integer, nullable=False)            # canonical seed for profile/action consistency
+    splash_prompt = Column(String, nullable=False)           # debug / reproducibility
+
+    # Subsequent generations
+    profile_image_id = Column(String, nullable=True)
+    action_image_ids = Column(JSON, nullable=True)           # list of asset IDs
+
+    # Reference image
+    reference_filename = Column(String, nullable=False)      # "ref_{leader_id}.png"
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+
+
 Base.metadata.create_all(bind=engine)
 
 

@@ -1,6 +1,5 @@
 import logging
 from contextlib import asynccontextmanager
-from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +7,10 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .database import SessionLocal, AssetRecord
-from .generators import get_generator
+from .generators import close_comfyui_client, get_generator, _get_comfyui_client
+from .leader_models import LeaderRequest, LeaderResponse, LeaderInfo
+from .leader_engine import LeaderEngine
+from .leader_registry import LeaderRegistry
 from .models import GenerationRequest, GenerationResponse, SplashRequest, SplashResponse
 from .static_catalog import catalog as static_catalog
 from .storage import store
@@ -20,13 +22,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Thread pool for blocking ComfyUI calls (generation is synchronous/blocking)
-_executor = ThreadPoolExecutor(max_workers=4)
+# Leader engine (initialized in lifespan if ComfyUI is reachable)
+leader_engine: LeaderEngine | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
+    global leader_engine
+
+    client = _get_comfyui_client()
+    if client is not None:
+        reachable = await client.health_check()
+        if reachable:
+            leader_engine = LeaderEngine(client)
+            logger.info("Leader engine initialized")
+        else:
+            logger.warning(
+                "ComfyUI server unreachable at %s -- leader endpoints will return 503",
+                client.base_url,
+            )
+
     logger.info(
         "Application started.  Modes: %s",
         {f: settings.get_mode(f) for f in [
@@ -34,11 +50,13 @@ async def lifespan(app: FastAPI):
             "character_sprite", "story", "splash",
         ]},
     )
-    logger.info("Static catalog: %d tile types, %d structure subtypes",
-                len(static_catalog.list_tile_types()),
-                len(static_catalog.list_structure_subtypes()))
+    logger.info(
+        "Static catalog: %d tile types, %d structure subtypes",
+        len(static_catalog.list_tile_types()),
+        len(static_catalog.list_structure_subtypes()),
+    )
     yield
-    _executor.shutdown(wait=True)
+    await close_comfyui_client()
     logger.info("Application shutting down.")
 
 
@@ -91,10 +109,9 @@ async def generate_image(request: GenerationRequest):
         # Resolve generation mode (for logging + DB)
         mode = settings.get_mode(request.asset_family)
 
-        # Run blocking generation in a thread
+        # Run generation directly (async -- no thread-pool needed)
         generator = get_generator(request.asset_family, request)
-        loop = __import__("asyncio").get_event_loop()
-        filename: str = await loop.run_in_executor(_executor, generator.generate, request)
+        filename: str = await generator.generate(request)
 
         # Persist to database
         with SessionLocal() as db:
@@ -141,8 +158,7 @@ async def generate_splash(request: SplashRequest):
     try:
         mode = settings.get_mode("splash")
         generator = get_generator("splash", request)
-        loop = __import__("asyncio").get_event_loop()
-        filename: str = await loop.run_in_executor(_executor, generator.generate, request)
+        filename: str = await generator.generate(request)
 
         # Persist to database
         with SessionLocal() as db:
@@ -198,12 +214,13 @@ async def get_catalog():
 
 
 @app.get("/health")
-def health_check():
-    from .generators import _get_comfyui_client
+async def health_check():
+    """Report service status including ComfyUI connectivity."""
     client = _get_comfyui_client()
+    comfyui_ok = (client is not None) and await client.health_check() if client else False
     return {
         "status": "ok",
-        "comfyui_connected": client is not None,
+        "comfyui_connected": comfyui_ok,
         "modes": {
             "background_tile": settings.get_mode("background_tile"),
             "structure": settings.get_mode("structure"),
@@ -212,4 +229,93 @@ def health_check():
             "story": settings.get_mode("story"),
             "splash": settings.get_mode("splash"),
         },
+        "leaders_registered": len(LeaderRegistry.list_all()),
     }
+
+
+# ---------------------------------------------------------------------------
+#  Leader pipeline
+# ---------------------------------------------------------------------------
+
+
+@app.post("/leader", response_model=LeaderResponse)
+async def generate_leader(request: LeaderRequest):
+    """Generate a leader asset: splash, profile, or action scene.
+
+    Pipeline order:
+      1. POST /leader {asset_type: "splash", ...}     → returns leader_id
+      2. POST /leader {asset_type: "profile", leader_id: "...", ...}
+      3. POST /leader {asset_type: "action", leader_id: "...", action_category: "...", ...}
+    """
+    logger.info("Received leader request for type: %s", request.asset_type)
+
+    if leader_engine is None:
+        raise HTTPException(503, "Leader generation not available (ComfyUI unreachable)")
+
+    try:
+        response: LeaderResponse = await leader_engine.generate(request)
+        logger.info(
+            "Leader %s generated: %s (%.1fs)",
+            response.leader_name,
+            response.asset_type,
+            (response.generation_time_ms or 0) / 1000,
+        )
+        return response
+
+    except ValueError as e:
+        logger.warning("Leader validation error: %s", e)
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Leader runtime error: %s", e)
+        raise HTTPException(503, detail=str(e))
+    except Exception as e:
+        logger.error("Leader generation error: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/leader", response_model=list[LeaderInfo])
+async def list_leaders():
+    """Return all registered leaders. Parallels GET /catalog."""
+    records = LeaderRegistry.list_all()
+    return [
+        LeaderInfo(
+            leader_id=r.leader_id,
+            leader_name=r.leader_name,
+            archetype=r.archetype,
+            culture=r.culture,
+            splash_url=f"/assets/{r.splash_image_id}" if r.splash_image_id else None,
+            profile_url=f"/assets/{r.profile_image_id}" if r.profile_image_id else None,
+            action_urls=[f"/assets/{aid}" for aid in (r.action_image_ids or [])],
+            splash_seed=r.splash_seed,
+            created_at=r.created_at.isoformat() if r.created_at else None,
+        )
+        for r in records
+    ]
+
+
+@app.get("/leader/{leader_id}", response_model=LeaderInfo)
+async def get_leader(leader_id: str):
+    """Get a specific leader's info + asset URLs."""
+    leader = LeaderRegistry.get(leader_id)
+    if not leader:
+        raise HTTPException(404, f"Leader '{leader_id}' not found")
+    return LeaderInfo(
+        leader_id=leader.leader_id,
+        leader_name=leader.leader_name,
+        archetype=leader.archetype,
+        culture=leader.culture,
+        splash_url=f"/assets/{leader.splash_image_id}" if leader.splash_image_id else None,
+        profile_url=f"/assets/{leader.profile_image_id}" if leader.profile_image_id else None,
+        action_urls=[f"/assets/{aid}" for aid in (leader.action_image_ids or [])],
+        splash_seed=leader.splash_seed,
+        created_at=leader.created_at.isoformat() if leader.created_at else None,
+    )
+
+
+@app.delete("/leader/{leader_id}")
+async def delete_leader(leader_id: str):
+    """Remove a leader and their reference image. Generated assets remain on disk."""
+    deleted = LeaderRegistry.delete(leader_id)
+    if not deleted:
+        raise HTTPException(404, f"Leader '{leader_id}' not found")
+    return {"status": "deleted", "leader_id": leader_id}
