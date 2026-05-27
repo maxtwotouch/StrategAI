@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "templates": {
+    "structure": "<tdp> Front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
+    "object": "<tdp> Front view overhead shot elevated shot medium shot. The object faces the camera straight from the front. The object should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
+    "terrain": "<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature faces the camera straight from the front. The terrain should flow into any inserted background at its base edges. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. The base of the terrain feature should sit flush with the bottom of the frame. Grounded, stable perspective, no floating objects."
+  }
+}

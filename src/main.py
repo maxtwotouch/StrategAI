@@ -14,6 +14,17 @@ from .leader_registry import LeaderRegistry
 from .models import GenerationRequest, GenerationResponse, SplashRequest, SplashResponse
 from .static_catalog import catalog as static_catalog
 from .storage import store
+from .tile_engine import TileEngine, StaticTileEngine
+from .tile_models import (
+    StructureRequest, StructureResponse,
+    ObjectRequest, ObjectResponse,
+    TerrainRequest, TerrainResponse,
+    StructureCatalog, ObjectCatalog, TerrainCatalog,
+    StructureCategory, StructureStyle, StructureCondition, StructureScale,
+    ObjectCategory, Biome, Season,
+    TerrainCategory, TerrainScale, TerrainMaterial,
+)
+from .tile_registry import StructureRegistry, ObjectRegistry, TerrainRegistry
 
 # Setup production logging
 logging.basicConfig(
@@ -25,11 +36,14 @@ logger = logging.getLogger(__name__)
 # Leader engine (initialized in lifespan — comfyui or static mode)
 leader_engine: LeaderEngine | StaticLeaderEngine | None = None
 
+# Tile engine (initialized in lifespan)
+tile_engine: TileEngine | StaticTileEngine | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
-    global leader_engine
+    global leader_engine, tile_engine
 
     leader_mode = settings.get_mode("leader")
 
@@ -48,6 +62,22 @@ async def lifespan(app: FastAPI):
                     "ComfyUI server unreachable at %s -- leader endpoints will return 503",
                     client.base_url,
                 )
+
+    # Initialize tile engine based on structure/object/terrain mode
+    # (all three share the same client; mode determines instance type)
+    tile_families = ["structure", "object", "terrain"]
+    tile_mode = settings.get_mode("structure")  # representative — all three share config
+
+    if tile_mode in ("static", "placeholder"):
+        tile_engine = StaticTileEngine()
+        logger.info("Tile engine initialized (%s mode)", tile_mode)
+    else:
+        client = _get_comfyui_client()
+        if client is not None:
+            tile_engine = TileEngine(client)
+            logger.info("Tile engine initialized (comfyui mode)")
+        else:
+            logger.warning("Tile engine: ComfyUI unreachable, tile endpoints will return 503")
 
     logger.info(
         "Application started.  Modes: %s",
@@ -230,6 +260,8 @@ async def health_check():
         "modes": {
             "background_tile": settings.get_mode("background_tile"),
             "structure": settings.get_mode("structure"),
+            "object": settings.get_mode("object"),
+            "terrain": settings.get_mode("terrain"),
             "nature_object": settings.get_mode("nature_object"),
             "character_sprite": settings.get_mode("character_sprite"),
             "story": settings.get_mode("story"),
@@ -253,8 +285,8 @@ async def get_modes():
     'comfyui', 'static', or 'placeholder' mode without reading config.
     """
     families = [
-        "background_tile", "structure", "nature_object",
-        "character_sprite", "story", "splash", "leader",
+        "background_tile", "structure", "object", "terrain",
+        "nature_object", "character_sprite", "story", "splash", "leader",
     ]
     return {
         "modes": {f: settings.get_mode(f) for f in families},
@@ -348,3 +380,257 @@ async def delete_leader(leader_id: str):
     if not deleted:
         raise HTTPException(404, f"Leader '{leader_id}' not found")
     return {"status": "deleted", "leader_id": leader_id}
+
+
+# ---------------------------------------------------------------------------
+#  Tile pipelines — Structure, Object, Terrain
+# ---------------------------------------------------------------------------
+
+
+@app.post("/structure", response_model=StructureResponse)
+async def generate_structure(request: StructureRequest):
+    """Generate a structure tile (fortification, production, housing, sacred)."""
+    logger.info("Received structure request: category=%s style=%s", request.category, request.style)
+
+    if tile_engine is None:
+        raise HTTPException(503, "Tile generation not available (ComfyUI unreachable)")
+
+    try:
+        response: StructureResponse = await tile_engine.generate_structure(request)
+        logger.info("Structure generated: %s (%.1fs)", response.asset_id,
+                     (response.generation_time_ms or 0) / 1000)
+        return response
+    except ValueError as e:
+        logger.warning("Structure validation error: %s", e)
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Structure runtime error: %s", e)
+        raise HTTPException(503, detail=str(e))
+    except Exception as e:
+        logger.error("Structure generation error: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/structure", response_model=list[StructureResponse])
+async def list_structures():
+    """Return all generated structures."""
+    records = StructureRegistry.list_all()
+    return [
+        StructureResponse(
+            url=f"/assets/{r.image_id}",
+            asset_id=r.structure_id,
+            category=r.category,
+            style=r.style,
+            condition=r.condition,
+            scale=r.scale,
+            seed=r.seed,
+            generation_mode=r.generation_mode or "unknown",
+            prompt_used=r.prompt_used,
+        )
+        for r in records
+    ]
+
+
+@app.get("/structure/{structure_id}", response_model=StructureResponse)
+async def get_structure(structure_id: str):
+    """Get a specific structure by ID."""
+    record = StructureRegistry.get(structure_id)
+    if not record:
+        raise HTTPException(404, f"Structure '{structure_id}' not found")
+    return StructureResponse(
+        url=f"/assets/{record.image_id}",
+        asset_id=record.structure_id,
+        category=record.category,
+        style=record.style,
+        condition=record.condition,
+        scale=record.scale,
+        seed=record.seed,
+        generation_mode=record.generation_mode or "unknown",
+        prompt_used=record.prompt_used,
+    )
+
+
+@app.delete("/structure/{structure_id}")
+async def delete_structure(structure_id: str):
+    """Remove a structure record. Generated asset remains on disk."""
+    deleted = StructureRegistry.delete(structure_id)
+    if not deleted:
+        raise HTTPException(404, f"Structure '{structure_id}' not found")
+    return {"status": "deleted", "structure_id": structure_id}
+
+
+@app.get("/structure/catalog", response_model=StructureCatalog)
+async def structure_catalog():
+    """Return available enum values for structure generation."""
+    return StructureCatalog(
+        categories=sorted(StructureCategory.ALL),
+        styles=sorted(StructureStyle.ALL),
+        conditions=sorted(StructureCondition.ALL),
+        scales=sorted(StructureScale.ALL),
+    )
+
+
+# ---------------------------------------------------------------------------
+
+
+@app.post("/object", response_model=ObjectResponse)
+async def generate_object(request: ObjectRequest):
+    """Generate an object tile (vegetation, geological, rural/urban props, debris)."""
+    logger.info("Received object request: category=%s biome=%s", request.category, request.biome)
+
+    if tile_engine is None:
+        raise HTTPException(503, "Tile generation not available (ComfyUI unreachable)")
+
+    try:
+        response: ObjectResponse = await tile_engine.generate_object(request)
+        logger.info("Object generated: %s (%.1fs)", response.asset_id,
+                     (response.generation_time_ms or 0) / 1000)
+        return response
+    except ValueError as e:
+        logger.warning("Object validation error: %s", e)
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Object runtime error: %s", e)
+        raise HTTPException(503, detail=str(e))
+    except Exception as e:
+        logger.error("Object generation error: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/object", response_model=list[ObjectResponse])
+async def list_objects():
+    """Return all generated objects."""
+    records = ObjectRegistry.list_all()
+    return [
+        ObjectResponse(
+            url=f"/assets/{r.image_id}",
+            asset_id=r.object_id,
+            category=r.category,
+            biome=r.biome,
+            season=r.season,
+            seed=r.seed,
+            generation_mode=r.generation_mode or "unknown",
+            prompt_used=r.prompt_used,
+        )
+        for r in records
+    ]
+
+
+@app.get("/object/{object_id}", response_model=ObjectResponse)
+async def get_object(object_id: str):
+    """Get a specific object by ID."""
+    record = ObjectRegistry.get(object_id)
+    if not record:
+        raise HTTPException(404, f"Object '{object_id}' not found")
+    return ObjectResponse(
+        url=f"/assets/{record.image_id}",
+        asset_id=record.object_id,
+        category=record.category,
+        biome=record.biome,
+        season=record.season,
+        seed=record.seed,
+        generation_mode=record.generation_mode or "unknown",
+        prompt_used=record.prompt_used,
+    )
+
+
+@app.delete("/object/{object_id}")
+async def delete_object(object_id: str):
+    """Remove an object record. Generated asset remains on disk."""
+    deleted = ObjectRegistry.delete(object_id)
+    if not deleted:
+        raise HTTPException(404, f"Object '{object_id}' not found")
+    return {"status": "deleted", "object_id": object_id}
+
+
+@app.get("/object/catalog", response_model=ObjectCatalog)
+async def object_catalog():
+    """Return available enum values for object generation."""
+    return ObjectCatalog(
+        categories=sorted(ObjectCategory.ALL),
+        biomes=sorted(Biome.ALL),
+        seasons=sorted(Season.ALL),
+    )
+
+
+# ---------------------------------------------------------------------------
+
+
+@app.post("/terrain", response_model=TerrainResponse)
+async def generate_terrain(request: TerrainRequest):
+    """Generate a terrain tile (hill, slope, cliff, ridge, depression)."""
+    logger.info("Received terrain request: category=%s material=%s", request.category, request.material)
+
+    if tile_engine is None:
+        raise HTTPException(503, "Tile generation not available (ComfyUI unreachable)")
+
+    try:
+        response: TerrainResponse = await tile_engine.generate_terrain(request)
+        logger.info("Terrain generated: %s (%.1fs)", response.asset_id,
+                     (response.generation_time_ms or 0) / 1000)
+        return response
+    except ValueError as e:
+        logger.warning("Terrain validation error: %s", e)
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Terrain runtime error: %s", e)
+        raise HTTPException(503, detail=str(e))
+    except Exception as e:
+        logger.error("Terrain generation error: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/terrain", response_model=list[TerrainResponse])
+async def list_terrains():
+    """Return all generated terrains."""
+    records = TerrainRegistry.list_all()
+    return [
+        TerrainResponse(
+            url=f"/assets/{r.image_id}",
+            asset_id=r.terrain_id,
+            category=r.category,
+            scale=r.scale,
+            material=r.material,
+            seed=r.seed,
+            generation_mode=r.generation_mode or "unknown",
+            prompt_used=r.prompt_used,
+        )
+        for r in records
+    ]
+
+
+@app.get("/terrain/{terrain_id}", response_model=TerrainResponse)
+async def get_terrain(terrain_id: str):
+    """Get a specific terrain by ID."""
+    record = TerrainRegistry.get(terrain_id)
+    if not record:
+        raise HTTPException(404, f"Terrain '{terrain_id}' not found")
+    return TerrainResponse(
+        url=f"/assets/{record.image_id}",
+        asset_id=record.terrain_id,
+        category=record.category,
+        scale=record.scale,
+        material=record.material,
+        seed=record.seed,
+        generation_mode=record.generation_mode or "unknown",
+        prompt_used=record.prompt_used,
+    )
+
+
+@app.delete("/terrain/{terrain_id}")
+async def delete_terrain(terrain_id: str):
+    """Remove a terrain record. Generated asset remains on disk."""
+    deleted = TerrainRegistry.delete(terrain_id)
+    if not deleted:
+        raise HTTPException(404, f"Terrain '{terrain_id}' not found")
+    return {"status": "deleted", "terrain_id": terrain_id}
+
+
+@app.get("/terrain/catalog", response_model=TerrainCatalog)
+async def terrain_catalog():
+    """Return available enum values for terrain generation."""
+    return TerrainCatalog(
+        categories=sorted(TerrainCategory.ALL),
+        scales=sorted(TerrainScale.ALL),
+        materials=sorted(TerrainMaterial.ALL),
+    )

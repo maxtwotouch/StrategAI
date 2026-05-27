@@ -27,6 +27,8 @@ generation:
   modes:
     background_tile: "comfyui"
     structure: "comfyui"
+    object: "comfyui"
+    terrain: "comfyui"
     nature_object: "comfyui"
     character_sprite: "comfyui"
     story: "comfyui"

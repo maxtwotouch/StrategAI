@@ -13,7 +13,8 @@ The service accepts structured requests describing *what* to generate and return
 | Asset Family | Example | Description |
 |---|---|---|
 | `structure` | castle, blacksmith | Buildings and constructed objects |
-| `nature_object` | tree, boulder | Organic world decorations |
+| `object` | tree, boulder, crate | Nature objects and world props |
+| `terrain` | hill, cliff, slope | Elevation features layered over background tiles |
 | `background_tile` | grass, dirt, water | Repeatable terrain tiles |
 | `character_sprite` | knight, archer | Character sprites |
 | `story` | "The dragon attacks" | Epic 16:9 cinematic concept art |
@@ -34,18 +35,25 @@ Game Client
 ┌──────────────────────────────────────────┐
 │  FastAPI (main.py)                       │
 │  POST /generate   POST /splash           │
-│  POST /leader     GET  /assets/...       │
-│  GET  /health     GET  /catalog          │
-│  GET  /modes                             │
-├──────────────────────────────────────────┤
-│  Pydantic Models (models.py)             │
-│  GenerationRequest, SplashRequest, etc.  │
+│  POST /leader     POST /structure        │
+│  POST /object     POST /terrain          │
+│  GET  /assets/... GET  /health           │
+│  GET  /catalog    GET  /modes            │
+├──────────────────┬───────────────────────┤
+│  Pydantic Models                         │
+│  models.py, leader_models.py,            │
+│  tile_models.py                          │
 ├──────────────────┬───────────────────────┤
 │  Generator       │  Leader Engine        │
 │  (generators.py) │  (leader_engine.py)   │
 │  ├ ComfyUI       │  ├ Splash (txt2img)   │
 │  ├ StaticTile    │  ├ Profile (img2img)  │
 │  └ Placeholder   │  └ Action (img2img)   │
+├──────────────────┼───────────────────────┤
+│  Tile Engine (tile_engine.py)            │
+│  ├ TileEngine (comfyui)                  │
+│  ├ StaticTileEngine                      │
+│  └ _PlaceholderTileEngine                │
 ├──────────────────┴───────────────────────┤
 │  ComfyUIClient (comfyui_client.py)       │
 │  Async HTTP+WS: httpx + websockets       │
@@ -55,9 +63,11 @@ Game Client
 ├──────────────────────────────────────────┤
 │  AssetStore (storage.py)                 │
 │  In-memory LRU cache + disk fallback     │
-├───────────────────────────────────────��──┤
+├──────────────────────────────────────────┤
 │  SQLite DB (database.py)                 │
-│  AssetRecord + LeaderRecord              │
+│  AssetRecord + LeaderRecord +            │
+│  StructureRecord + ObjectRecord +        │
+│  TerrainRecord                           │
 └──────────────────────────────────────────┘
 ```
 
@@ -88,12 +98,16 @@ Set in `config.yaml` — no code changes. The game client never knows which mode
 │   ├── comfyui_client.py    # HTTP + WebSocket client for ComfyUI
 │   ├── inpainting.py         # Mask creation, prompt mapping
 │   ├── storage.py            # AssetStore: in-memory LRU cache + disk I/O
-│   ├── database.py           # SQLAlchemy + SQLite (AssetRecord, LeaderRecord)
+│   ├── database.py           # SQLAlchemy + SQLite (tables for all record types)
 │   ├── static_catalog.py     # Scans static_tiles/ for available PNGs
 │   ├── leader_models.py      # Leader enums + Pydantic schemas
 │   ├── leader_prompts.py     # Enum injection maps + prompt builders
 │   ├── leader_registry.py    # SQLite-backed leader CRUD
 │   ├── leader_engine.py      # Splash → profile → action orchestrator
+│   ├── tile_models.py        # Tile enums + Pydantic request/response schemas
+│   ├── tile_prompts.py       # Enum injection maps + prompt builders
+│   ├── tile_registry.py      # SQLite-backed tile CRUD (structure, object, terrain)
+│   ├── tile_engine.py        # Tile generation orchestrator (comfyui/static/placeholder)
 │   └── workflows/            # ComfyUI API-format workflow JSONs
 │       ├── txt2img.json
 │       ├── inpaint.json
@@ -198,7 +212,9 @@ Returns service status, generation modes, ComfyUI connectivity, and registered l
   "comfyui_connected": true,
   "modes": {
     "background_tile": "comfyui",
-    "structure": "static",
+    "structure": "comfyui",
+    "object": "comfyui",
+    "terrain": "comfyui",
     "nature_object": "comfyui",
     "character_sprite": "comfyui",
     "story": "comfyui",
@@ -216,7 +232,9 @@ Returns the active generation mode for every asset family, plus the list of vali
 {
   "modes": {
     "background_tile": "comfyui",
-    "structure": "static",
+    "structure": "comfyui",
+    "object": "comfyui",
+    "terrain": "comfyui",
     "nature_object": "comfyui",
     "character_sprite": "comfyui",
     "story": "comfyui",
@@ -314,6 +332,114 @@ Generate a character portrait / splash art.
 }
 ```
 
+### `POST /structure`
+
+Generate a structure (building) asset. Enum-driven prompt injection — the client picks from constrained vocabularies.
+
+**Request:**
+
+```json
+{
+  "category": "fortification",
+  "style": "norman_romanesque",
+  "condition": "pristine",
+  "scale": "large",
+  "description": "a massive keep with crenellated battlements, a raised gatehouse with iron portcullis, and a tall watchtower at the northeast corner"
+}
+```
+
+| Field | Required | Valid Values |
+|---|---|---|
+| `category` | ✅ | `fortification`, `production`, `housing`, `sacred` |
+| `style` | ✅ | `nordic_wooden`, `anglo_saxon_stone`, `norman_romanesque`, `gothic`, `mediterranean`, `slavic_timber`, `moorish` |
+| `condition` | ✅ | `pristine`, `weathered`, `ruined`, `under_construction`, `fortified` |
+| `scale` | ✅ | `small`, `medium`, `large` |
+| `description` | ✅ | Free-form text (20-400 chars): roof material, height, distinctive features |
+| `seed` | — | Optional integer for reproducibility |
+
+**Response:**
+
+```json
+{
+  "url": "/assets/struct_fortification_a1b2c3.png",
+  "asset_type": "structure",
+  "asset_id": "struct_fortification_a1b2c3",
+  "category": "fortification",
+  "style": "norman_romanesque",
+  "condition": "pristine",
+  "scale": "large",
+  "seed": 982374012,
+  "generation_mode": "comfyui",
+  "prompt_used": "<tdp> Front view overhead shot... a large imposing grand structure...",
+  "resolution": "512x512",
+  "generation_time_ms": 12340
+}
+```
+
+**Catalog:** `GET /structure/catalog` → `{ categories: [...], styles: [...], conditions: [...], scales: [...] }`
+
+---
+
+### `POST /object`
+
+Generate a nature object or world prop.
+
+**Request:**
+
+```json
+{
+  "category": "vegetation",
+  "biome": "temperate_forest",
+  "season": "autumn",
+  "description": "a gnarled old oak tree with spreading branches, a thick trunk with rough bark, a small hollow at the base"
+}
+```
+
+| Field | Required | Valid Values |
+|---|---|---|
+| `category` | ✅ | `vegetation`, `geological`, `rural_props`, `urban_props`, `debris` |
+| `biome` | ✅ | `temperate_forest`, `taiga`, `desert`, `swamp`, `mountain`, `coastal` |
+| `season` | ✅ | `spring`, `summer`, `autumn`, `winter` |
+| `description` | ✅ | Free-form text (20-400 chars) |
+| `seed` | — | Optional integer |
+
+**Response:** Same shape as `/structure` with `asset_type: "object"`.
+
+**Catalog:** `GET /object/catalog` → `{ categories: [...], biomes: [...], seasons: [...] }`
+
+---
+
+### `POST /terrain`
+
+Generate an elevation / topographical sprite designed to layer *on top of* background tiles.
+
+**Request:**
+
+```json
+{
+  "category": "hill",
+  "scale": "medium",
+  "material": "earthen",
+  "description": "a rounded grassy hill with a gentle slope on the left side, wildflowers scattered on top"
+}
+```
+
+| Field | Required | Valid Values |
+|---|---|---|
+| `category` | ✅ | `hill`, `slope`, `cliff`, `ridge`, `depression` |
+| `scale` | ✅ | `low`, `medium`, `high` |
+| `material` | ✅ | `earthen`, `sandy`, `rocky`, `snowy`, `muddy` |
+| `description` | ✅ | Free-form text (20-400 chars) |
+| `seed` | — | Optional integer |
+
+**Response:** Same shape as `/structure` with `asset_type: "terrain"`.
+
+**Catalog:** `GET /terrain/catalog` → `{ categories: [...], scales: [...], materials: [...] }`
+
+**Important:** Terrain sprites are isolated on white and alpha-masked in-game. They sit on Layer 2 between background tiles (Layer 1) and structures/objects (Layer 3).
+
+---
+
 ### `POST /leader`
 
 Generate a leader asset through the splash → profile → action pipeline.
@@ -388,14 +514,14 @@ Download a previously generated asset. Returns `image/png`.
 ## Design Decisions
 
 - **ComfyUI as inference backend**: The FastAPI server never loads model weights — it delegates all generation to an external ComfyUI instance. The web server stays lightweight at ~200MB RAM.
-- **Fully async ComfyUI client**: Uses ``httpx`` + ``websockets`` for non-blocking I/O. Generation runs directly on the asyncio event loop — no thread-pool needed, enabling high concurrency without worker saturation.
+- **Fully async ComfyUI client**: Uses `httpx` + `websockets` for non-blocking I/O. Generation runs directly on the asyncio event loop — no thread-pool needed, enabling high concurrency without worker saturation.
 - **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, `placeholder`, or `random` mode via `config.yaml`. Ops, not code.
 - **YAML-first configuration**: All behavioural settings live in version-controlled `config.yaml`. Only deployment-specific values (ComfyUI IP, bind host/port) go in `.env`, using `__` delimiter for nested overrides.
 - **Drop-in static injection**: Adding a new pre-made asset is creating a PNG in the right `static_tiles/` folder and restarting.
 - **Workflows as version-controlled assets**: ComfyUI workflow JSONs live in `src/workflows/` alongside code.
 - **In-memory caching**: `AssetStore` uses an LRU-backed `OrderedDict` for zero-latency asset serving. Falls back to disk reads transparently.
-- **SQLite**: No external database dependency. `AssetRecord` and `LeaderRecord` track every generation.
-- **Prompt enrichment happens server-side**: The game client says `"water"`; the service handles making it sound good to the diffusion model.
+- **SQLite**: No external database dependency. Tracks every generation across `AssetRecord`, `LeaderRecord`, `StructureRecord`, `ObjectRecord`, and `TerrainRecord`.
+- **Prompt enrichment happens server-side**: The game client says `"water"` or picks an enum; the service handles making it sound good to the diffusion model.
 - **Copy-on-Write**: Inpainting never mutates the original asset, enabling safe concurrent modifications.
 
 ---
@@ -408,5 +534,7 @@ Download a previously generated asset. Returns `image/png`.
 | [`docs/migration_plan.md`](docs/migration_plan.md) | Plan and rationale for ComfyUI migration |
 | [`docs/leader_pipeline_plan.md`](docs/leader_pipeline_plan.md) | Leader pipeline implementation plan + checklist |
 | [`docs/client-api-leader-guide.md`](docs/client-api-leader-guide.md) | Original leader API design reference (FLUX-focused) |
+| [`docs/tile_generation_plan.md`](docs/tile_generation_plan.md) | Structure, object, and terrain pipeline design |
+| [`docs/client-api-tile-guide.md`](docs/client-api-tile-guide.md) | Client-facing prompt-writing guide for tile endpoints |
 | [`docs/inpainting_workflow.md`](docs/inpainting_workflow.md) | Inpainting prototyping with ComfyUI vs diffusers |
 | [`docs/next_steps.md`](docs/next_steps.md) | Future roadmap items |

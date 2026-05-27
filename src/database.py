@@ -53,6 +53,51 @@ class LeaderRecord(Base):
     updated_at = Column(DateTime, onupdate=func.now())
 
 
+class StructureRecord(Base):
+    __tablename__ = "structure_records"
+
+    structure_id = Column(String, primary_key=True, index=True)
+    category = Column(String, nullable=False)
+    style = Column(String, nullable=False)
+    condition = Column(String, nullable=False)
+    scale = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    image_id = Column(String, nullable=False)
+    seed = Column(Integer, nullable=False)
+    prompt_used = Column(String, nullable=False)
+    generation_mode = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class ObjectRecord(Base):
+    __tablename__ = "object_records"
+
+    object_id = Column(String, primary_key=True, index=True)
+    category = Column(String, nullable=False)
+    biome = Column(String, nullable=False)
+    season = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    image_id = Column(String, nullable=False)
+    seed = Column(Integer, nullable=False)
+    prompt_used = Column(String, nullable=False)
+    generation_mode = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class TerrainRecord(Base):
+    __tablename__ = "terrain_records"
+
+    terrain_id = Column(String, primary_key=True, index=True)
+    category = Column(String, nullable=False)
+    scale = Column(String, nullable=False)
+    material = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    image_id = Column(String, nullable=False)
+    seed = Column(Integer, nullable=False)
+    prompt_used = Column(String, nullable=False)
+    generation_mode = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
 Base.metadata.create_all(bind=engine)
 
 

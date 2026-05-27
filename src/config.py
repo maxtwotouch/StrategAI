@@ -35,6 +35,8 @@ class GenerationSettings(BaseModel):
     modes: dict[str, str] = Field(default_factory=lambda: {
         "background_tile": "comfyui",
         "structure": "comfyui",
+        "object": "comfyui",
+        "terrain": "comfyui",
         "nature_object": "comfyui",
         "character_sprite": "comfyui",
         "story": "comfyui",
