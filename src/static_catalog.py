@@ -32,9 +32,13 @@ class StaticCatalog:
     # ------------------------------------------------------------------
 
     def resolve_tile(self, tile_type: str) -> str | None:
-        """Return exact file path for a background tile type, or None."""
+        """Return a random file path for a background tile type, or None.
+
+        When multiple PNGs exist for the same tile type (e.g. grass_1.png,
+        grass_2.png) a random one is picked so clients get variety.
+        """
         entries = self._catalog.get("background_tile", {}).get(tile_type, [])
-        return entries[0] if entries else None
+        return random.choice(entries) if entries else None
 
     def list_tile_types(self) -> list[str]:
         """Return available background tile types that have at least one PNG."""
@@ -110,13 +114,20 @@ class StaticCatalog:
             self._catalog["structure"][None] = all_pngs
 
     def _scan_flat_named(self, path: str, family: str) -> None:
-        """Flat folder where filename = type key (background_tile)."""
+        """Flat folder where filename = type key (background_tile).
+
+        Supports multiple variants per tile type via numeric suffixes:
+        ``grass_1.png``, ``grass_2.png`` → both stored under key ``"grass"``.
+        Plain names like ``water.png`` work as before.
+        """
         for fname in sorted(os.listdir(path)):
             if not fname.lower().endswith(".png"):
                 continue
-            key = os.path.splitext(fname)[0]  # "water.png" → "water"
+            base = os.path.splitext(fname)[0]  # "grass_1" or "water"
+            # Strip trailing _N suffix to group variants under one key
+            key = base.rsplit("_", 1)[0] if "_" in base else base
             full = os.path.join(path, fname)
-            self._catalog[family][key] = [full]
+            self._catalog[family].setdefault(key, []).append(full)
 
     def _scan_flat_unnamed(self, path: str, family: str) -> None:
         """Flat folder where any PNG is a valid random pick."""

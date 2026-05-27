@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .database import SessionLocal, AssetRecord
 from .generators import close_comfyui_client, get_generator, _get_comfyui_client
+from .leader_engine import LeaderEngine, StaticLeaderEngine
 from .leader_models import LeaderRequest, LeaderResponse, LeaderInfo
-from .leader_engine import LeaderEngine
 from .leader_registry import LeaderRegistry
 from .models import GenerationRequest, GenerationResponse, SplashRequest, SplashResponse
 from .static_catalog import catalog as static_catalog
@@ -22,8 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Leader engine (initialized in lifespan if ComfyUI is reachable)
-leader_engine: LeaderEngine | None = None
+# Leader engine (initialized in lifespan — comfyui or static mode)
+leader_engine: LeaderEngine | StaticLeaderEngine | None = None
 
 
 @asynccontextmanager
@@ -31,23 +31,29 @@ async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
     global leader_engine
 
-    client = _get_comfyui_client()
-    if client is not None:
-        reachable = await client.health_check()
-        if reachable:
-            leader_engine = LeaderEngine(client)
-            logger.info("Leader engine initialized")
-        else:
-            logger.warning(
-                "ComfyUI server unreachable at %s -- leader endpoints will return 503",
-                client.base_url,
-            )
+    leader_mode = settings.get_mode("leader")
+
+    if leader_mode in ("static", "placeholder"):
+        leader_engine = StaticLeaderEngine()
+        logger.info("Leader engine initialized (%s mode)", leader_mode)
+    else:
+        client = _get_comfyui_client()
+        if client is not None:
+            reachable = await client.health_check()
+            if reachable:
+                leader_engine = LeaderEngine(client)
+                logger.info("Leader engine initialized (comfyui mode)")
+            else:
+                logger.warning(
+                    "ComfyUI server unreachable at %s -- leader endpoints will return 503",
+                    client.base_url,
+                )
 
     logger.info(
         "Application started.  Modes: %s",
         {f: settings.get_mode(f) for f in [
             "structure", "nature_object", "background_tile",
-            "character_sprite", "story", "splash",
+            "character_sprite", "story", "splash", "leader",
         ]},
     )
     logger.info(
@@ -228,8 +234,31 @@ async def health_check():
             "character_sprite": settings.get_mode("character_sprite"),
             "story": settings.get_mode("story"),
             "splash": settings.get_mode("splash"),
+            "leader": settings.get_mode("leader"),
         },
         "leaders_registered": len(LeaderRegistry.list_all()),
+    }
+
+
+# ---------------------------------------------------------------------------
+#  Modes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/modes")
+async def get_modes():
+    """Return the active generation mode for every asset family.
+
+    Clients can use this to discover whether the server is running in
+    'comfyui', 'static', or 'placeholder' mode without reading config.
+    """
+    families = [
+        "background_tile", "structure", "nature_object",
+        "character_sprite", "story", "splash", "leader",
+    ]
+    return {
+        "modes": {f: settings.get_mode(f) for f in families},
+        "valid_modes": ["comfyui", "static", "placeholder", "random"],
     }
 
 

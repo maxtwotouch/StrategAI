@@ -454,6 +454,9 @@ def get_generator(
     """
     mode = settings.get_mode(asset_family)
 
+    if mode == "placeholder":
+        return _PlaceholderGenerator(asset_family)
+
     if mode == "static":
         return StaticTileGenerator(asset_family)
 

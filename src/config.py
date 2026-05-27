@@ -39,6 +39,7 @@ class GenerationSettings(BaseModel):
         "character_sprite": "comfyui",
         "story": "comfyui",
         "splash": "comfyui",
+        "leader": "comfyui",
     })
     default_mode: str = "comfyui"
     random_probability: float = 0.5
@@ -128,9 +129,9 @@ class Settings(BaseSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (
             init_settings,
-            YamlConfigSettingsSource(settings_cls),
-            dotenv_settings,
             env_settings,
+            dotenv_settings,
+            YamlConfigSettingsSource(settings_cls),
             file_secret_settings,
         )
 

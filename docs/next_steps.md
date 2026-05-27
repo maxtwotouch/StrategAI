@@ -7,7 +7,7 @@ This document tracks remaining work after the ComfyUI migration and leader pipel
 ## 1. ✅ Completed
 
 - [x] ComfyUI HTTP + WebSocket client (`comfyui_client.py`)
-- [x] Per-family generation modes (comfyui / static / random) via `.env`
+- [x] Per-family generation modes (comfyui / static / placeholder / random) via `config.yaml` + `.env`
 - [x] Static asset injection via `static_catalog.py` + `static_tiles/`
 - [x] Copy-on-Write inpainting via ComfyUI
 - [x] Seven workflow JSONs exported (txt2img, inpaint, story, splash, leader_splash, leader_profile, leader_action)
@@ -20,6 +20,8 @@ This document tracks remaining work after the ComfyUI migration and leader pipel
 - [x] `GET /health` with ComfyUI status and leader count
 - [x] `.env.example` with all settings documented
 - [x] Async ComfyUI client: replaced blocking `requests` + `websocket-client` with `async` `httpx` + `websockets`. Generation runs on the asyncio event loop — no `ThreadPoolExecutor` required. Removed `requests` and `websocket-client` from `requirements.txt`. Added `close_comfyui_client()` shutdown hook.
+- [x] `.env.testing` drop-in file for zero-dependency testing (all families in static/placeholder mode)
+- [x] Documentation polish: README, architecture.md, and .env.example reflect the project as-is
 
 ---
 

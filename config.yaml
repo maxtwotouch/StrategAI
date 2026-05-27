@@ -22,7 +22,7 @@ paths:
   leader_reference_dir: "leader_references"
 
 # ---- Generation modes (per asset family) ------------------------------
-# Valid per-family: "comfyui" | "static" | "random"
+# Valid per-family: "comfyui" | "static" | "placeholder" | "random"
 generation:
   modes:
     background_tile: "comfyui"
@@ -31,6 +31,7 @@ generation:
     character_sprite: "comfyui"
     story: "comfyui"
     splash: "comfyui"
+    leader: "comfyui"
   default_mode: "comfyui"
   random_probability: 0.5
 

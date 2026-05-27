@@ -2,6 +2,8 @@
 
 An on-demand generative AI microservice that produces pixel art game assets for a top-down medieval game. Built with **FastAPI** and **ComfyUI** as the inference backend. Generation modes are configurable per asset family in `config.yaml` — no code changes needed.
 
+**Zero-dependency testing mode available** — run the full API with procedural placeholders, no GPU or ComfyUI required.
+
 ---
 
 ## What It Does
@@ -34,6 +36,7 @@ Game Client
 │  POST /generate   POST /splash           │
 │  POST /leader     GET  /assets/...       │
 │  GET  /health     GET  /catalog          │
+│  GET  /modes                             │
 ├──────────────────────────────────────────┤
 │  Pydantic Models (models.py)             │
 │  GenerationRequest, SplashRequest, etc.  │
@@ -52,7 +55,7 @@ Game Client
 ├──────────────────────────────────────────┤
 │  AssetStore (storage.py)                 │
 │  In-memory LRU cache + disk fallback     │
-├──────────────────────────────────────────┤
+├───────────────────────────────────────��──┤
 │  SQLite DB (database.py)                 │
 │  AssetRecord + LeaderRecord              │
 └──────────────────────────────────────────┘
@@ -60,12 +63,13 @@ Game Client
 
 ### Generation Modes
 
-Each asset family can be independently configured to one of three modes:
+Each asset family can be independently configured to one of four modes:
 
 | Mode | Behaviour |
 |---|---|
 | `comfyui` | Delegates to an external ComfyUI server |
 | `static`  | Serves pre-made PNGs from `static_tiles/` directory |
+| `placeholder` | Always returns a procedural coloured placeholder (zero dependencies) |
 | `random`  | Coin-flip per request between `comfyui` and `static` |
 
 Set in `config.yaml` — no code changes. The game client never knows which mode produced the image.
@@ -96,7 +100,7 @@ Set in `config.yaml` — no code changes. The game client never knows which mode
 │       ├── story.json
 │       ├── splash.json
 │       └── leader/
-│           ├── leader_splash.json
+│           ���── leader_splash.json
 │           ├── leader_profile.json
 │           └── leader_action.json
 ├── static_tiles/             # Pre-made PNG assets (used in static mode)
@@ -201,6 +205,25 @@ Returns service status, generation modes, ComfyUI connectivity, and registered l
     "splash": "comfyui"
   },
   "leaders_registered": 3
+}
+```
+
+### `GET /modes`
+
+Returns the active generation mode for every asset family, plus the list of valid modes.
+
+```json
+{
+  "modes": {
+    "background_tile": "comfyui",
+    "structure": "static",
+    "nature_object": "comfyui",
+    "character_sprite": "comfyui",
+    "story": "comfyui",
+    "splash": "comfyui",
+    "leader": "comfyui"
+  },
+  "valid_modes": ["comfyui", "static", "placeholder", "random"]
 }
 ```
 
@@ -366,7 +389,7 @@ Download a previously generated asset. Returns `image/png`.
 
 - **ComfyUI as inference backend**: The FastAPI server never loads model weights — it delegates all generation to an external ComfyUI instance. The web server stays lightweight at ~200MB RAM.
 - **Fully async ComfyUI client**: Uses ``httpx`` + ``websockets`` for non-blocking I/O. Generation runs directly on the asyncio event loop — no thread-pool needed, enabling high concurrency without worker saturation.
-- **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, or `random` mode via `config.yaml`. Ops, not code.
+- **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, `placeholder`, or `random` mode via `config.yaml`. Ops, not code.
 - **YAML-first configuration**: All behavioural settings live in version-controlled `config.yaml`. Only deployment-specific values (ComfyUI IP, bind host/port) go in `.env`, using `__` delimiter for nested overrides.
 - **Drop-in static injection**: Adding a new pre-made asset is creating a PNG in the right `static_tiles/` folder and restarting.
 - **Workflows as version-controlled assets**: ComfyUI workflow JSONs live in `src/workflows/` alongside code.

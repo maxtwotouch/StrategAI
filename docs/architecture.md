@@ -3,14 +3,15 @@
 ## 1. System Overview
 The Medieval Pixel Art Image Service is a decoupled, highly scalable web service that provides on-demand generative AI assets, acting as the dynamic engine behind the game's terrain, structures, and storytelling.
 
-The web server is a lightweight orchestrator — it never loads model weights. All image generation is delegated to an external **ComfyUI** server via its HTTP + WebSocket API. Static/pre-made assets are served from a folder structure with zero configuration.
+The web server is a lightweight orchestrator — it never loads model weights. All image generation is delegated to an external **ComfyUI** server via its HTTP + WebSocket API. Static/pre-made assets are served from a folder structure with zero configuration. A **placeholder** mode provides always-available procedural fallbacks for testing and development.
 
 ## 2. Core Operational Flow
 1. **Request Intake**: `FastAPI` validates incoming payloads (`GenerationRequest`, `SplashRequest`, `LeaderRequest`) using strict Pydantic schemas.
-2. **Mode Resolution**: The factory (`get_generator`) delegates based on `asset_family` and the environment-configured generation mode (`comfyui`, `static`, or `random`).
+2. **Mode Resolution**: The factory (`get_generator`) delegates based on `asset_family` and the configured generation mode (`comfyui`, `static`, `placeholder`, or `random`).
 3. **Asset Processing**:
    - **ComfyUI**: Loads a workflow JSON template, patches in the prompt and seed, uploads any input images (for inpainting or img2img), submits to ComfyUI, polls via WebSocket, downloads the result.
    - **Static**: Serves pre-made PNGs from `static_tiles/` directory. Falls back to procedural placeholder if no static PNG is available.
+   - **Placeholder**: Always returns a procedural coloured rectangle with text label — zero external dependencies, always available.
    - **Random**: Coin-flip per request between `comfyui` and `static`.
    - **Copy-on-Write (CoW)**: For inpainting, the system loads the `base_image_id`, iteratively creates masks for each bounding box, and runs sequential inpainting passes through ComfyUI.
 4. **Caching & Delivery**: The final asset is stored in an in-memory LRU cache for fast serving, persisted to disk, and indexed in SQLite. The asset URL is returned to the client.
@@ -18,18 +19,18 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 ## 3. Component Architecture
 
 ### A. API Layer (`main.py` & `models.py`)
-- **FastAPI**: Handles high-concurrency requests with CORS middleware.
-- **Pydantic**: Guarantees typed, structural contracts for`asset_family`, `tile_type`, `structure_subtype`, CoW references, and leader pipeline parameters.
-- **ThreadPoolExecutor**: Runs blocking ComfyUI calls without blocking the async event loop.
+- **FastAPI**: Handles high-concurrency requests with CORS middleware. Endpoints: `POST /generate`, `POST /splash`, `POST /leader`, `GET /leader`, `GET /leader/{id}`, `DELETE /leader/{id}`, `GET /health`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`.
+- **Pydantic**: Guarantees typed, structural contracts for `asset_family`, `tile_type`, `structure_subtype`, CoW references, and leader pipeline parameters.
+- **Fully async**: Generation runs directly on the asyncio event loop via `httpx` + `websockets`. No thread-pool required.
 
 ### B. Storage Layer (`storage.py`)
 - **AssetStore**: In-memory LRU cache (OrderedDict, default 1000 entries) for zero-latency serving. Transparent disk fallback for cache misses.
 
 ### C. Compute Layer (`generators.py` & `comfyui_client.py`)
-- **ComfyUIClient**: Blocking HTTP + WebSocket client. Handles workflow submission, image upload, progress polling, result download, prompt cancellation, and health checks.
+- **ComfyUIClient**: Async HTTP + WebSocket client. Handles workflow submission, image upload, progress polling, result download, prompt cancellation, and health checks.
 - **ComfyUIGenerator**: Wraps ComfyUIClient for the standard asset pipeline. Handles txt2img, story, splash, and sequential CoW inpainting.
 - **StaticTileGenerator**: Serves pre-made PNGs from `static_tiles/`. Falls back to procedural placeholders for families without static assets.
-- **_PlaceholderGenerator**: Procedural coloured rectangle with text label — always-available fallback.
+- **_PlaceholderGenerator**: Procedural coloured rectangle with text label — always-available fallback for testing and development.
 
 ### D. Static Catalog (`static_catalog.py`)
 - Scans `static_tiles/` at startup and builds an in-memory lookup by family and subtype.
@@ -73,13 +74,13 @@ Resolution, steps, CFG, sampler, scheduler, denoise, model paths, LoRA strength,
 |---|---|---|
 | `comfyui` | Always calls ComfyUI. 503 if unreachable. | Full AI generation |
 | `static` | Serves from `static_tiles/`. Falls back to placeholder. | Offline dev, deterministic assets |
-| `random` | Coin-flip per request (`RANDOM_GENERATION_PROBABILITY`). | A/B testing, gradual rollout |
+| `placeholder` | Always returns procedural coloured placeholder. | Testing, CI, zero-dependency demos |
+| `random` | Coin-flip per request (`GENERATION__RANDOM_PROBABILITY`). | A/B testing, gradual rollout |
 
-All controlled via `.env` — ops-level control with zero code changes.
+Controlled via `config.yaml` (version-controlled) with `.env` overrides using `__` delimiter — ops-level control with zero code changes.
 
 ## 6. Path to Scaled Execution (Future)
 
 - **Task Queues**: Implement **Celery + Redis** for non-blocking generation at scale.
 - **Object Storage**: Swap in-memory/disk cache with **AWS S3 / Cloudflare R2** for multi-node deployments.
-- **Async Client**: Replace blocking `requests` + `websocket` with `httpx` + `websockets` for true async ComfyUI communication.
 - **GPU Cloud**: Separate web server hosting from GPU inference nodes.
