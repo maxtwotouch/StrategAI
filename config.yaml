@@ -34,6 +34,7 @@ generation:
     story: "comfyui"
     splash: "comfyui"
     leader: "comfyui"
+    unit: "comfyui"
   default_mode: "comfyui"
   random_probability: 0.5
 

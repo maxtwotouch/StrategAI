@@ -98,6 +98,25 @@ class TerrainRecord(Base):
     generation_mode = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
+
+class UnitRecord(Base):
+    __tablename__ = "unit_records"
+
+    unit_id = Column(String, primary_key=True, index=True)
+    unit_type = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+
+    # Four directional sprite image IDs (FK → asset_records.id)
+    image_id_s = Column(String, nullable=False)       # south/front (canonical)
+    image_id_n = Column(String, nullable=False)       # north/back  (may equal image_id_s if fallback)
+    image_id_e = Column(String, nullable=False)       # east/right
+    image_id_w = Column(String, nullable=False)       # west/left
+
+    seed = Column(Integer, nullable=False)
+    prompt_used = Column(String, nullable=False)
+    generation_mode = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
 Base.metadata.create_all(bind=engine)
 
 

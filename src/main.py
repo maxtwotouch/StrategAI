@@ -25,6 +25,12 @@ from .tile_models import (
     TerrainCategory, TerrainScale, TerrainMaterial,
 )
 from .tile_registry import StructureRegistry, ObjectRegistry, TerrainRegistry
+from .unit_engine import UnitEngine, StaticUnitEngine
+from .unit_models import (
+    UnitRequest, UnitResponse, UnitCatalog,
+    UnitType, Direction,
+)
+from .unit_registry import UnitRegistry
 
 # Setup production logging
 logging.basicConfig(
@@ -39,11 +45,14 @@ leader_engine: LeaderEngine | StaticLeaderEngine | None = None
 # Tile engine (initialized in lifespan)
 tile_engine: TileEngine | StaticTileEngine | None = None
 
+# Unit engine (initialized in lifespan)
+unit_engine: UnitEngine | StaticUnitEngine | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
-    global leader_engine, tile_engine
+    global leader_engine, tile_engine, unit_engine
 
     leader_mode = settings.get_mode("leader")
 
@@ -79,17 +88,32 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("Tile engine: ComfyUI unreachable, tile endpoints will return 503")
 
+    # Initialize unit engine
+    unit_mode = settings.get_mode("unit")
+
+    if unit_mode in ("static", "placeholder"):
+        unit_engine = StaticUnitEngine()
+        logger.info("Unit engine initialized (%s mode)", unit_mode)
+    else:
+        client = _get_comfyui_client()
+        if client is not None:
+            unit_engine = UnitEngine(client)
+            logger.info("Unit engine initialized (comfyui mode)")
+        else:
+            logger.warning("Unit engine: ComfyUI unreachable, unit endpoints will return 503")
+
     logger.info(
         "Application started.  Modes: %s",
         {f: settings.get_mode(f) for f in [
             "structure", "nature_object", "background_tile",
-            "character_sprite", "story", "splash", "leader",
+            "character_sprite", "story", "splash", "leader", "unit",
         ]},
     )
     logger.info(
-        "Static catalog: %d tile types, %d structure subtypes",
+        "Static catalog: %d tile types, %d structure subtypes, %d unit types",
         len(static_catalog.list_tile_types()),
         len(static_catalog.list_structure_subtypes()),
+        len(static_catalog.list_unit_types()),
     )
     yield
     await close_comfyui_client()
@@ -267,8 +291,10 @@ async def health_check():
             "story": settings.get_mode("story"),
             "splash": settings.get_mode("splash"),
             "leader": settings.get_mode("leader"),
+            "unit": settings.get_mode("unit"),
         },
         "leaders_registered": len(LeaderRegistry.list_all()),
+        "units_registered": len(UnitRegistry.list_all()),
     }
 
 
@@ -286,7 +312,7 @@ async def get_modes():
     """
     families = [
         "background_tile", "structure", "object", "terrain",
-        "nature_object", "character_sprite", "story", "splash", "leader",
+        "nature_object", "character_sprite", "story", "splash", "leader", "unit",
     ]
     return {
         "modes": {f: settings.get_mode(f) for f in families},
@@ -633,4 +659,104 @@ async def terrain_catalog():
         categories=sorted(TerrainCategory.ALL),
         scales=sorted(TerrainScale.ALL),
         materials=sorted(TerrainMaterial.ALL),
+    )
+
+# ---------------------------------------------------------------------------
+#  Unit pipeline  — Archer, Scout, Settler, Warrior
+# ---------------------------------------------------------------------------
+
+
+@app.post("/unit", response_model=UnitResponse)
+async def generate_unit(request: UnitRequest):
+    """Generate unit sprites for all 4 cardinal directions.
+
+    Returns a UnitResponse with ``directions`` mapping ``s``/``n``/``e``/``w``
+    to asset URLs.  The south-facing sprite is canonical.
+    """
+    logger.info("Received unit request: type=%s", request.unit_type)
+
+    if unit_engine is None:
+        raise HTTPException(503, "Unit generation not available (ComfyUI unreachable)")
+
+    try:
+        response: UnitResponse = await unit_engine.generate(request)
+        logger.info(
+            "Unit %s generated: %s (%.1fs)",
+            response.unit_type,
+            response.unit_id,
+            (response.generation_time_ms or 0) / 1000,
+        )
+        return response
+
+    except ValueError as e:
+        logger.warning("Unit validation error: %s", e)
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Unit runtime error: %s", e)
+        raise HTTPException(503, detail=str(e))
+    except Exception as e:
+        logger.error("Unit generation error: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/unit", response_model=list[UnitResponse])
+async def list_units():
+    """Return all generated units."""
+    records = UnitRegistry.list_all()
+    return [
+        UnitResponse(
+            url=f"/assets/{r.image_id_s}",
+            unit_id=r.unit_id,
+            unit_type=r.unit_type,
+            directions=UnitDirections(
+                s=f"/assets/{r.image_id_s}",
+                n=f"/assets/{r.image_id_n}",
+                e=f"/assets/{r.image_id_e}",
+                w=f"/assets/{r.image_id_w}",
+            ),
+            seed=r.seed,
+            generation_mode=r.generation_mode or "unknown",
+            prompt_used=r.prompt_used,
+        )
+        for r in records
+    ]
+
+
+@app.get("/unit/{unit_id}", response_model=UnitResponse)
+async def get_unit(unit_id: str):
+    """Get a specific unit by ID."""
+    record = UnitRegistry.get(unit_id)
+    if not record:
+        raise HTTPException(404, f"Unit '{unit_id}' not found")
+    return UnitResponse(
+        url=f"/assets/{record.image_id_s}",
+        unit_id=record.unit_id,
+        unit_type=record.unit_type,
+        directions=UnitDirections(
+            s=f"/assets/{record.image_id_s}",
+            n=f"/assets/{record.image_id_n}",
+            e=f"/assets/{record.image_id_e}",
+            w=f"/assets/{record.image_id_w}",
+        ),
+        seed=record.seed,
+        generation_mode=record.generation_mode or "unknown",
+        prompt_used=record.prompt_used,
+    )
+
+
+@app.delete("/unit/{unit_id}")
+async def delete_unit(unit_id: str):
+    """Remove a unit record. Generated assets remain on disk."""
+    deleted = UnitRegistry.delete(unit_id)
+    if not deleted:
+        raise HTTPException(404, f"Unit '{unit_id}' not found")
+    return {"status": "deleted", "unit_id": unit_id}
+
+
+@app.get("/unit/catalog", response_model=UnitCatalog)
+async def unit_catalog():
+    """Return available unit types and directions."""
+    return UnitCatalog(
+        unit_types=sorted(UnitType.ALL),
+        directions=sorted(Direction.ALL),
     )

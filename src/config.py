@@ -42,6 +42,7 @@ class GenerationSettings(BaseModel):
         "story": "comfyui",
         "splash": "comfyui",
         "leader": "comfyui",
+        "unit": "comfyui",
     })
     default_mode: str = "comfyui"
     random_probability: float = 0.5
