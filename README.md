@@ -1,6 +1,6 @@
 # Medieval Pixel Art Image Service
 
-An on-demand generative AI microservice that produces pixel art game assets for a top-down medieval game. Built with **FastAPI** and **ComfyUI** as the inference backend. Generation modes are configurable per asset family via environment variables — no code changes needed.
+An on-demand generative AI microservice that produces pixel art game assets for a top-down medieval game. Built with **FastAPI** and **ComfyUI** as the inference backend. Generation modes are configurable per asset family in `config.yaml` — no code changes needed.
 
 ---
 
@@ -68,7 +68,7 @@ Each asset family can be independently configured to one of three modes:
 | `static`  | Serves pre-made PNGs from `static_tiles/` directory |
 | `random`  | Coin-flip per request between `comfyui` and `static` |
 
-Set in `.env` — no code changes. The game client never knows which mode produced the image.
+Set in `config.yaml` — no code changes. The game client never knows which mode produced the image.
 
 ---
 
@@ -103,11 +103,39 @@ Set in `.env` — no code changes. The game client never knows which mode produc
 ├── leader_references/        # Runtime reference images for leader pipeline
 ├── generated_assets/         # Output directory (runtime)
 ├── splash_assets/            # Splash output directory (runtime)
-├── .env.example              # Configuration reference
+├── config.yaml              # Version-controlled config (modes, paths, prompts)
+├── .env.example              # Deployment-only overrides (ComfyUI IP, host, port)
 ├── requirements.txt          # Python dependencies
 ├── tilemap.db                # SQLite database (runtime)
 └── docs/                     # Architecture, plans, guides
 ```
+
+---
+
+## Configuration
+
+All behavioural settings (generation modes, paths, prompt defaults, resolution) live in
+**`config.yaml`** and are version-controlled for reproducibility.
+
+The **`.env`** file is kept lean — it only contains deployment-specific overrides
+that differ between machines:
+
+```bash
+# .env — only what changes per deployment
+COMFYUI__BASE_URL=http://10.0.0.5:8188   # ComfyUI server IP
+HOST=0.0.0.0                              # bind address
+PORT=8000                                 # bind port
+```
+
+Use `__` (double underscore) as the nesting delimiter. For example,
+`COMFYUI__BASE_URL` overrides `comfyui.base_url` in `config.yaml`.
+
+### Load order (later sources win)
+
+1. Pydantic defaults (in `src/config.py`)
+2. **`config.yaml`** — primary source of truth, committed to git
+3. `.env` file — deployment-specific
+4. Environment variables — highest priority
 
 ---
 
@@ -129,11 +157,14 @@ pip install -r requirements.txt
 ### Run (Static Mode — No GPU Required)
 
 ```bash
-# Copy and configure .env
-cp .env.example .env
-# Edit .env: set all modes to "static"
+# Edit config.yaml: set generation.modes.* to "static"
+# Example:
+#   generation:
+#     modes:
+#       background_tile: "static"
+#       structure: "static"
+#       ...
 
-# Start the server
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -142,8 +173,9 @@ The service is now live at `http://localhost:8000`. All endpoints work with pre-
 ### Run (ComfyUI Mode — Requires ComfyUI Server)
 
 ```bash
-cp .env.example .env
-# Edit .env: set modes to "comfyui" and COMFYUI_BASE_URL to your ComfyUI server
+# config.yaml defaults to comfyui for all families — no changes needed.
+# Only create .env if your ComfyUI server is not at 127.0.0.1:8188:
+echo 'COMFYUI__BASE_URL=http://your-comfyui-host:8188' > .env
 
 uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
@@ -334,7 +366,8 @@ Download a previously generated asset. Returns `image/png`.
 
 - **ComfyUI as inference backend**: The FastAPI server never loads model weights — it delegates all generation to an external ComfyUI instance. The web server stays lightweight at ~200MB RAM.
 - **Fully async ComfyUI client**: Uses ``httpx`` + ``websockets`` for non-blocking I/O. Generation runs directly on the asyncio event loop — no thread-pool needed, enabling high concurrency without worker saturation.
-- **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, or `random` mode via environment variables. Ops, not code.
+- **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, or `random` mode via `config.yaml`. Ops, not code.
+- **YAML-first configuration**: All behavioural settings live in version-controlled `config.yaml`. Only deployment-specific values (ComfyUI IP, bind host/port) go in `.env`, using `__` delimiter for nested overrides.
 - **Drop-in static injection**: Adding a new pre-made asset is creating a PNG in the right `static_tiles/` folder and restarting.
 - **Workflows as version-controlled assets**: ComfyUI workflow JSONs live in `src/workflows/` alongside code.
 - **In-memory caching**: `AssetStore` uses an LRU-backed `OrderedDict` for zero-latency asset serving. Falls back to disk reads transparently.
