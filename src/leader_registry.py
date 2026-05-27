@@ -5,6 +5,7 @@ and integrated with the existing database infrastructure.
 """
 
 import logging
+import os
 import re
 import shutil
 import uuid
@@ -13,7 +14,7 @@ from typing import Optional
 
 from sqlalchemy.orm.attributes import flag_modified
 
-from .config import settings
+from .config import settings, BASE_DIR
 from .database import SessionLocal, LeaderRecord
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,8 @@ class LeaderRegistry:
         ref_name = f"ref_{leader_id}.png"
 
         # Copy splash → reference directory
-        src = Path(settings.output_dir) / splash_image_filename
-        dst = Path(settings.leader_reference_dir) / ref_name
+        src = Path(os.path.join(BASE_DIR, settings.paths.output_dir)) / splash_image_filename
+        dst = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / ref_name
         shutil.copy2(src, dst)
         logger.info("Copied splash → reference image: %s", ref_name)
 
@@ -161,7 +162,7 @@ class LeaderRegistry:
         """
         # Clean up reference image
         ref_name = f"ref_{leader_id}.png"
-        ref_path = Path(settings.leader_reference_dir) / ref_name
+        ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / ref_name
         if ref_path.exists():
             ref_path.unlink()
 

@@ -1,0 +1,49 @@
+# config.yaml — version-controlled, reproducible service configuration
+# =====================================================================
+# Every setting that defines *how* the service behaves lives here.
+# Deployment-specific overrides (ComfyUI IP, bind host/port) go in .env
+# and are transparently layered on top of these defaults.
+# =====================================================================
+
+# ---- Network ----------------------------------------------------------
+host: "0.0.0.0"
+port: 8000
+
+# ---- ComfyUI connection -----------------------------------------------
+comfyui:
+  base_url: "http://127.0.0.1:8188"
+  timeout: 300
+
+# ---- Paths (all relative to project root) -----------------------------
+paths:
+  output_dir: "generated_assets"
+  splash_dir: "splash_assets"
+  static_tiles_dir: "static_tiles"
+  leader_reference_dir: "leader_references"
+
+# ---- Generation modes (per asset family) ------------------------------
+# Valid per-family: "comfyui" | "static" | "random"
+generation:
+  modes:
+    background_tile: "comfyui"
+    structure: "comfyui"
+    nature_object: "comfyui"
+    character_sprite: "comfyui"
+    story: "comfyui"
+    splash: "comfyui"
+  default_mode: "comfyui"
+  random_probability: 0.5
+
+# ---- Splash art defaults ----------------------------------------------
+splash:
+  width: 256
+  height: 256
+
+# ---- Leader pipeline --------------------------------------------------
+leader:
+  negative_prompt: >
+    blurry, low quality, distorted, ugly, deformed face, bad hands,
+    missing fingers, text, watermark, signature, logo, cartoon, 3D render,
+    photograph, selfie, modern clothing, jeans, t-shirt, plastic,
+    oversaturated colors, bad anatomy, extra limbs, cloned face, disfigured,
+    jpeg artifacts

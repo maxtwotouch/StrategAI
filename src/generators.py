@@ -166,7 +166,7 @@ class ComfyUIGenerator(ImageGenerator):
 
     async def _generate_splash(self, request: SplashRequest) -> str:
         prompt = self._build_splash_prompt(request)
-        w, h = settings.splash_width, settings.splash_height
+        w, h = settings.splash.width, settings.splash.height
 
         img = await self._client.generate(
             self._workflow_path,
@@ -312,7 +312,7 @@ class _PlaceholderGenerator(ImageGenerator):
         if self._family == "story":
             w, h = (1024, 576)
         elif isinstance(request, SplashRequest):
-            w, h = settings.splash_width, settings.splash_height
+            w, h = settings.splash.width, settings.splash.height
 
         img = Image.new("RGBA", (w, h), color)
         draw = ImageDraw.Draw(img)
@@ -348,7 +348,7 @@ class _PlaceholderSplash:
 
     @staticmethod
     def generate(request: SplashRequest) -> str:
-        w, h = settings.splash_width, settings.splash_height
+        w, h = settings.splash.width, settings.splash.height
         background_colors = {
             "solid_dark": (30, 25, 40, 255),
             "banner": (60, 30, 20, 255),
@@ -459,7 +459,7 @@ def get_generator(
 
     if mode == "random":
         # Coin-flip per request
-        if random.random() >= settings.random_generation_probability:
+        if random.random() >= settings.generation.random_probability:
             return StaticTileGenerator(asset_family)
 
     # mode == "comfyui" (or random coin landed on comfyui)
@@ -467,7 +467,7 @@ def get_generator(
     if client is None:
         raise RuntimeError(
             f"Asset family '{asset_family}' is in 'comfyui' mode but ComfyUI server is "
-            f"unreachable at {settings.comfyui_base_url}"
+            f"unreachable at {settings.comfyui.base_url}"
         )
 
     workflow_file = ComfyUIGenerator._WORKFLOW_MAP.get(asset_family, "txt2img.json")

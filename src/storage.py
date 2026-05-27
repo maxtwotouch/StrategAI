@@ -1,7 +1,7 @@
 import os
 import io
 from PIL import Image
-from .config import settings
+from .config import settings, BASE_DIR
 import logging
 from collections import OrderedDict
 
@@ -11,11 +11,12 @@ class AssetStore:
     def __init__(self, max_cache_size=1000):
         self._memory_cache = OrderedDict()
         self.max_cache_size = max_cache_size
+        self._output_dir = os.path.join(BASE_DIR, settings.paths.output_dir)
 
     def save_image(self, filename: str, img: Image.Image):
         """Saves the image to both the in-memory cache and local disk."""
         # Save to disk
-        path = os.path.join(settings.output_dir, filename)
+        path = os.path.join(self._output_dir, filename)
         img.save(path, format="PNG")
 
         # Save to memory
@@ -36,7 +37,7 @@ class AssetStore:
             self._memory_cache.move_to_end(filename)
             return self._memory_cache[filename]
 
-        path = os.path.join(settings.output_dir, filename)
+        path = os.path.join(self._output_dir, filename)
         if os.path.exists(path):
             with open(path, "rb") as f:
                 data = f.read()

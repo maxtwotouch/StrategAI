@@ -40,8 +40,8 @@ class ComfyUIClient:
         base_url: str | None = None,
         timeout: int | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.comfyui_base_url).rstrip("/")
-        self.timeout = timeout or settings.comfyui_timeout
+        self.base_url = (base_url or settings.comfyui.base_url).rstrip("/")
+        self.timeout = timeout or settings.comfyui.timeout
         self._http: httpx.AsyncClient | None = None
 
     # ------------------------------------------------------------------

@@ -17,12 +17,13 @@ import logging
 import random
 import time
 import uuid
+import os
 from pathlib import Path
 
 from PIL import Image
 
 from .comfyui_client import ComfyUIClient
-from .config import settings
+from .config import settings, BASE_DIR
 from .database import SessionLocal, AssetRecord
 from .leader_models import LeaderRequest, LeaderResponse
 from .leader_prompts import build_prompt
@@ -75,7 +76,7 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader_negative_prompt,
+            negative_prompt=settings.leader.negative_prompt,
             seed=seed,
         )
 
@@ -138,7 +139,7 @@ class LeaderEngine:
         seed = req.seed or leader.splash_seed
 
         # 3. Upload reference image
-        ref_path = Path(settings.leader_reference_dir) / leader.reference_filename
+        ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / leader.reference_filename
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
         ref_img = Image.open(ref_path).convert("RGBA")
@@ -155,7 +156,7 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader_negative_prompt,
+            negative_prompt=settings.leader.negative_prompt,
             seed=seed,
             ref_image_filename=leader.reference_filename,
         )
@@ -215,7 +216,7 @@ class LeaderEngine:
         seed = req.seed or leader.splash_seed
 
         # 3. Upload reference image
-        ref_path = Path(settings.leader_reference_dir) / leader.reference_filename
+        ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / leader.reference_filename
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
         ref_img = Image.open(ref_path).convert("RGBA")
@@ -232,7 +233,7 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader_negative_prompt,
+            negative_prompt=settings.leader.negative_prompt,
             seed=seed,
             ref_image_filename=leader.reference_filename,
         )

@@ -4,7 +4,7 @@ import os
 import random
 from collections import defaultdict
 
-from .config import settings
+from .config import settings, BASE_DIR
 
 _VALID_STRUCTURE_SUBTYPES = {"fortification", "production", "civilian", "religious"}
 
@@ -23,7 +23,7 @@ class StaticCatalog:
     """
 
     def __init__(self, root_dir: str | None = None):
-        self.root_dir = root_dir or settings.static_tiles_dir
+        self.root_dir = root_dir or os.path.join(BASE_DIR, settings.paths.static_tiles_dir)
         self._catalog: dict[str, dict[str | None, list[str]]] = defaultdict(dict)
         self._scan()
 
@@ -135,4 +135,3 @@ class StaticCatalog:
 
 # Singleton
 catalog = StaticCatalog()
-
