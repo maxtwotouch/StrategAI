@@ -278,6 +278,7 @@ PALETTES_TILE = [
 # ------------------------------------------------------------
 def structure_caption(structure, theme, motif, personality, detail, complexity, material, condition, palette):
     return (
+        f"Front view overhead elevated medium shot. "
         f"a medieval {structure} in a {theme} setting, "
         f"featuring {motif}, {personality} character, "
         f"{detail}, {complexity}, {material}, {condition}, {palette}"
@@ -286,6 +287,7 @@ def structure_caption(structure, theme, motif, personality, detail, complexity, 
 
 def object_caption(obj, drama, complexity, material, condition, palette):
     return (
+        f"Front view overhead elevated medium shot. "
         f"a dramatic medieval world asset of a {obj} with {drama}, "
         f"{complexity}, {material}, {condition}, {palette}"
     )
@@ -293,6 +295,7 @@ def object_caption(obj, drama, complexity, material, condition, palette):
 
 def terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, material, condition, palette):
     return (
+        f"Front view overhead elevated medium shot. "
         f"a {terrain_type} with wide flat top, {side_smoothness}, "
         f"{complexity}, {seam_integrity}, "
         f"{material}, {condition}, {palette}"
@@ -301,6 +304,7 @@ def terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, m
 
 def background_caption(material, texture_details, palette):
     return (
+        f"Front view overhead elevated medium shot. "
         f"{material} texture with {texture_details}, "
         f"stable tile state, {palette}"
     )
