@@ -584,6 +584,7 @@ rural_props           desert                 autumn
 urban_props           swamp                  winter
 debris                mountain
                       coastal
+                      grassland
 
 
 TERRAIN

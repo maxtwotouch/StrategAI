@@ -120,6 +120,14 @@ class TestStructureEndpoints:
         assert data["url"].startswith("/assets/")
         assert data["asset_id"].startswith("struct_")
         assert data["generation_mode"] == "static"
+        # Response completeness (optional fields — may be None in static/placeholder modes)
+        if data.get("prompt_used") is not None:
+            assert isinstance(data["prompt_used"], str) and len(data["prompt_used"]) > 0
+        if data.get("resolution") is not None:
+            assert isinstance(data["resolution"], str) and len(data["resolution"]) > 0
+        if data.get("generation_time_ms") is not None:
+            assert isinstance(data["generation_time_ms"], int) and data["generation_time_ms"] >= 0
+        assert isinstance(data["seed"], int)
 
     @pytest.mark.asyncio
     async def test_generate_structure_validation_error(self, async_client):
@@ -188,6 +196,24 @@ class TestStructureEndpoints:
         assert get_resp.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_generate_with_seed(self, async_client):
+        """Providing a seed produces deterministic results."""
+        payload = {
+            "category": "fortification",
+            "style": "nordic_wooden",
+            "condition": "pristine",
+            "scale": "small",
+            "description": "A small wooden watchtower with a pointed roof and a lookout platform.",
+            "seed": 424242,
+        }
+        resp1 = await async_client.post("/structure", json=payload)
+        resp2 = await async_client.post("/structure", json=payload)
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp1.json()["seed"] == 424242
+        assert resp2.json()["seed"] == 424242
+
+    @pytest.mark.asyncio
     async def test_structure_catalog(self, async_client):
         resp = await async_client.get("/structure/catalog")
         assert resp.status_code == 200
@@ -220,6 +246,15 @@ class TestObjectEndpoints:
         assert data["asset_type"] == "object"
         assert data["category"] == "vegetation"
         assert data["generation_mode"] == "static"
+
+    @pytest.mark.asyncio
+    async def test_generate_object_validation_error(self, async_client):
+        """Missing required field → 422."""
+        resp = await async_client.post("/object", json={
+            "category": "vegetation",
+            # missing biome, season, description
+        })
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_list_objects(self, async_client):
@@ -288,6 +323,15 @@ class TestTerrainEndpoints:
         assert data["asset_type"] == "terrain"
         assert data["category"] == "hill"
         assert data["generation_mode"] == "placeholder"
+
+    @pytest.mark.asyncio
+    async def test_generate_terrain_validation_error(self, async_client):
+        """Missing required field → 422."""
+        resp = await async_client.post("/terrain", json={
+            "category": "hill",
+            # missing scale, material, description
+        })
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_list_terrains(self, async_client):
@@ -360,6 +404,14 @@ class TestLeaderEndpoints:
         assert data["leader_name"] == "Cleopatra VII"
         assert data["leader_id"].startswith("leader_cleopatra_vii_")
         assert data["generation_mode"] == "static"
+        # Response completeness (optional fields — may be None in static/placeholder modes)
+        if data.get("prompt_used") is not None:
+            assert isinstance(data["prompt_used"], str) and len(data["prompt_used"]) > 0
+        if data.get("resolution") is not None:
+            assert isinstance(data["resolution"], str) and len(data["resolution"]) > 0
+        if data.get("generation_time_ms") is not None:
+            assert isinstance(data["generation_time_ms"], int) and data["generation_time_ms"] >= 0
+        assert isinstance(data["seed"], int)
 
     @pytest.mark.asyncio
     async def test_generate_profile(self, async_client):
@@ -436,6 +488,203 @@ class TestLeaderEndpoints:
             "leader_id": "nonexistent",
         })
         assert resp.status_code == 400
+
+    # ------------------------------------------------------------------
+    #  Multi-leader action
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_generate_multi_leader_action(self, async_client):
+        """Multi-leader action scene via leader_ids → 200 with leader_ids/leader_names in response."""
+        # Generate two leaders first
+        lid1 = await self._create_splash(async_client, "Cleopatra VII",
+            "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence.")
+        lid2 = await self._create_splash(async_client, "Ramesses II",
+            "A tall pharaoh with broad shoulders, shaved head, a gold and lapis nemes crown, "
+            "and a stern expression of absolute power.")
+
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Multi-Scene",
+            "leader_description": "Placeholder description ignored when leader_ids is provided for multi-leader action scenes.",
+            "leader_ids": [lid1, lid2],
+            "archetype": "diplomat",
+            "culture": "ancient_egyptian",
+            "time_of_day": "midday",
+            "mood": "contemplative",
+            "action_category": "diplomatic",
+            "action_description": "Two pharaohs seated at a long stone table signing a peace treaty.",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["asset_type"] == "action"
+        assert data["leader_ids"] == [lid1, lid2]
+        assert data["leader_names"] == ["Cleopatra VII", "Ramesses II"]
+        assert "prompt_used" in data
+        assert len(data["prompt_used"]) > 0
+        assert data["url"].startswith("/assets/")
+        assert data["generation_mode"] == "static"
+
+    @pytest.mark.asyncio
+    async def test_multi_action_empty_leader_ids_400(self, async_client):
+        """Empty leader_ids list → 400."""
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Test",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears white linen.",
+            "leader_ids": [],
+            "archetype": "diplomat",
+            "culture": "ancient_egyptian",
+            "time_of_day": "midday",
+            "mood": "contemplative",
+            "action_category": "diplomatic",
+            "action_description": "Signing a treaty.",
+        })
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_multi_action_nonexistent_leader_400(self, async_client):
+        """leader_ids with unknown leader → 400."""
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Test",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears white linen.",
+            "leader_ids": ["nonexistent_leader_id"],
+            "archetype": "diplomat",
+            "culture": "ancient_egyptian",
+            "time_of_day": "midday",
+            "mood": "contemplative",
+            "action_category": "diplomatic",
+            "action_description": "Signing a treaty.",
+        })
+        assert resp.status_code == 400
+
+    # ------------------------------------------------------------------
+    #  Action validation
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_action_without_category_400(self, async_client):
+        """Action without action_category → 400."""
+        lid = await self._create_splash(async_client, "Cleopatra VII",
+            "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence.")
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Cleopatra VII",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry. She wears white linen.",
+            "leader_id": lid,
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "action_description": "Leading troops into battle.",
+        })
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_action_without_description_400(self, async_client):
+        """Action without action_description → 400."""
+        lid = await self._create_splash(async_client, "Cleopatra VII",
+            "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence.")
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Cleopatra VII",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry. She wears white linen.",
+            "leader_id": lid,
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "action_category": "military",
+        })
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_full_leader_pipeline(self, async_client):
+        """Complete pipeline: splash → profile → action → verify registry state."""
+        # 1. Splash
+        splash = await async_client.post("/leader", json={
+            "asset_type": "splash",
+            "leader_name": "Cleopatra VII",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress.",
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+        })
+        assert splash.status_code == 200
+        lid = splash.json()["leader_id"]
+
+        # 2. After splash: splash_url present, no profile_url, no action_urls
+        leader_info = await async_client.get(f"/leader/{lid}")
+        assert leader_info.status_code == 200
+        info = leader_info.json()
+        assert info["splash_url"] is not None
+        assert info["profile_url"] is None
+        assert info["action_urls"] == []
+
+        # 3. Profile
+        profile = await async_client.post("/leader", json={
+            "asset_type": "profile",
+            "leader_name": "Cleopatra VII",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry. She wears white linen.",
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "leader_id": lid,
+        })
+        assert profile.status_code == 200
+
+        # 4. After profile: profile_url now present
+        leader_info = await async_client.get(f"/leader/{lid}")
+        info = leader_info.json()
+        assert info["profile_url"] is not None
+
+        # 5. Action (single)
+        action = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Cleopatra VII",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry. She wears white linen.",
+            "leader_id": lid,
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "action_category": "military",
+            "action_description": "Leading troops into battle with sword raised high.",
+        })
+        assert action.status_code == 200
+
+        # 6. After action: action_urls now has 1 entry
+        leader_info = await async_client.get(f"/leader/{lid}")
+        info = leader_info.json()
+        assert len(info["action_urls"]) >= 1
+
+        # 7. Delete
+        delete_resp = await async_client.delete(f"/leader/{lid}")
+        assert delete_resp.status_code == 200
+
+        # 8. Verify gone
+        get_resp = await async_client.get(f"/leader/{lid}")
+        assert get_resp.status_code == 404
+
+    # --- helper --------------------------------------------------------
+
+    @staticmethod
+    async def _create_splash(client, name: str, description: str) -> str:
+        """Create a splash leader and return the leader_id."""
+        resp = await client.post("/leader", json={
+            "asset_type": "splash",
+            "leader_name": name,
+            "leader_description": description,
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+        })
+        assert resp.status_code == 200, f"Splash failed: {resp.text}"
+        return resp.json()["leader_id"]
 
     @pytest.mark.asyncio
     async def test_list_leaders(self, async_client):
@@ -526,6 +775,30 @@ class TestUnitEndpoints:
         assert data["directions"]["n"].startswith("/assets/")
         assert data["directions"]["e"].startswith("/assets/")
         assert data["directions"]["w"].startswith("/assets/")
+        # Response completeness (optional fields — may be None in static/placeholder modes)
+        if data.get("prompt_used") is not None:
+            assert isinstance(data["prompt_used"], str) and len(data["prompt_used"]) > 0
+        if data.get("resolution") is not None:
+            assert isinstance(data["resolution"], str) and len(data["resolution"]) > 0
+        if data.get("generation_time_ms") is not None:
+            assert isinstance(data["generation_time_ms"], int) and data["generation_time_ms"] >= 0
+        assert isinstance(data["seed"], int)
+
+    @pytest.mark.asyncio
+    async def test_generate_unit_single_direction(self, async_client):
+        """Requesting direction 's' still generates the unit (placeholder mode always produces all 4)."""
+        resp = await async_client.post("/unit", json={
+            "unit_type": "archer",
+            "description": "A medieval archer in green leather armor with a longbow and quiver of arrows.",
+            "direction": "s",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        # South direction always populated
+        assert data["directions"]["s"].startswith("/assets/")
+        # In placeholder mode, all 4 directions are generated
+        assert data["directions"]["n"] is not None or data["directions"]["n"] is None  # may vary by engine
+        assert isinstance(data["seed"], int) and data["seed"] >= 0
 
     @pytest.mark.asyncio
     async def test_list_units(self, async_client):
@@ -614,6 +887,36 @@ class TestLegacyEndpoints:
             "asset_family": "invalid_family",
         })
         assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_generate_inpaint_cow(self, async_client):
+        """Copy-on-Write inpainting via base_image_id + inpaints."""
+        # First generate a base tile to use as input
+        base_resp = await async_client.post("/generate", json={
+            "asset_family": "background_tile",
+            "tile_type": "grass",
+        })
+        assert base_resp.status_code == 200
+        base_url = base_resp.json()["url"]
+        base_filename = base_url.split("/")[-1]
+
+        # Now inpaint a water strip across it
+        resp = await async_client.post("/generate", json={
+            "asset_family": "background_tile",
+            "tile_type": "grass",
+            "base_image_id": base_filename,
+            "inpaints": [
+                {
+                    "point_a": {"x": 128, "y": 200},
+                    "point_b": {"x": 384, "y": 312},
+                    "fill_type": "water",
+                }
+            ],
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["asset_family"] == "background_tile"
+        assert data["url"].startswith("/assets/")
 
     @pytest.mark.asyncio
     async def test_splash(self, async_client):

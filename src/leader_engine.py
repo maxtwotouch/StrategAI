@@ -588,6 +588,9 @@ class StaticLeaderEngine:
             ))
             db.commit()
 
+        # Track action in registry
+        LeaderRegistry.record_action(req.leader_id, filename)
+
         elapsed = int((time.time() - start) * 1000)
 
         return LeaderResponse(
