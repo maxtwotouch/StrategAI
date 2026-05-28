@@ -179,8 +179,10 @@ class TileEngine:
             "resolution": f"{img.width}x{img.height}",
             "generation_time_ms": elapsed,
         }
-        # Inject request-specific fields
+        # Inject request-specific fields (skip seed — already set above)
         for field_name in req.model_fields:
+            if field_name == "seed":
+                continue
             kwargs[field_name] = getattr(req, field_name)
 
         return response_cls(**kwargs)
@@ -342,6 +344,8 @@ def _register_tile(registry_register, asset_id: str, req, image_id: str,
         "generation_mode": generation_mode,
     }
     for field_name in req.model_fields:
+        if field_name == "seed":
+            continue  # seed already set above, don't overwrite with req.seed (may be None)
         if hasattr(req, field_name):
             kwargs[field_name] = getattr(req, field_name)
 
@@ -366,6 +370,8 @@ def _build_response(response_cls, req, asset_id: str, filename: str,
         kwargs["generation_time_ms"] = elapsed
 
     for field_name in req.model_fields:
+        if field_name == "seed":
+            continue
         kwargs[field_name] = getattr(req, field_name)
 
     return response_cls(**kwargs)

@@ -27,7 +27,7 @@ from .tile_models import (
 from .tile_registry import StructureRegistry, ObjectRegistry, TerrainRegistry
 from .unit_engine import UnitEngine, StaticUnitEngine
 from .unit_models import (
-    UnitRequest, UnitResponse, UnitCatalog,
+    UnitRequest, UnitResponse, UnitDirections, UnitCatalog,
     UnitType, Direction,
 )
 from .unit_registry import UnitRegistry
@@ -457,6 +457,17 @@ async def list_structures():
     ]
 
 
+@app.get("/structure/catalog", response_model=StructureCatalog)
+async def structure_catalog():
+    """Return available enum values for structure generation."""
+    return StructureCatalog(
+        categories=sorted(StructureCategory.ALL),
+        styles=sorted(StructureStyle.ALL),
+        conditions=sorted(StructureCondition.ALL),
+        scales=sorted(StructureScale.ALL),
+    )
+
+
 @app.get("/structure/{structure_id}", response_model=StructureResponse)
 async def get_structure(structure_id: str):
     """Get a specific structure by ID."""
@@ -483,20 +494,6 @@ async def delete_structure(structure_id: str):
     if not deleted:
         raise HTTPException(404, f"Structure '{structure_id}' not found")
     return {"status": "deleted", "structure_id": structure_id}
-
-
-@app.get("/structure/catalog", response_model=StructureCatalog)
-async def structure_catalog():
-    """Return available enum values for structure generation."""
-    return StructureCatalog(
-        categories=sorted(StructureCategory.ALL),
-        styles=sorted(StructureStyle.ALL),
-        conditions=sorted(StructureCondition.ALL),
-        scales=sorted(StructureScale.ALL),
-    )
-
-
-# ---------------------------------------------------------------------------
 
 
 @app.post("/object", response_model=ObjectResponse)
@@ -542,6 +539,16 @@ async def list_objects():
     ]
 
 
+@app.get("/object/catalog", response_model=ObjectCatalog)
+async def object_catalog():
+    """Return available enum values for object generation."""
+    return ObjectCatalog(
+        categories=sorted(ObjectCategory.ALL),
+        biomes=sorted(Biome.ALL),
+        seasons=sorted(Season.ALL),
+    )
+
+
 @app.get("/object/{object_id}", response_model=ObjectResponse)
 async def get_object(object_id: str):
     """Get a specific object by ID."""
@@ -567,19 +574,6 @@ async def delete_object(object_id: str):
     if not deleted:
         raise HTTPException(404, f"Object '{object_id}' not found")
     return {"status": "deleted", "object_id": object_id}
-
-
-@app.get("/object/catalog", response_model=ObjectCatalog)
-async def object_catalog():
-    """Return available enum values for object generation."""
-    return ObjectCatalog(
-        categories=sorted(ObjectCategory.ALL),
-        biomes=sorted(Biome.ALL),
-        seasons=sorted(Season.ALL),
-    )
-
-
-# ---------------------------------------------------------------------------
 
 
 @app.post("/terrain", response_model=TerrainResponse)
@@ -625,6 +619,16 @@ async def list_terrains():
     ]
 
 
+@app.get("/terrain/catalog", response_model=TerrainCatalog)
+async def terrain_catalog():
+    """Return available enum values for terrain generation."""
+    return TerrainCatalog(
+        categories=sorted(TerrainCategory.ALL),
+        scales=sorted(TerrainScale.ALL),
+        materials=sorted(TerrainMaterial.ALL),
+    )
+
+
 @app.get("/terrain/{terrain_id}", response_model=TerrainResponse)
 async def get_terrain(terrain_id: str):
     """Get a specific terrain by ID."""
@@ -650,20 +654,6 @@ async def delete_terrain(terrain_id: str):
     if not deleted:
         raise HTTPException(404, f"Terrain '{terrain_id}' not found")
     return {"status": "deleted", "terrain_id": terrain_id}
-
-
-@app.get("/terrain/catalog", response_model=TerrainCatalog)
-async def terrain_catalog():
-    """Return available enum values for terrain generation."""
-    return TerrainCatalog(
-        categories=sorted(TerrainCategory.ALL),
-        scales=sorted(TerrainScale.ALL),
-        materials=sorted(TerrainMaterial.ALL),
-    )
-
-# ---------------------------------------------------------------------------
-#  Unit pipeline  — Archer, Scout, Settler, Warrior
-# ---------------------------------------------------------------------------
 
 
 @app.post("/unit", response_model=UnitResponse)
@@ -722,6 +712,15 @@ async def list_units():
     ]
 
 
+@app.get("/unit/catalog", response_model=UnitCatalog)
+async def unit_catalog():
+    """Return available unit types and directions."""
+    return UnitCatalog(
+        unit_types=sorted(UnitType.ALL),
+        directions=sorted(Direction.ALL),
+    )
+
+
 @app.get("/unit/{unit_id}", response_model=UnitResponse)
 async def get_unit(unit_id: str):
     """Get a specific unit by ID."""
@@ -751,12 +750,3 @@ async def delete_unit(unit_id: str):
     if not deleted:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
     return {"status": "deleted", "unit_id": unit_id}
-
-
-@app.get("/unit/catalog", response_model=UnitCatalog)
-async def unit_catalog():
-    """Return available unit types and directions."""
-    return UnitCatalog(
-        unit_types=sorted(UnitType.ALL),
-        directions=sorted(Direction.ALL),
-    )
