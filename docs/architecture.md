@@ -41,10 +41,12 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 - Manages an internal vocabulary mapping (`get_inpaint_prompt`) to decouple game logic ("water") from prompt engineering ("sparkling blue pixel art river water texture, seamless, top-down 2d game").
 
 ### F. Leader Pipeline (`leader_engine.py`, `leader_models.py`, `leader_prompts.py`, `leader_registry.py`)
-- **Three-stage generation**: splash (txt2img, establishes canonical visual identity) → profile (img2img, close-crop portrait using splash as reference, denoise=0.30) → action (img2img, new scene preserving character, denoise=0.60).
+- **Three-stage generation**: splash (txt2img, establishes canonical visual identity) → profile (img2img, close-crop portrait using splash as reference, denoise=0.30) → action.
+- **Single-leader action**: img2img using the leader's reference image (denoise=0.60), preserving character identity while placing them in a new scene.
+- **Multi-leader action**: txt2img with a composite prompt that weaves together all leaders' physical descriptions and names via `build_multi_action_prompt()`. No reference image is used because ComfyUI can only accept one reference image for img2img, but a multi-leader scene needs to depict multiple distinct faces. Triggered by providing `leader_ids` (list) in the request body alongside `asset_type: "action"`.
 - **Structured prompt injection**: clients select from enum values (archetype, culture, time_of_day, mood, action_category). The server maps these to rich, hand-crafted prose via `leader_prompts.py`.
 - **Seed anchoring**: splash seed is stored in `leader_records` and re-used for profile/action to maximize img2img consistency.
-- **Reference image**: splash art is copied to `leader_references/ref_{leader_id}.png` and re-uploaded to ComfyUI before each profile/action generation.
+- **Reference image**: splash art is copied to `leader_references/ref_{leader_id}.png` and re-uploaded to ComfyUI before each profile and single-leader action generation.
 - **SQLite-backed**: `LeaderRecord` table tracks all leaders alongside `AssetRecord`.
 
 ### G. Unit Pipeline (`unit_engine.py`, `unit_models.py`, `unit_prompts.py`, `unit_registry.py`)
@@ -71,7 +73,7 @@ Seven ComfyUI workflows stored in `workflows/`, exported in API format:
 | `splash.json` | Leader portrait (legacy /splash endpoint) | Positive prompt (built from style/outfit/weapon fields), seed |
 | `leader/leader_splash.json` | Leader splash (txt2img, 1920×1088) | Positive prompt, negative prompt, seed |
 | `leader/leader_profile.json` | Leader profile (img2img, 1024×1024, denoise=0.30) | Positive prompt, negative prompt, seed, reference image filename |
-| `leader/leader_action.json` | Leader action (img2img, 1920×1088, denoise=0.60) | Positive prompt, negative prompt, seed, reference image filename |
+| `leader/leader_action.json` | Leader action (1920×1088, denoise=0.60). Single-leader: img2img with reference image. Multi-leader: txt2img with composite prompt. | Positive prompt, negative prompt, seed, reference image filename (single-leader only) |
 
 Resolution, steps, CFG, sampler, scheduler, denoise, model paths, LoRA strength, and output filename prefix are baked into the workflow JSONs and do not vary per request.
 

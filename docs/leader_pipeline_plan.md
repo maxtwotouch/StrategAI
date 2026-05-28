@@ -63,10 +63,13 @@
 ### What the engine actually injects per request
 
 ```
-Splash:    positive_prompt + seed
-Profile:   positive_prompt + seed + negative_prompt (from config) + ref image upload + LoadImage filename
-Action:    positive_prompt + seed + negative_prompt (from config) + ref image upload + LoadImage filename
+Splash:             positive_prompt + seed
+Profile:            positive_prompt + seed + negative_prompt (from config) + ref image upload + LoadImage filename
+Action (single):    positive_prompt + seed + negative_prompt (from config) + ref image upload + LoadImage filename
+Action (multi):     positive_prompt + seed + negative_prompt (from config)   [txt2img — no ref image]
 ```
+
+Multi-leader action scenes run as **txt2img** because ComfyUI can only accept one reference image for img2img, but the scene must depict multiple distinct leaders. Character consistency is achieved by weaving all leader descriptions (from their splash records) into a single composite prompt via `build_multi_action_prompt()`.
 
 Everything else — resolution, denoise, steps, cfg, sampler, scheduler, model paths, LoRA strength, output prefix — is baked into the workflow JSONs, tested in ComfyUI, and version-controlled.
 
@@ -275,7 +278,13 @@ class LeaderRequest(BaseModel):
     # --- Profile/Action only ---
     leader_id: Optional[str] = Field(
         default=None,
-        description="Required for profile and action. The leader_id from a previous splash generation.",
+        description="Required for profile and single-leader action. The leader_id from a previous splash generation. Ignored if leader_ids is provided.",
+    )
+    leader_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Required for multi-leader action scenes. List of leader_ids to include in the scene. "
+                    "When provided for asset_type='action', leader_id is ignored and the engine generates "
+                    "a txt2img composite scene depicting all listed leaders.",
     )
     seed: Optional[int] = Field(
         default=None,
@@ -305,6 +314,8 @@ class LeaderResponse(BaseModel):
     asset_type: str                                   # "splash" | "profile" | "action"
     leader_name: str
     leader_id: str                                    # returned so clients can chain calls
+    leader_ids: list[str] = []                        # all leader IDs in this scene (multi-leader action)
+    leader_names: list[str] = []                      # all leader names in this scene
     seed: int                                         # actual seed used
     generation_mode: str                              # "comfyui" | "placeholder"
     status: str = "completed"                         # matching existing convention
@@ -656,6 +667,44 @@ def build_action_prompt(req: LeaderRequest) -> str:
     return ", ".join(parts)
 
 
+def build_multi_action_prompt(
+    req: LeaderRequest,
+    leader_descriptions: list[str],
+    leader_names: list[str],
+) -> str:
+    """Build a prompt for a multi-leader action scene.
+
+    Composes all leader descriptions into a single prompt describing
+    their interaction within the action scene. Handles 1, 2, or 3+
+    leaders with appropriate natural-language phrasing.
+    """
+    if len(leader_descriptions) == 1:
+        char_part = f"epic cinematic scene depicting {leader_descriptions[0].strip()}"
+    elif len(leader_descriptions) == 2:
+        char_part = (
+            f"epic cinematic scene depicting two leaders interacting: "
+            f"{leader_names[0]}, {leader_descriptions[0].strip()}, "
+            f"and {leader_names[1]}, {leader_descriptions[1].strip()}"
+        )
+    else:
+        named = ", ".join(
+            f"{name}, {desc.strip()}"
+            for name, desc in zip(leader_names, leader_descriptions)
+        )
+        char_part = f"epic cinematic scene depicting multiple leaders: {named}"
+
+    parts = [
+        char_part,
+        req.action_description.strip(),
+        f"in {CULTURE[req.culture]}",
+        TIME_OF_DAY[req.time_of_day],
+        MOOD[req.mood],
+        ACTION_CATEGORY[req.action_category],
+        ACTION_TAIL,
+    ]
+    return ", ".join(parts)
+
+
 def build_prompt(req: LeaderRequest) -> str:
     """Route to the correct builder based on asset_type."""
     builders = {
@@ -993,7 +1042,7 @@ from .comfyui_client import ComfyUIClient
 from .config import settings
 from .database import SessionLocal, AssetRecord
 from .leader_models import LeaderRequest, LeaderResponse
-from .leader_prompts import build_prompt
+from .leader_prompts import build_prompt, build_multi_action_prompt
 from .leader_registry import LeaderRegistry, generate_leader_id
 from .storage import store
 
@@ -1235,6 +1284,81 @@ class LeaderEngine:
             leader_name=req.leader_name,
             leader_id=req.leader_id,
             seed=seed,
+            generation_mode="comfyui",
+            prompt_used=prompt,
+            resolution=None,
+            generation_time_ms=elapsed,
+        )
+
+    # ------------------------------------------------------------------
+    # Multi-leader action (txt2img — no reference image)
+    # ------------------------------------------------------------------
+
+    def generate_multi_action(
+        self,
+        req: LeaderRequest,
+        leader_ids: list[str],
+    ) -> LeaderResponse:
+        """Generate a multi-leader action scene via txt2img.
+
+        Loads all leader records from the registry, builds a composite
+        prompt from their descriptions and names, and generates a single
+        action image without img2img (since ComfyUI can only accept one
+        reference image but the scene must depict multiple distinct faces).
+        """
+        t0 = time.time()
+
+        # Load all leader records
+        leader_names = []
+        leader_descriptions = []
+        for lid in leader_ids:
+            leader = LeaderRegistry.get(lid)
+            if not leader:
+                raise ValueError(
+                    f"Leader '{lid}' not found. Generate a splash first."
+                )
+            leader_names.append(leader.leader_name)
+            leader_descriptions.append(leader.leader_description)
+
+        # Build composite prompt
+        prompt = build_multi_action_prompt(req, leader_descriptions, leader_names)
+
+        # Workflow path — same action workflow, but no reference image
+        wf_path = str(Path(settings.leader_workflow_dir) / "leader_action.json")
+
+        # Run as txt2img
+        img = self._client.generate(
+            wf_path,
+            positive_prompt=prompt,
+            negative_prompt=settings.leader_negative_prompt,
+            seed=req.seed or random.randint(10**14, 10**15 - 1),
+        )
+
+        # Save
+        asset_id = str(uuid.uuid4())
+        filename = f"leader_multi_{asset_id}_action.png"
+        store.save_image(filename, img)
+
+        # Persist AssetRecord
+        with SessionLocal() as db:
+            db.add(AssetRecord(
+                id=filename,
+                asset_family="leader_action",
+                character_name=", ".join(leader_names),
+                generation_mode="comfyui",
+            ))
+            db.commit()
+
+        elapsed = int((time.time() - t0) * 1000)
+
+        return LeaderResponse(
+            url=f"/assets/{filename}",
+            asset_type="action",
+            leader_name=", ".join(leader_names),
+            leader_id=asset_id,
+            leader_ids=leader_ids,
+            leader_names=leader_names,
+            seed=req.seed or 0,
             generation_mode="comfyui",
             prompt_used=prompt,
             resolution=None,

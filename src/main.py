@@ -333,6 +333,12 @@ async def generate_leader(request: LeaderRequest):
       1. POST /leader {asset_type: "splash", ...}     → returns leader_id
       2. POST /leader {asset_type: "profile", leader_id: "...", ...}
       3. POST /leader {asset_type: "action", leader_id: "...", action_category: "...", ...}
+
+    Multi-leader action (txt2img — no reference image):
+      POST /leader {asset_type: "action", leader_ids: ["id1","id2"], action_category: "...", ...}
+
+    When leader_ids is provided for action, the engine generates a single
+    composite scene depicting all listed leaders via a combined prompt.
     """
     logger.info("Received leader request for type: %s", request.asset_type)
 

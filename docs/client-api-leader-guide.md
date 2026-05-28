@@ -1,5 +1,15 @@
 # Implementation Plan: Civ Leader Art Service — Single Instance
 
+> **⚠️ Status: Historical design proposal.** This document describes the original FLUX-based standalone service design. The actual implementation diverged significantly:
+> - Integrated into the main `src/` server (not a standalone `/opt/civ-leader-api/`)
+> - Uses SDXL Turbo (not FLUX.1-dev)
+> - Three separate workflow JSONs (`leader_splash.json`, `leader_profile.json`, `leader_action.json`) instead of one monolithic workflow
+> - `POST /leader` endpoint (not `POST /generate`)
+> - Parameters (resolution, denoise, steps, CFG, etc.) are baked into workflow JSONs — no `workflow_mutator.py`
+> - SQLite-backed `LeaderRegistry` instead of JSON file
+>
+> **See authoritative docs:** [`architecture.md`](./architecture.md) and [`leader_pipeline_plan.md`](./leader_pipeline_plan.md) for the as-built system.
+
 ## System Overview
 
 ```
@@ -1223,6 +1233,41 @@ curl -X POST http://localhost:8000/generate \
     "action_category": "military",
     "action_description": "standing on horseback at the crest of a hill, cavalry behind her silhouetted against sunset, watching enemy banners lowered in surrender, her bloodied sword resting across her saddle, expression of grim relief"
   }' | python -m json.tool
+
+# --- Multi-leader action scene (txt2img — no reference image) ---
+# Provide leader_ids list to generate a scene with multiple leaders.
+# This runs as txt2img because ComfyUI can only accept one reference image
+# for img2img, but the scene must depict multiple distinct faces.
+# All leader descriptions are woven into a single composite prompt.
+
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_type": "action",
+    "leader_name": "Multi-Scene",
+    "leader_description": "placeholder — ignored when leader_ids is provided",
+    "leader_ids": ["LEADER_ID_1", "LEADER_ID_2"],
+    "archetype": "diplomat",
+    "culture": "medieval_european",
+    "time_of_day": "midday",
+    "mood": "contemplative",
+    "action_category": "diplomatic",
+    "action_description": "two leaders seated at opposite sides of a long oak table in a great hall, signing a peace treaty, quill in hand, solemn expressions, advisors standing behind each"
+  }' | python -m json.tool
+
+# Response includes leader_ids and leader_names for multi-leader scenes:
+# {
+#   "url": "/assets/leader_multi_abc123_action.png",
+#   "asset_type": "action",
+#   "leader_name": "Cleopatra VII, Ramesses II",
+#   "leader_id": "abc123",
+#   "leader_ids": ["leader_cleopatra_vii_a1b2c3", "leader_ramesses_ii_d4e5f6"],
+#   "leader_names": ["Cleopatra VII", "Ramesses II"],
+#   "seed": 123456789012345,
+#   "generation_mode": "comfyui",
+#   "status": "completed",
+#   ...
+# }
 ```
 
 ---
@@ -1334,14 +1379,16 @@ contemplative
 
 | Scenario | HTTP Code | Message |
 |----------|-----------|---------|
-| `leader_id` missing for profile/action | 400 | `"leader_id required for profile and action assets"` |
+| `leader_id` missing for profile/action | 400 | `"leader_id is required for profile/action assets"` |
 | `leader_id` not found | 404 | `"Leader 'X' not found. Generate a splash first."` |
-| `action_category` missing for action | 400 | `"action_category required for action assets"` |
-| `action_description` missing for action | 400 | `"action_description required for action assets"` |
+| `leader_ids` empty for multi-leader action | 400 | `"leader_ids must contain at least one leader_id for multi-leader action scenes."` |
+| Any leader in `leader_ids` not found | 400 | `"Leader 'X' not found. Generate a splash first."` |
+| `action_category` missing for action | 400 | `"action_category is required for action assets."` |
+| `action_description` missing for action | 400 | `"action_description is required for action assets."` |
 | `leader_description` < 50 chars | 422 | Pydantic validation |
 | ComfyUI unreachable | 502 | `"ComfyUI submission failed: ..."` |
-| Generation timeout (>120s) | 504 | `"Generation timed out"` |
-| Reference image missing from disk | 500 | `"Reference image missing for leader 'X'"` |
+| Generation timeout | 504 | `"Generation timed out"` |
+| Reference image missing from disk | 500 | `"Reference image missing: ..."` |
 | ComfyUI error in history | 500 | `"Failed to parse ComfyUI output: ..."` |
 
 ---

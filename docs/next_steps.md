@@ -12,6 +12,7 @@ This document tracks remaining work after the ComfyUI migration and leader pipel
 - [x] Copy-on-Write inpainting via ComfyUI
 - [x] Seven workflow JSONs exported (txt2img, inpaint, story, splash, leader_splash, leader_profile, leader_action)
 - [x] Leader pipeline: splash → profile → action with img2img consistency
+- [x] Multi-leader action scene generation: txt2img composite prompt via `build_multi_action_prompt()`. Triggered by providing `leader_ids` list in the request body alongside `asset_type: "action"`. No reference image used because ComfyUI can only accept one for img2img, but multiple distinct faces must be depicted.
 - [x] Leader registry: SQLite-backed CRUD (`leader_registry.py`)
 - [x] Prompt engine: structured enum → rich prose injection (`leader_prompts.py`)
 - [x] In-memory LRU cache with disk fallback (`AssetStore`)
