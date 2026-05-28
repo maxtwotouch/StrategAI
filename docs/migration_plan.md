@@ -44,7 +44,7 @@ Generation modes are set entirely via environment variables on the asset server.
 1. **The client doesn't know how assets are produced.** `POST /generate` returns a URL. Always.
 2. **Ops, not code.** Switching between ComfyUI, static PNGs, or a random mix is a `.env` change + restart.
 3. **Drop-in injection.** Adding a new static asset is creating a PNG in the right folder.
-4. **Workflows as assets.** ComfyUI workflow JSONs are files in `src/workflows/`, version-controlled alongside code.
+4. **Workflows as assets.** ComfyUI workflow JSONs are files in `workflows/`, version-controlled alongside code.
 5. **No model weights in the FastAPI process.** The web server stays lightweight; GPU lives elsewhere.
 
 ---
@@ -442,10 +442,10 @@ stored as version-controlled JSON files.
 | **`src/models.py`** | Edit | Add `TileType`, `StructureSubtype`; extend `GenerationRequest` with `tile_type` + `structure_subtype` |
 | **`src/comfyui_client.py`** | **New** | `ComfyUIClient` class (section 6.3) |
 | **`src/static_catalog.py`** | **New** | `StaticCatalog` class (section 5.3) |
-| **`src/workflows/txt2img.json`** | **New** | Text-to-image workflow template |
-| **`src/workflows/inpaint.json`** | **New** | Inpainting workflow template |
-| **`src/workflows/story.json`** | **New** | Story concept art workflow template |
-| **`src/workflows/splash.json`** | **New** | Splash portrait workflow template |
+| **`workflows/txt2img.json`** | **New** | Text-to-image workflow template |
+| **`workflows/inpaint.json`** | **New** | Inpainting workflow template |
+| **`workflows/story.json`** | **New** | Story concept art workflow template |
+| **`workflows/splash.json`** | **New** | Splash portrait workflow template |
 | **`src/generators.py`** | **Rewrite** | Remove `Flux2Generator`, `ZImageTurboGenerator`, `MockGenerator`, diffusers imports, `init_pipelines()`. Add `ComfyUIGenerator` and `StaticTileGenerator`. Rewrite `get_generator()`. |
 | **`src/main.py`** | Edit | Add `GET /catalog`. Update lifespan: remove `init_pipelines()`, add catalog init + ComfyUI health check. |
 | **`src/database.py`** | Edit | Add `tile_type`, `structure_subtype`, `generation_mode` columns to `AssetRecord` |
@@ -654,7 +654,7 @@ RANDOM_GENERATION_PROBABILITY=0.5
 # === Paths ===
 OUTPUT_DIR=./generated_assets
 STATIC_TILES_DIR=./static_tiles
-WORKFLOW_DIR=./src/workflows
+WORKFLOW_DIR=./workflows
 SPLASH_DIR=./splash_assets
 
 # === Splash defaults ===
@@ -686,7 +686,7 @@ SPLASH_HEIGHT=256
 ### Phase 2: ComfyUI client
 
 1. **Implement `comfyui_client.py`** — upload, queue, poll/download.
-2. **Export the four workflow JSONs** from ComfyUI UI → `src/workflows/`.
+2. **Export the four workflow JSONs** from ComfyUI UI → `workflows/`.
 3. **Test end-to-end:** `comfyui_client.generate("txt2img.json", {"positive_prompt": "test"})` → returns a PIL Image.
 
 ### Phase 3: Replace generators
@@ -715,4 +715,3 @@ SPLASH_HEIGHT=256
 ---
 
 *End of plan.*
-

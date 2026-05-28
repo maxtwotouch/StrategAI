@@ -120,9 +120,9 @@ The `LeaderRequest` is deliberately **flat** (matching `GenerationRequest` and `
 | `src/leader_prompts.py` | **New** | 2 |
 | `src/leader_registry.py` | **New** | 3 |
 | `src/leader_engine.py` | **New** | 6 |
-| `src/workflows/leader/leader_splash.json` | **New** | 4 |
-| `src/workflows/leader/leader_profile.json` | **New** | 4 |
-| `src/workflows/leader/leader_action.json` | **New** | 4 |
+| `workflows/leader/leader_splash.json` | **New** | 4 |
+| `workflows/leader/leader_profile.json` | **New** | 4 |
+| `workflows/leader/leader_action.json` | **New** | 4 |
 | `tests/test_leader_pipeline.py` | **New** | 9 |
 | `src/config.py` | **Edit** | 1 |
 | `src/database.py` | **Edit** | 1 |
@@ -130,7 +130,7 @@ The `LeaderRequest` is deliberately **flat** (matching `GenerationRequest` and `
 | `src/main.py` | **Edit** | 7 |
 | `docs/leader_pipeline_plan.md` | **New** (this file) | 0 |
 
-**Untouched files:** `src/generators.py`, `src/storage.py`, `src/inpainting.py`, `src/static_catalog.py`, `src/__init__.py`, `requirements.txt`, `src/workflows/txt2img.json`, `src/workflows/inpaint.json`, `src/workflows/story.json`, `src/workflows/splash.json`, `static_tiles/`, `generated_assets/`, `splash_assets/`, `mock_assets/`.
+**Untouched files:** `src/generators.py`, `src/storage.py`, `src/inpainting.py`, `src/static_catalog.py`, `src/__init__.py`, `requirements.txt`, `workflows/txt2img.json`, `workflows/inpaint.json`, `workflows/story.json`, `workflows/splash.json`, `static_tiles/`, `generated_assets/`, `splash_assets/`, `mock_assets/`.
 
 The leader pipeline is a **parallel feature** that reuses the same `ComfyUIClient`, `AssetStore`, `SessionLocal`, and `ThreadPoolExecutor` infrastructure. No existing behaviour changes.
 
@@ -859,7 +859,7 @@ def generate_leader_id(leader_name: str) -> str:
 
 Three independent workflow JSONs. Each is self-contained — no disconnected nodes, no link surgery at runtime. Exported from ComfyUI in "Save (API Format)" mode.
 
-### 6.1 `src/workflows/leader/leader_splash.json` (NEW)
+### 6.1 `workflows/leader/leader_splash.json` (NEW)
 
 **Purpose:** txt2img canonical splash art.
 
@@ -877,7 +877,7 @@ Three independent workflow JSONs. Each is self-contained — no disconnected nod
 
 **No LoadImage or VAEEncode nodes.** This is pure txt2img.
 
-### 6.2 `src/workflows/leader/leader_profile.json` (NEW)
+### 6.2 `workflows/leader/leader_profile.json` (NEW)
 
 **Purpose:** img2img profile portrait (uses splash reference, denoise=0.30).
 
@@ -896,7 +896,7 @@ Three independent workflow JSONs. Each is self-contained — no disconnected nod
 
 **Permanently connected chain:** LoadImage → VAEEncode → KSampler.latent_image. No dynamic link surgery.
 
-### 6.3 `src/workflows/leader/leader_action.json` (NEW)
+### 6.3 `workflows/leader/leader_action.json` (NEW)
 
 **Purpose:** img2img action scene (uses splash reference, denoise=0.60).
 
@@ -1636,48 +1636,9 @@ Phase 3 — Leader Registry
 □ src/leader_registry.py created (SQLite-backed CRUD + generate_leader_id)
 
 Phase 4 — Workflow JSONs
-□ src/workflows/leader/leader_splash.json exported from ComfyUI
-□ src/workflows/leader/leader_profile.json exported from ComfyUI
-□ src/workflows/leader/leader_action.json exported from ComfyUI
-□ Each workflow tested manually in ComfyUI
-
-Phase 5 — ComfyUI Client Extensions
-□ comfyui_client.py: upload_reference_image() added
-□ comfyui_client.py: cancel_prompt() added
-
-Phase 6 — Leader Engine
-□ src/leader_engine.py created
-□ LeaderEngine.generate() routes to correct handler
-□ _generate_splash() → txt2img, registers leader
-□ _generate_profile() → img2img with reference, seed from splash
-□ _generate_action() → img2img with reference, seed from splash
-
-Phase 7 — API Endpoints
-□ POST /leader endpoint in main.py
-□ GET /leader endpoint in main.py
-□ GET /leader/{leader_id} endpoint in main.py
-□ DELETE /leader/{leader_id} endpoint in main.py
-□ GET /health extended with leaders_registered
-□ LeaderEngine initialized in lifespan
-
-Phase 8 — Production Polish (deferred)
-□ Async job status pattern (POST /leader/async, GET /leader/job/{id})
-□ Async ComfyUI client (httpx + websockets)
-□ Reference image TTL cleanup
-□ Exponential backoff on timeout
-□ Prompt validation / forbidden word stripping
-□ GET /leader/{id}/preview watermark endpoint
-□ POST /leader/batch endpoint
-
-Phase 9 — Integration Tests
-□ tests/test_leader_pipeline.py created
-□ Prompt builder unit tests pass
-□ Registry CRUD tests pass
-□ Engine mock tests pass
-
-Phase 10 — Documentation
-□ docs/architecture.md updated
-□ This plan filed as docs/leader_pipeline_plan.md
+□ workflows/leader/leader_splash.json exported from ComfyUI
+□ workflows/leader/leader_profile.json exported from ComfyUI
+□ workflows/leader/leader_action.json exported from ComfyUI
 ```
 
 ---
@@ -1829,15 +1790,15 @@ TopDownMedievalPixelArt-Prod/
 │   ├── leader_prompts.py              # NEW: enum injection maps + builders
 │   ├── leader_registry.py             # NEW: SQLite-backed CRUD
 │   ├── leader_engine.py               # NEW: pipeline orchestrator
-│   └── workflows/
-│       ├── txt2img.json                # UNCHANGED
-│       ├── inpaint.json                # UNCHANGED
-│       ├── story.json                  # UNCHANGED
-│       ├── splash.json                 # UNCHANGED (existing tile splash)
-│       └── leader/                     # NEW directory
-│           ├── leader_splash.json      # NEW: txt2img 1920×1088
-│           ├── leader_profile.json     # NEW: img2img 1024×1024, denoise 0.30
-│           └── leader_action.json      # NEW: img2img 1920×1088, denoise 0.60
+├── workflows/
+│   ├── txt2img.json                # UNCHANGED
+│   ├── inpaint.json                # UNCHANGED
+│   ├── story.json                  # UNCHANGED
+│   ├── splash.json                 # UNCHANGED (existing tile splash)
+│   └── leader/                     # NEW directory
+│       ├── leader_splash.json      # NEW: txt2img 1920×1088
+│       ├── leader_profile.json     # NEW: img2img 1024×1024, denoise 0.30
+│       └── leader_action.json      # NEW: img2img 1920×1088, denoise 0.60
 ├── tests/
 │   └── test_leader_pipeline.py         # NEW
 ├── leader_references/                  # NEW directory (runtime)
@@ -1865,5 +1826,3 @@ TopDownMedievalPixelArt-Prod/
 ---
 
 *End of plan.*
-
-
