@@ -255,6 +255,44 @@ def build_action_prompt(req: LeaderRequest) -> str:
     return ", ".join(parts)
 
 
+def build_multi_action_prompt(
+    req: LeaderRequest,
+    leader_descriptions: list[str],
+    leader_names: list[str],
+) -> str:
+    """Build a prompt for a multi-leader action scene.
+
+    Composes all leader descriptions into a single prompt describing
+    their interaction within the action scene.
+    """
+    # Build the character descriptions part
+    if len(leader_descriptions) == 1:
+        char_part = f"epic cinematic scene depicting {leader_descriptions[0].strip()}"
+    elif len(leader_descriptions) == 2:
+        char_part = (
+            f"epic cinematic scene depicting two leaders interacting: "
+            f"{leader_names[0]}, {leader_descriptions[0].strip()}, "
+            f"and {leader_names[1]}, {leader_descriptions[1].strip()}"
+        )
+    else:
+        named = ", ".join(
+            f"{name}, {desc.strip()}"
+            for name, desc in zip(leader_names, leader_descriptions)
+        )
+        char_part = f"epic cinematic scene depicting multiple leaders: {named}"
+
+    parts = [
+        char_part,
+        req.action_description.strip(),
+        f"in {CULTURE[req.culture]}",
+        TIME_OF_DAY[req.time_of_day],
+        MOOD[req.mood],
+        ACTION_CATEGORY[req.action_category],
+        ACTION_TAIL,
+    ]
+    return ", ".join(parts)
+
+
 def build_prompt(req: LeaderRequest) -> str:
     """Route to the correct builder based on asset_type."""
     builders = {
@@ -263,4 +301,3 @@ def build_prompt(req: LeaderRequest) -> str:
         "action":  build_action_prompt,
     }
     return builders[req.asset_type](req)
-

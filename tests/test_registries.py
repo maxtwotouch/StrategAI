@@ -38,6 +38,7 @@ class TestLeaderRegistry:
         LeaderRegistry.register(
             leader_id=lid,
             leader_name="Test Leader",
+            leader_description="A test leader for unit testing purposes.",
             archetype="warrior_king",
             culture="medieval_european",
             time_of_day="midday",
@@ -70,6 +71,7 @@ class TestLeaderRegistry:
         lid = "leader_ref_test"
         LeaderRegistry.register(
             leader_id=lid, leader_name="Ref Test",
+            leader_description="A test leader for reference image testing.",
             archetype="warrior_queen", culture="ancient_egyptian",
             time_of_day="dawn", mood="grim_determined",
             splash_image_filename="splash_ref.png",
@@ -96,6 +98,7 @@ class TestLeaderRegistry:
         lid = "leader_exists_test"
         LeaderRegistry.register(
             leader_id=lid, leader_name="Exists",
+            leader_description="A test leader for existence checking.",
             archetype="warrior_king", culture="medieval_european",
             time_of_day="midday", mood="triumphant",
             splash_image_filename="splash_ex.png",
@@ -123,6 +126,7 @@ class TestLeaderRegistry:
             LeaderRegistry.register(
                 leader_id=f"leader_list_{i}",
                 leader_name=f"Leader {i}",
+                leader_description="A test leader for list ordering.",
                 archetype="warrior_king", culture="medieval_european",
                 time_of_day="midday", mood="triumphant",
                 splash_image_filename="splash_list.png",
@@ -146,6 +150,7 @@ class TestLeaderRegistry:
         lid = "leader_profile_test"
         LeaderRegistry.register(
             leader_id=lid, leader_name="Profile",
+            leader_description="A test leader for profile recording.",
             archetype="warrior_king", culture="medieval_european",
             time_of_day="midday", mood="triumphant",
             splash_image_filename="splash_prof.png",
@@ -170,6 +175,7 @@ class TestLeaderRegistry:
         lid = "leader_action_test"
         LeaderRegistry.register(
             leader_id=lid, leader_name="Action",
+            leader_description="A test leader for action recording.",
             archetype="warrior_king", culture="medieval_european",
             time_of_day="midday", mood="triumphant",
             splash_image_filename="splash_act.png",
@@ -195,6 +201,7 @@ class TestLeaderRegistry:
         lid = "leader_delete_test"
         LeaderRegistry.register(
             leader_id=lid, leader_name="Delete",
+            leader_description="A test leader for deletion testing.",
             archetype="warrior_king", culture="medieval_european",
             time_of_day="midday", mood="triumphant",
             splash_image_filename="splash_del.png",
@@ -477,4 +484,3 @@ class TestGenerateUnitId:
         assert uid.startswith("unit_archer_")
         suffix = uid.split("_")[-1]
         assert len(suffix) == 6
-

@@ -19,7 +19,7 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 ## 3. Component Architecture
 
 ### A. API Layer (`main.py` & `models.py`)
-- **FastAPI**: Handles high-concurrency requests with CORS middleware. Endpoints: `POST /generate`, `POST /splash`, `POST /leader`, `GET /leader`, `GET /leader/{id}`, `DELETE /leader/{id}`, `GET /health`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`.
+- **FastAPI**: Handles high-concurrency requests with CORS middleware. Endpoints: `POST /generate`, `POST /splash`, `POST /leader`, `GET /leader`, `GET /leader/{id}`, `DELETE /leader/{id}`, `POST /structure`, `POST /object`, `POST /terrain`, `POST /unit`, `GET /unit`, `GET /unit/{unit_id}`, `DELETE /unit/{unit_id}`, `GET /health`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`.
 - **Pydantic**: Guarantees typed, structural contracts for `asset_family`, `tile_type`, `structure_subtype`, CoW references, and leader pipeline parameters.
 - **Fully async**: Generation runs directly on the asyncio event loop via `httpx` + `websockets`. No thread-pool required.
 
@@ -47,7 +47,14 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 - **Reference image**: splash art is copied to `leader_references/ref_{leader_id}.png` and re-uploaded to ComfyUI before each profile/action generation.
 - **SQLite-backed**: `LeaderRecord` table tracks all leaders alongside `AssetRecord`.
 
-### G. Persistence (`database.py`)
+### G. Unit Pipeline (`unit_engine.py`, `unit_models.py`, `unit_prompts.py`, `unit_registry.py`)
+- **Directional sprite generation**: each unit type (archer, scout, settler, warrior) generates up to 4 cardinal-facing sprites (south/north/east/west) as separate 512×512 images.
+- **Single-direction fast path**: clients can request a single direction (e.g. `"s"`) for ~4× faster iteration. The south-facing sprite is canonical.
+- **Enum-driven prompt assembly**: `unit_prompts.py` maps `unit_type` + `direction` to rich pixel-art prose, combined with the client's free-form `description`.
+- **Static fallback with direction resolution**: `StaticUnitEngine` resolves sprites from `static_tiles/unit/{type}_{direction}.png`, falling back to the south sprite for any missing direction.
+- **SQLite-backed**: `UnitRecord` table stores all four directional image IDs per unit.
+
+### H. Persistence (`database.py`)
 - **SQLite** via SQLAlchemy. No external database dependency.
 - **AssetRecord**: tracks every generated asset: id, family, tile_type, structure_subtype, inpainting data, generation mode.
 - **LeaderRecord**: tracks leader identity: canonical splash image, seed, prompt, profile/action image IDs, reference filename.
@@ -58,7 +65,7 @@ Seven ComfyUI workflows stored in `workflows/`, exported in API format:
 
 | Workflow | Purpose | Key injection points |
 |---|---|---|
-| `txt2img.json` | Structures, nature objects, character sprites | Positive/negative prompt, seed |
+| `txt2img.json` | Structures, objects, terrain, unit sprites | Positive/negative prompt, seed |
 | `inpaint.json` | Background tiles with CoW inpainting | Base image, mask image, fill prompt, seed |
 | `story.json` | 16:9 cinematic concept art | Positive prompt, seed |
 | `splash.json` | Leader portrait (legacy /splash endpoint) | Positive prompt (built from style/outfit/weapon fields), seed |

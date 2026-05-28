@@ -26,7 +26,7 @@ from .comfyui_client import ComfyUIClient
 from .config import settings, BASE_DIR
 from .database import SessionLocal, AssetRecord
 from .leader_models import LeaderRequest, LeaderResponse
-from .leader_prompts import build_prompt
+from .leader_prompts import build_prompt, build_multi_action_prompt
 from .leader_registry import LeaderRegistry, generate_leader_id
 from .storage import store
 
@@ -98,6 +98,7 @@ class LeaderEngine:
         LeaderRegistry.register(
             leader_id=leader_id,
             leader_name=req.leader_name,
+            leader_description=req.leader_description,
             archetype=req.archetype,
             culture=req.culture,
             time_of_day=req.time_of_day,
@@ -270,6 +271,75 @@ class LeaderEngine:
             generation_time_ms=elapsed,
         )
 
+    async def generate_multi_action(
+        self,
+        req: LeaderRequest,
+        leader_ids: list[str],
+    ) -> LeaderResponse:
+        """Generate a multi-leader action scene with multiple leaders via ComfyUI.
+
+        Loads all leader records, builds a composite prompt from their
+        descriptions, and generates a single action image.
+        """
+        t0 = time.time()
+
+        # Load all leader records
+        leader_names = []
+        leader_descriptions = []
+        for lid in leader_ids:
+            leader = LeaderRegistry.get(lid)
+            if not leader:
+                raise ValueError(
+                    f"Leader '{lid}' not found. Generate a splash first."
+                )
+            leader_names.append(leader.leader_name)
+            leader_descriptions.append(leader.leader_description)
+
+        # Build composite prompt
+        prompt = build_multi_action_prompt(req, leader_descriptions, leader_names)
+
+        # Workflow path — use the standard action workflow
+        wf_path = str(Path(settings.leader_workflow_dir) / "leader_action.json")
+
+        # Run
+        img = await self._client.generate(
+            wf_path,
+            positive_prompt=prompt,
+            negative_prompt=settings.leader.negative_prompt,
+            seed=req.seed or random.randint(10**14, 10**15 - 1),
+        )
+
+        # Save
+        asset_id = str(uuid.uuid4())
+        filename = f"leader_multi_{asset_id}_action.png"
+        store.save_image(filename, img)
+
+        # Persist AssetRecord
+        with SessionLocal() as db:
+            db.add(AssetRecord(
+                id=filename,
+                asset_family="leader_action",
+                character_name=", ".join(leader_names),
+                generation_mode="comfyui",
+            ))
+            db.commit()
+
+        elapsed = int((time.time() - t0) * 1000)
+
+        return LeaderResponse(
+            url=f"/assets/{filename}",
+            asset_type="action",
+            leader_name=", ".join(leader_names),
+            leader_id=asset_id,
+            leader_ids=leader_ids,
+            leader_names=leader_names,
+            seed=req.seed or 0,
+            generation_mode="comfyui",
+            prompt_used=prompt,
+            resolution=f"{img.width}x{img.height}",
+            generation_time_ms=elapsed,
+        )
+
 
 class StaticLeaderEngine:
     """Generates placeholder PNGs at runtime for the leader pipeline.
@@ -392,6 +462,7 @@ class StaticLeaderEngine:
         LeaderRegistry.register(
             leader_id=leader_id,
             leader_name=req.leader_name,
+            leader_description=req.leader_description,
             archetype=req.archetype,
             culture=req.culture,
             time_of_day=req.time_of_day,
@@ -517,8 +588,6 @@ class StaticLeaderEngine:
             ))
             db.commit()
 
-        LeaderRegistry.record_action(req.leader_id, filename)
-
         elapsed = int((time.time() - start) * 1000)
 
         return LeaderResponse(
@@ -532,3 +601,68 @@ class StaticLeaderEngine:
             resolution=f"{img.width}x{img.height}",
             generation_time_ms=elapsed,
         )
+
+    async def generate_multi_action(
+        self,
+        req: LeaderRequest,
+        leader_ids: list[str],
+    ) -> LeaderResponse:
+        """Generate a multi-leader action scene placeholder with multiple leaders."""
+        t0 = time.time()
+
+        # Load all leader records
+        leader_names = []
+        leader_descriptions = []
+        for lid in leader_ids:
+            leader = LeaderRegistry.get(lid)
+            if not leader:
+                raise ValueError(
+                    f"Leader '{lid}' not found. Generate a splash first."
+                )
+            leader_names.append(leader.leader_name)
+            leader_descriptions.append(leader.leader_description)
+
+        # Build composite prompt
+        prompt = build_multi_action_prompt(req, leader_descriptions, leader_names)
+
+        # Pick category-specific colours
+        bg_color, fg_color = self._ACTION_COLORS.get(
+            req.action_category, ("#1A1A2E", "#E0E0E0")
+        )
+
+        img = self._build_placeholder(
+            label=f"ACTION: {req.action_category.upper()}",
+            sublabel=", ".join(leader_names),
+            bg_color=bg_color,
+            fg_color=fg_color,
+        )
+
+        asset_id = str(uuid.uuid4())
+        filename = f"leader_multi_{asset_id}_action.png"
+        store.save_image(filename, img)
+
+        with SessionLocal() as db:
+            db.add(AssetRecord(
+                id=filename,
+                asset_family="leader_action",
+                character_name=", ".join(leader_names),
+                generation_mode="static",
+            ))
+            db.commit()
+
+        elapsed = int((time.time() - t0) * 1000)
+
+        return LeaderResponse(
+            url=f"/assets/{filename}",
+            asset_type="action",
+            leader_name=", ".join(leader_names),
+            leader_id=asset_id,
+            leader_ids=leader_ids,
+            leader_names=leader_names,
+            seed=0,
+            generation_mode="static",
+            prompt_used=prompt,
+            resolution=f"{img.width}x{img.height}",
+            generation_time_ms=elapsed,
+        )
+

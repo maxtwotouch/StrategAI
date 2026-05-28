@@ -340,6 +340,26 @@ async def generate_leader(request: LeaderRequest):
         raise HTTPException(503, "Leader generation not available (ComfyUI unreachable)")
 
     try:
+        # --- Multi-leader action scene ---
+        if request.asset_type == "action" and getattr(request, "leader_ids", None):
+            if len(request.leader_ids) < 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="leader_ids must contain at least one leader_id for multi-leader action scenes.",
+                )
+            if not request.action_category:
+                raise HTTPException(
+                    status_code=400,
+                    detail="action_category is required for action assets.",
+                )
+            if not request.action_description:
+                raise HTTPException(
+                    status_code=400,
+                    detail="action_description is required for action assets.",
+                )
+            return await leader_engine.generate_multi_action(request, request.leader_ids)
+
+        # --- Single-leader action ---
         response: LeaderResponse = await leader_engine.generate(request)
         logger.info(
             "Leader %s generated: %s (%.1fs)",

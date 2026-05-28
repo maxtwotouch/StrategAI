@@ -41,6 +41,7 @@ class LeaderRegistry:
     def register(
         leader_id: str,
         leader_name: str,
+        leader_description: str,
         archetype: str,
         culture: str,
         time_of_day: str,
@@ -68,6 +69,7 @@ class LeaderRegistry:
             record = LeaderRecord(
                 leader_id=leader_id,
                 leader_name=leader_name,
+                leader_description=leader_description,
                 archetype=archetype,
                 culture=culture,
                 time_of_day=time_of_day,

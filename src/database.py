@@ -32,6 +32,7 @@ class LeaderRecord(Base):
 
     leader_id = Column(String, primary_key=True, index=True)
     leader_name = Column(String, nullable=False)
+    leader_description = Column(String, nullable=False, default="")
     archetype = Column(String, nullable=False)
     culture = Column(String, nullable=False)
     time_of_day = Column(String, nullable=False)

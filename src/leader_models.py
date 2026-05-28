@@ -134,6 +134,11 @@ class LeaderRequest(BaseModel):
         default=None,
         description="Required for profile and action. The leader_id from a previous splash generation.",
     )
+    leader_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Required for multi-leader action scenes. List of leader_ids to include in the scene. "
+                    "When provided, leader_id is ignored for action generation.",
+    )
     seed: Optional[int] = Field(
         default=None,
         description="Override the canonical splash seed. Defaults to the stored splash seed for profile/action.",
@@ -162,6 +167,8 @@ class LeaderResponse(BaseModel):
     asset_type: str                                   # "splash" | "profile" | "action"
     leader_name: str
     leader_id: str                                    # returned so clients can chain calls
+    leader_ids: list[str] = []                        # all leader IDs in this scene (multi-leader action)
+    leader_names: list[str] = []                      # all leader names in this scene
     seed: int                                         # actual seed used
     generation_mode: str                              # "comfyui" | "placeholder"
     status: str = "completed"                         # matching existing convention
