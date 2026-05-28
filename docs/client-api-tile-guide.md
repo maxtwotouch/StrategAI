@@ -243,7 +243,7 @@ FIELDS:
 
 ───────────────────────────────────────────────────────────────────
 CATEGORY — pick one
-───────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────���──
 
   vegetation     Living plants
                  Trees (oak, pine, dead, fruit), bushes, shrubs,
@@ -290,7 +290,7 @@ SEASON — pick one
 
 ───────────────────────────────────────────────────────────────────
 DESCRIPTION — free-form text (20–400 characters)
-───────────────────────────────────────────────────────────────────
+─────────────────────────────────────────────────��─────────────────
 
 Describe the specific object. Be concrete about what it is and
 what makes it distinct.
@@ -328,7 +328,7 @@ what makes it distinct.
 
 ───────────────────────────────────────────────────────────────────
 EXAMPLE REQUESTS
-───────────────────────────────────────────────────────────────────
+───────────────────────────────────���───────────────────────────────
 
 Vegetation — autumn temperate forest tree:
 
@@ -366,7 +366,7 @@ Debris — winter mountain wreckage:
   }
 
 
-═══════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════��═══════════
   TERRAIN PIPELINE — ELEVATION FEATURES
 ═══════════════════════════════════════════════════════════════════
 
@@ -612,7 +612,7 @@ biomes, seasons, and materials. The server is the single source
 of truth for what's valid.
 
 
-═══════════════════════════════════════════════════════════════════
+═════════════════════════════════════════════════���═════════════════
   BACKGROUND TILES (existing POST /generate)
 ═══════════════════════════════════════════════════════════════════
 
@@ -704,10 +704,12 @@ on top of it.
 
 LAYERING MODEL (for game engine integration)
 
-  Layer 3:  Structures & Objects   ← POST /structure, POST /object
-  Layer 2:  Terrain features        ← POST /terrain
-  Layer 1:  Background tiles        ← POST /generate
+  Layer 4:  Units (characters)        ← POST /unit
+  Layer 3:  Structures & Objects      ← POST /structure, POST /object
+  Layer 2:  Terrain features          ← POST /terrain
+  Layer 1:  Background tiles          ← POST /generate
 
 Generate bottom-up: background tile first, then terrain features
-for elevation, then structures and objects on top.
+for elevation, then structures and objects, then units on top.
 
+See docs/client-api-unit-guide.md for the unit generation API.
