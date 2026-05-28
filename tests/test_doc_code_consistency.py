@@ -135,8 +135,3 @@ class TestUnitDocEnums:
         from src.unit_models import UnitType
         for val in sorted(UnitType.ALL):
             assert val in doc_text, f"UnitType: '{val}' missing from unit-prompt-guide.md"
-
-    def test_direction_all_in_doc(self, doc_text):
-        from src.unit_models import Direction
-        for val in sorted(Direction.ALL):
-            assert val in doc_text, f"Direction: '{val}' missing from unit-prompt-guide.md"

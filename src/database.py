@@ -106,13 +106,7 @@ class UnitRecord(Base):
     unit_id = Column(String, primary_key=True, index=True)
     unit_type = Column(String, nullable=False)
     description = Column(String, nullable=True)
-
-    # Four directional sprite image IDs (FK → asset_records.id)
-    image_id_s = Column(String, nullable=False)       # south/front (canonical, always present)
-    image_id_n = Column(String, nullable=True)        # north/back  (null when not generated)
-    image_id_e = Column(String, nullable=True)        # east/right  (null when not generated)
-    image_id_w = Column(String, nullable=True)        # west/left   (null when not generated)
-
+    image_id = Column(String, nullable=False)           # FK → asset_records.id
     seed = Column(Integer, nullable=False)
     prompt_used = Column(String, nullable=False)
     generation_mode = Column(String, nullable=True)

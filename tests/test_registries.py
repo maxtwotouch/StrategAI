@@ -415,10 +415,7 @@ class TestUnitRegistry:
             unit_id=uid,
             unit_type="archer",
             description="A test unit",
-            image_id_s="s.png",
-            image_id_n="n.png",
-            image_id_e="e.png",
-            image_id_w="w.png",
+            image_id="sprite.png",
             seed=42,
             prompt_used="test prompt",
             generation_mode="placeholder",
@@ -426,7 +423,7 @@ class TestUnitRegistry:
         record = UnitRegistry.get(uid)
         assert record is not None
         assert record.unit_type == "archer"
-        assert record.image_id_s == "s.png"
+        assert record.image_id == "sprite.png"
 
     def test_list_all(self, test_db):
         for i in range(3):
@@ -434,10 +431,7 @@ class TestUnitRegistry:
                 unit_id=f"unit_list_{i}",
                 unit_type="archer",
                 description="test",
-                image_id_s=f"s_{i}.png",
-                image_id_n=f"n_{i}.png",
-                image_id_e=f"e_{i}.png",
-                image_id_w=f"w_{i}.png",
+                image_id=f"sprite_{i}.png",
                 seed=i,
                 prompt_used="p",
                 generation_mode="placeholder",
@@ -448,8 +442,7 @@ class TestUnitRegistry:
         uid = "unit_del"
         UnitRegistry.register(
             unit_id=uid, unit_type="archer", description="test",
-            image_id_s="s.png", image_id_n="n.png",
-            image_id_e="e.png", image_id_w="w.png",
+            image_id="sprite.png",
             seed=1, prompt_used="p", generation_mode="placeholder",
         )
         assert UnitRegistry.delete(uid) is True
@@ -457,18 +450,6 @@ class TestUnitRegistry:
 
     def test_delete_returns_false(self, test_db):
         assert UnitRegistry.delete("nonexistent") is False
-
-    def test_register_fallback_scenario(self, test_db):
-        """image_id_n == image_id_s (allowed — fallback reuse)."""
-        uid = "unit_fallback_reg"
-        UnitRegistry.register(
-            unit_id=uid, unit_type="scout", description="fallback",
-            image_id_s="same.png", image_id_n="same.png",
-            image_id_e="same.png", image_id_w="same.png",
-            seed=1, prompt_used="p", generation_mode="static",
-        )
-        record = UnitRegistry.get(uid)
-        assert record.image_id_n == record.image_id_s
 
     def test_has_static_always_true(self):
         """has_static() always returns True (stub)."""

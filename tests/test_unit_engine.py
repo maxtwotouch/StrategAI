@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from PIL import Image
 
-from src.unit_models import UnitRequest, UnitType, Direction
+from src.unit_models import UnitRequest
 from src.unit_engine import UnitEngine, StaticUnitEngine, _PlaceholderUnitEngine
 
 
@@ -22,7 +22,7 @@ class TestUnitEngine:
 
     @pytest.mark.asyncio
     async def test_generate(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        """Returns UnitResponse with 4 directions."""
+        """Returns UnitResponse with a single sprite URL."""
         monkeypatch.setattr("src.unit_engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
@@ -35,18 +35,14 @@ class TestUnitEngine:
         assert resp.generation_mode == "comfyui"
         assert resp.url.startswith("/assets/")
         assert resp.unit_id.startswith("unit_archer_")
-        assert resp.directions.s.startswith("/assets/")
-        assert resp.directions.n.startswith("/assets/")
-        assert resp.directions.e.startswith("/assets/")
-        assert resp.directions.w.startswith("/assets/")
         assert resp.seed is not None
         assert resp.prompt_used is not None
         assert resp.resolution == "512x512"
         assert resp.generation_time_ms is not None
 
     @pytest.mark.asyncio
-    async def test_generates_4_images(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        """client.generate called 4 times (once per direction)."""
+    async def test_generates_single_image(self, mock_comfyui_client, test_store, test_db, monkeypatch):
+        """client.generate called once (single sprite)."""
         monkeypatch.setattr("src.unit_engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
@@ -54,7 +50,7 @@ class TestUnitEngine:
         req = _make_unit_req()
         await engine.generate(req)
 
-        assert mock_comfyui_client.generate.call_count == 4
+        assert mock_comfyui_client.generate.call_count == 1
 
     @pytest.mark.asyncio
     async def test_persists_unit_record(self, mock_comfyui_client, test_store, test_db, monkeypatch):
@@ -113,21 +109,6 @@ class TestStaticUnitEngine:
         assert resp.asset_type == "unit"
         assert resp.generation_mode == "placeholder"
 
-    @pytest.mark.asyncio
-    async def test_s_fallback_reuse(self, test_store, test_catalog, test_db, monkeypatch):
-        """scout has only s.png → n/e/w reuse the same filename."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
-        monkeypatch.setattr("src.unit_engine.static_catalog", test_catalog)
-
-        engine = StaticUnitEngine()
-        req = _make_unit_req(unit_type="scout")
-        resp = await engine.generate(req)
-
-        # All directions should point to the same asset (south fallback)
-        s_id = resp.directions.s.split("/")[-1]
-        n_id = resp.directions.n.split("/")[-1]
-        assert s_id == n_id  # fallback reuse
-
 
 class TestPlaceholderUnitEngine:
     """Tests for _PlaceholderUnitEngine."""
@@ -143,10 +124,7 @@ class TestPlaceholderUnitEngine:
         assert resp.asset_type == "unit"
         assert resp.generation_mode == "placeholder"
         assert resp.unit_type == "archer"
-        assert resp.directions.s.startswith("/assets/")
-        assert resp.directions.n.startswith("/assets/")
-        assert resp.directions.e.startswith("/assets/")
-        assert resp.directions.w.startswith("/assets/")
+        assert resp.url.startswith("/assets/")
         assert resp.resolution == "512x512"
 
     @pytest.mark.asyncio
@@ -171,7 +149,7 @@ class TestPlaceholderUnitEngine:
         resp1 = await engine.generate(_make_unit_req(unit_type="archer"))
         resp2 = await engine.generate(_make_unit_req(unit_type="warrior"))
 
-        # Both should succeed
         assert resp1.unit_type == "archer"
+        assert resp2.unit_type == "warrior"
         assert resp2.unit_type == "warrior"
 

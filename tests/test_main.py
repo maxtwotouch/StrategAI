@@ -770,11 +770,8 @@ class TestUnitEndpoints:
         assert data["asset_type"] == "unit"
         assert data["unit_type"] == "archer"
         assert data["generation_mode"] == "placeholder"
-        assert "directions" in data
-        assert data["directions"]["s"].startswith("/assets/")
-        assert data["directions"]["n"].startswith("/assets/")
-        assert data["directions"]["e"].startswith("/assets/")
-        assert data["directions"]["w"].startswith("/assets/")
+        assert data["url"].startswith("/assets/")
+        assert data["unit_id"].startswith("unit_archer_")
         # Response completeness (optional fields — may be None in static/placeholder modes)
         if data.get("prompt_used") is not None:
             assert isinstance(data["prompt_used"], str) and len(data["prompt_used"]) > 0
@@ -783,22 +780,6 @@ class TestUnitEndpoints:
         if data.get("generation_time_ms") is not None:
             assert isinstance(data["generation_time_ms"], int) and data["generation_time_ms"] >= 0
         assert isinstance(data["seed"], int)
-
-    @pytest.mark.asyncio
-    async def test_generate_unit_single_direction(self, async_client):
-        """Requesting direction 's' still generates the unit (placeholder mode always produces all 4)."""
-        resp = await async_client.post("/unit", json={
-            "unit_type": "archer",
-            "description": "A medieval archer in green leather armor with a longbow and quiver of arrows.",
-            "direction": "s",
-        })
-        assert resp.status_code == 200
-        data = resp.json()
-        # South direction always populated
-        assert data["directions"]["s"].startswith("/assets/")
-        # In placeholder mode, all 4 directions are generated
-        assert data["directions"]["n"] is not None or data["directions"]["n"] is None  # may vary by engine
-        assert isinstance(data["seed"], int) and data["seed"] >= 0
 
     @pytest.mark.asyncio
     async def test_list_units(self, async_client):
@@ -847,9 +828,7 @@ class TestUnitEndpoints:
         assert resp.status_code == 200
         data = resp.json()
         assert "unit_types" in data
-        assert "directions" in data
         assert "archer" in data["unit_types"]
-        assert "s" in data["directions"]
 
 
 # ===========================================================================

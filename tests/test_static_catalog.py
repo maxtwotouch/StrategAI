@@ -112,51 +112,38 @@ class TestUnit:
     """Tests for unit sprite scanning and resolution."""
 
     def test_list_unit_types(self, test_catalog):
-        """Only types with at least a south PNG appear."""
+        """All types with any PNG appear."""
         types = test_catalog.list_unit_types()
         assert "archer" in types
         assert "scout" in types
 
     def test_has_unit_type(self, test_catalog):
-        """has_unit_type('archer') with archer_s.png → True."""
+        """has_unit_type('archer') with archer.png → True."""
         assert test_catalog.has_unit_type("archer") is True
 
     def test_has_unit_type_false(self, test_catalog):
         """has_unit_type('warrior') with no warrior PNGs → False."""
         assert test_catalog.has_unit_type("warrior") is False
 
-    def test_resolve_unit_exact_direction(self, test_catalog):
-        """resolve_unit('archer', 'n') → returns the north sprite."""
-        path = test_catalog.resolve_unit("archer", "n")
+    def test_resolve_unit(self, test_catalog):
+        """resolve_unit('archer') → returns the archer sprite."""
+        path = test_catalog.resolve_unit("archer")
         assert path is not None
-        assert "archer_n" in os.path.basename(path)
+        assert "archer" in os.path.basename(path)
 
-    def test_resolve_unit_s_fallback(self, test_catalog):
-        """resolve_unit('scout', 'e') when no east PNG → returns south sprite."""
-        path = test_catalog.resolve_unit("scout", "e")
-        assert path is not None
-        assert "scout_s" in os.path.basename(path)
+    def test_resolve_unit_nonexistent(self, test_catalog):
+        """resolve_unit('warrior') with no warrior PNGs → None."""
+        assert test_catalog.resolve_unit("warrior") is None
 
-    def test_resolve_unit_no_s_fallback(self, test_catalog):
-        """resolve_unit('warrior', 's') with no warrior PNGs → None."""
-        assert test_catalog.resolve_unit("warrior", "s") is None
-
-    def test_invalid_direction_ignored(self, tmp_project_root):
-        """archer_x.png not cataloged (x not in _VALID_UNIT_DIRECTIONS)."""
+    def test_invalid_filename_ignored(self, tmp_project_root):
+        """Non-PNG files are ignored."""
         unit_dir = os.path.join(tmp_project_root, "static_tiles", "unit")
-        _make_png(os.path.join(unit_dir, "archer_x.png"))
+        os.makedirs(unit_dir, exist_ok=True)
+        _make_png(os.path.join(unit_dir, "archer.png"))
+        with open(os.path.join(unit_dir, "notes.txt"), "w") as f:
+            f.write("not an image")
         cat = StaticCatalog(root_dir=os.path.join(tmp_project_root, "static_tiles"))
-        # archer_x should not appear as a direction
-        assert "x" not in cat._unit_catalog.get("archer", {})
-
-    def test_unit_filename_with_underscores(self, tmp_project_root):
-        """city_settler_s.png → parses as type=city_settler, direction=s."""
-        unit_dir = os.path.join(tmp_project_root, "static_tiles", "unit")
-        _make_png(os.path.join(unit_dir, "city_settler_s.png"))
-        cat = StaticCatalog(root_dir=os.path.join(tmp_project_root, "static_tiles"))
-        assert cat.has_unit_type("city_settler") is True
-        path = cat.resolve_unit("city_settler", "s")
-        assert path is not None
+        assert "notes" not in cat._unit_catalog
 
 
 class TestEdgeCases:

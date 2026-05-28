@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import settings
-from .database import SessionLocal, AssetRecord, UnitRecord
+from .database import SessionLocal, AssetRecord
 from .generators import close_comfyui_client, get_generator, _get_comfyui_client
 from .leader_engine import LeaderEngine, StaticLeaderEngine
 from .leader_models import LeaderRequest, LeaderResponse, LeaderInfo
@@ -27,8 +27,8 @@ from .tile_models import (
 from .tile_registry import StructureRegistry, ObjectRegistry, TerrainRegistry
 from .unit_engine import UnitEngine, StaticUnitEngine
 from .unit_models import (
-    UnitRequest, UnitResponse, UnitDirections, UnitCatalog,
-    UnitType, Direction,
+    UnitRequest, UnitResponse, UnitCatalog,
+    UnitType,
 )
 from .unit_registry import UnitRegistry
 
@@ -684,17 +684,12 @@ async def delete_terrain(terrain_id: str):
 
 @app.post("/unit", response_model=UnitResponse)
 async def generate_unit(request: UnitRequest):
-    """Generate unit sprites for 1-4 cardinal directions.
+    """Generate a single south-facing unit sprite (front view).
 
-    Set ``direction`` to ``"s"`` to generate only the south-facing (front)
-    sprite — ~4× faster than generating all four.  Omit ``direction`` to
-    generate all four facings (s/n/e/w).
-
-    Returns a UnitResponse with ``directions`` mapping ``s``/``n``/``e``/``w``
-    to asset URLs.  Non-generated directions are ``null``.  The south-facing
-    sprite is canonical.
+    Returns a UnitResponse with the sprite URL.  The south-facing
+    (front view) sprite is the canonical game-facing direction.
     """
-    logger.info("Received unit request: type=%s direction=%s", request.unit_type, request.direction)
+    logger.info("Received unit request: type=%s", request.unit_type)
 
     if unit_engine is None:
         raise HTTPException(503, "Unit generation not available (ComfyUI unreachable)")
@@ -726,16 +721,9 @@ async def list_units():
     records = UnitRegistry.list_all()
     return [
         UnitResponse(
-            url=f"/assets/{r.image_id_s}",
+            url=f"/assets/{r.image_id}",
             unit_id=r.unit_id,
             unit_type=r.unit_type,
-            directions=UnitDirections(
-                s=f"/assets/{r.image_id_s}",
-                n=f"/assets/{r.image_id_n}" if r.image_id_n else None,
-                e=f"/assets/{r.image_id_e}" if r.image_id_e else None,
-                w=f"/assets/{r.image_id_w}" if r.image_id_w else None,
-            ),
-            generated_directions=_infer_generated_directions(r),
             seed=r.seed,
             generation_mode=r.generation_mode or "unknown",
             prompt_used=r.prompt_used,
@@ -746,10 +734,9 @@ async def list_units():
 
 @app.get("/unit/catalog", response_model=UnitCatalog)
 async def unit_catalog():
-    """Return available unit types and directions."""
+    """Return available unit types."""
     return UnitCatalog(
         unit_types=sorted(UnitType.ALL),
-        directions=sorted(Direction.ALL),
     )
 
 
@@ -760,16 +747,9 @@ async def get_unit(unit_id: str):
     if not record:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
     return UnitResponse(
-        url=f"/assets/{record.image_id_s}",
+        url=f"/assets/{record.image_id}",
         unit_id=record.unit_id,
         unit_type=record.unit_type,
-        directions=UnitDirections(
-            s=f"/assets/{record.image_id_s}",
-            n=f"/assets/{record.image_id_n}" if record.image_id_n else None,
-            e=f"/assets/{record.image_id_e}" if record.image_id_e else None,
-            w=f"/assets/{record.image_id_w}" if record.image_id_w else None,
-        ),
-        generated_directions=_infer_generated_directions(record),
         seed=record.seed,
         generation_mode=record.generation_mode or "unknown",
         prompt_used=record.prompt_used,
@@ -783,21 +763,3 @@ async def delete_unit(unit_id: str):
     if not deleted:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
     return {"status": "deleted", "unit_id": unit_id}
-
-
-def _infer_generated_directions(record: UnitRecord) -> list[str]:
-    """Infer which directions were actually generated from a UnitRecord.
-
-    Returns a list of direction codes (e.g. ``["s"]`` or ``["s","n","e","w"]``)
-    based on which image_id columns are non-null.
-    """
-    directions: list[str] = []
-    if record.image_id_s:
-        directions.append("s")
-    if record.image_id_n:
-        directions.append("n")
-    if record.image_id_e:
-        directions.append("e")
-    if record.image_id_w:
-        directions.append("w")
-    return directions

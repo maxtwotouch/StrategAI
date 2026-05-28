@@ -198,10 +198,7 @@ class TestUnitRecord:
             unit_id="unit_archer_a1b2c3",
             unit_type="archer",
             description="A test unit",
-            image_id_s="s.png",
-            image_id_n="n.png",
-            image_id_e="e.png",
-            image_id_w="w.png",
+            image_id="sprite.png",
             seed=400,
             prompt_used="test prompt",
         )
@@ -213,59 +210,15 @@ class TestUnitRecord:
         ).first()
         assert result is not None
         assert result.unit_type == "archer"
+        assert result.image_id == "sprite.png"
 
-    def test_fallback_columns_equal(self, db_session):
-        """image_id_n == image_id_s allowed (fallback scenario)."""
+    def test_image_id_required(self, db_session):
+        """image_id is NOT NULL — omitting it raises."""
         record = UnitRecord(
-            unit_id="unit_fallback",
-            unit_type="scout",
-            description="fallback test",
-            image_id_s="same.png",
-            image_id_n="same.png",
-            image_id_e="same.png",
-            image_id_w="same.png",
-            seed=1,
-            prompt_used="p",
-        )
-        db_session.add(record)
-        db_session.commit()
-
-        result = db_session.query(UnitRecord).filter(UnitRecord.unit_id == "unit_fallback").first()
-        assert result.image_id_n == result.image_id_s
-
-    def test_all_directions_required(self, db_session):
-        """n/e/w are now optional (nullable=True).  Inserting with None succeeds."""
-        record = UnitRecord(
-            unit_id="unit_partial",
+            unit_id="unit_no_image",
             unit_type="archer",
-            description="partial directions",
-            image_id_s="s.png",
-            image_id_n=None,
-            image_id_e=None,
-            image_id_w=None,
-            seed=1,
-            prompt_used="p",
-        )
-        db_session.add(record)
-        db_session.commit()
-
-        result = db_session.query(UnitRecord).filter(UnitRecord.unit_id == "unit_partial").first()
-        assert result is not None
-        assert result.image_id_s == "s.png"
-        assert result.image_id_n is None
-        assert result.image_id_e is None
-        assert result.image_id_w is None
-
-    def test_south_still_required(self, db_session):
-        """image_id_s remains NOT NULL — omitting it raises."""
-        record = UnitRecord(
-            unit_id="unit_no_south",
-            unit_type="archer",
-            description="missing south",
-            image_id_s=None,
-            image_id_n="n.png",
-            image_id_e="e.png",
-            image_id_w="w.png",
+            description="missing image",
+            image_id=None,
             seed=1,
             prompt_used="p",
         )

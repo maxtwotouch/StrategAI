@@ -50,11 +50,10 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 - **SQLite-backed**: `LeaderRecord` table tracks all leaders alongside `AssetRecord`.
 
 ### G. Unit Pipeline (`unit_engine.py`, `unit_models.py`, `unit_prompts.py`, `unit_registry.py`)
-- **Directional sprite generation**: each unit type (archer, scout, settler, warrior) generates up to 4 cardinal-facing sprites (south/north/east/west) as separate 512×512 images.
-- **Single-direction fast path**: clients can request a single direction (e.g. `"s"`) for ~4× faster iteration. The south-facing sprite is canonical.
-- **Enum-driven prompt assembly**: `unit_prompts.py` maps `unit_type` + `direction` to rich pixel-art prose, combined with the client's free-form `description`.
-- **Static fallback with direction resolution**: `StaticUnitEngine` resolves sprites from `static_tiles/unit/{type}_{direction}.png`, falling back to the south sprite for any missing direction.
-- **SQLite-backed**: `UnitRecord` table stores all four directional image IDs per unit.
+- **Single-sprite generation**: each unit type (archer, scout, settler, warrior) generates one south-facing (front view) sprite at 512×512.
+- **Enum-driven prompt assembly**: `unit_prompts.py` maps `unit_type` to rich pixel-art prose, combined with the client's free-form `description`. South-facing direction is hardcoded into the prompt.
+- **Static fallback**: `StaticUnitEngine` resolves sprites from `static_tiles/unit/{type}.png`, falling back to procedural placeholders if no static PNG exists.
+- **SQLite-backed**: `UnitRecord` table stores a single `image_id` per unit.
 
 ### H. Persistence (`database.py`)
 - **SQLite** via SQLAlchemy. No external database dependency.

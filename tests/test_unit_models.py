@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 from src.unit_models import (
-    UnitRequest, UnitResponse, UnitDirections, UnitCatalog,
-    UnitType, Direction,
+    UnitRequest, UnitResponse, UnitCatalog,
+    UnitType,
 )
 
 
@@ -61,39 +61,6 @@ class TestUnitRequest:
         assert req.unit_type == "dragon"
 
 
-class TestUnitDirections:
-    """Tests for UnitDirections model."""
-
-    def test_all_fields_required(self):
-        """n/e/w are now optional — constructing with only s succeeds."""
-        d = UnitDirections(s="/assets/s.png")
-        assert d.s == "/assets/s.png"
-        assert d.n is None
-        assert d.e is None
-        assert d.w is None
-
-    def test_single_direction_construction(self):
-        """When only south is generated, n/e/w are None."""
-        d = UnitDirections(
-            s="/assets/s.png",
-            n=None,
-            e=None,
-            w=None,
-        )
-        assert d.s == "/assets/s.png"
-        assert d.n is None
-
-    def test_construction(self):
-        d = UnitDirections(
-            s="/assets/s.png",
-            n="/assets/n.png",
-            e="/assets/e.png",
-            w="/assets/w.png",
-        )
-        assert d.s == "/assets/s.png"
-        assert d.n == "/assets/n.png"
-
-
 class TestUnitResponse:
     """Tests for UnitResponse construction."""
 
@@ -102,18 +69,12 @@ class TestUnitResponse:
             url="/assets/s.png",
             unit_id="unit_archer_a1b2c3",
             unit_type="archer",
-            directions=UnitDirections(
-                s="/assets/s.png",
-                n="/assets/n.png",
-                e="/assets/e.png",
-                w="/assets/w.png",
-            ),
             seed=42,
             generation_mode="placeholder",
         )
         assert resp.asset_type == "unit"
         assert resp.status == "completed"
-        assert resp.directions.s == "/assets/s.png"
+        assert resp.url == "/assets/s.png"
 
 
 class TestUnitCatalog:
@@ -122,10 +83,8 @@ class TestUnitCatalog:
     def test_construction(self):
         cat = UnitCatalog(
             unit_types=sorted(UnitType.ALL),
-            directions=sorted(Direction.ALL),
         )
         assert "archer" in cat.unit_types
-        assert "s" in cat.directions
 
 
 class TestEnums:
@@ -133,6 +92,3 @@ class TestEnums:
 
     def test_unit_type_all(self):
         assert UnitType.ALL == {"archer", "scout", "settler", "warrior"}
-
-    def test_direction_all(self):
-        assert Direction.ALL == {"s", "n", "e", "w"}

@@ -16,13 +16,15 @@ The service accepts structured requests describing *what* to generate and return
 | `object` | tree, boulder, crate | Nature objects and world props |
 | `terrain` | hill, cliff, slope | Elevation features layered over background tiles |
 | `background_tile` | grass, dirt, water | Repeatable terrain tiles |
-| `character_sprite` | knight, archer | Character sprites |
+| `character_sprite` | knight, archer | Character sprites (legacy /generate endpoint) |
+| `unit` | archer, warrior, scout | Top-down character sprites with enum-driven prompts (POST /unit) |
 | `story` | "The dragon attacks" | Epic 16:9 cinematic concept art |
 | `splash` | "King Aldric" | Leader portrait / profile card |
 
 It also supports:
 - **Copy-on-Write inpainting**: take an existing background tile, specify a bounding box (e.g., a river cutting across the tile), and the service fills only that region — leaving the rest untouched.
-- **Leader pipeline**: three-stage generation (splash → profile → action) with img2img character consistency via reference images.
+- **Leader pipeline**: three-stage generation (splash → profile → action) with img2img character consistency via reference images, plus multi-leader action scenes.
+- **Unit pipeline**: single-sprite character generation with enum-driven prompt assembly. Four unit types (archer, scout, settler, warrior) with full CRUD endpoints.
 
 ---
 
@@ -37,12 +39,13 @@ Game Client
 │  POST /generate   POST /splash           │
 │  POST /leader     POST /structure        │
 │  POST /object     POST /terrain          │
+│  POST /unit       GET  /unit             │
 │  GET  /assets/... GET  /health           │
 │  GET  /catalog    GET  /modes            │
 ├──────────────────┬───────────────────────┤
 │  Pydantic Models                         │
 │  models.py, leader_models.py,            │
-│  tile_models.py                          │
+│  tile_models.py, unit_models.py          │
 ├──────────────────┬───────────────────────┤
 │  Generator       │  Leader Engine        │
 │  (generators.py) │  (leader_engine.py)   │
@@ -54,6 +57,11 @@ Game Client
 │  ├ TileEngine (comfyui)                  │
 │  ├ StaticTileEngine                      │
 │  └ _PlaceholderTileEngine                │
+├──────────────────┼───────────────────────┤
+│  Unit Engine (unit_engine.py)            │
+│  ├ UnitEngine (comfyui)                  │
+│  ├ StaticUnitEngine                      │
+│  └ _PlaceholderUnitEngine                │
 ├──────────────────┴───────────────────────┤
 │  ComfyUIClient (comfyui_client.py)       │
 │  Async HTTP+WS: httpx + websockets       │
@@ -67,7 +75,7 @@ Game Client
 │  SQLite DB (database.py)                 │
 │  AssetRecord + LeaderRecord +            │
 │  StructureRecord + ObjectRecord +        │
-│  TerrainRecord                           │
+│  TerrainRecord + UnitRecord              │
 └──────────────────────────────────────────┘
 ```
 
@@ -108,6 +116,10 @@ Set in `config.yaml` — no code changes. The game client never knows which mode
 │   ├── tile_prompts.py       # Enum injection maps + prompt builders
 │   ├── tile_registry.py      # SQLite-backed tile CRUD (structure, object, terrain)
 │   ├── tile_engine.py        # Tile generation orchestrator (comfyui/static/placeholder)
+│   ├── unit_models.py        # Unit enums + Pydantic request/response schemas
+│   ├── unit_prompts.py       # Enum injection maps + prompt builders
+│   ├── unit_registry.py      # SQLite-backed unit CRUD
+│   ├── unit_engine.py        # Single-sprite unit generation (comfyui/static/placeholder)
 ├── workflows/                # ComfyUI API-format workflow JSONs
 │   ├── txt2img.json
 │   ├── inpaint.json

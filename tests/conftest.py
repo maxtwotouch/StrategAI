@@ -192,7 +192,7 @@ def test_catalog_dir(tmp_project_root):
     # unit/
     unit = os.path.join(root, "unit")
     os.makedirs(unit, exist_ok=True)
-    for name in ["archer_s.png", "archer_n.png", "scout_s.png"]:
+    for name in ["archer.png", "scout.png"]:
         _make_empty_png(os.path.join(unit, name))
 
     return root
