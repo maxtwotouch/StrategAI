@@ -269,6 +269,8 @@ select:focus {
 
 .modal input,
 .modal select,
+.diplomacy-drawer__composer input,
+.diplomacy-drawer__composer select,
 .diplomacy-thread__composer input,
 .diplomacy-thread__composer select {
   background: rgba(255, 252, 245, 0.98);
@@ -279,6 +281,8 @@ select:focus {
 
 .modal input::placeholder,
 .modal select::placeholder,
+.diplomacy-drawer__composer input::placeholder,
+.diplomacy-drawer__composer select::placeholder,
 .diplomacy-thread__composer input::placeholder,
 .diplomacy-thread__composer select::placeholder {
   color: rgba(17, 17, 17, 0.52);
@@ -853,6 +857,22 @@ select:focus {
   align-items: center;
 }
 
+.chronicle-tab--badge {
+  background: transparent;
+  border: 1px solid rgba(203, 166, 88, 0.35);
+  color: var(--accent);
+  padding: 0.32rem 0.85rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.chronicle-tab--badge:hover {
+  border-color: rgba(203, 166, 88, 0.7);
+}
+
 .chronicle-collapse {
   margin-left: auto;
   padding: 0.32rem 0.8rem;
@@ -941,32 +961,108 @@ select:focus {
   background: #7d8ba1;
 }
 
-.diplomacy-layout {
-  min-height: 0;
+/* Right-edge diplomacy drawer (Option 1) */
+.diplomacy-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw);
+  background: linear-gradient(180deg, #11181f 0%, #0c1117 100%);
+  border-left: 1px solid rgba(203, 166, 88, 0.22);
+  box-shadow: -16px 0 30px rgba(0, 0, 0, 0.4);
+  z-index: 80;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: var(--space-md);
-  overflow: hidden;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: var(--space-sm);
+  padding: 1rem 1.1rem 1.1rem;
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
+  pointer-events: none;
 }
 
-.diplomacy-list {
+.diplomacy-drawer.is-open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.diplomacy-drawer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(203, 166, 88, 0.14);
+}
+
+.diplomacy-drawer__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.diplomacy-drawer__portrait {
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
+}
+
+.diplomacy-drawer__leader {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+.diplomacy-drawer__close {
+  background: transparent;
+  border: 1px solid rgba(203, 166, 88, 0.22);
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.diplomacy-drawer__close:hover {
+  border-color: rgba(203, 166, 88, 0.55);
+  color: var(--accent);
+}
+
+.diplomacy-drawer__messages {
+  min-height: 0;
+  display: grid;
+  gap: var(--space-xs);
+  align-content: start;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.diplomacy-list {
-  display: grid;
-  gap: var(--space-xs);
-  align-content: start;
+.diplomacy-drawer__messages::-webkit-scrollbar {
+  width: 6px;
 }
 
-.diplomacy-thread {
-  min-width: 0;
-  min-height: 0;
+.diplomacy-drawer__messages::-webkit-scrollbar-thumb {
+  background: rgba(203, 166, 88, 0.18);
+  border-radius: 3px;
+}
+
+.diplomacy-drawer__composer {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-sm);
-  overflow: hidden;
+  align-items: end;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(203, 166, 88, 0.14);
+}
+
+.diplomacy-drawer__composer .field:nth-child(2) {
+  grid-column: 1 / -1;
+}
+
+.diplomacy-drawer__composer .empty-copy,
+.diplomacy-drawer__composer button {
+  grid-column: 1 / -1;
 }
 
 .thread-pills {

@@ -15,7 +15,6 @@ import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 
 type PendingAction = { kind: "found"; unit: UnitDTO } | null;
 type Setup = { radius: number; seed: number; humanName: string };
-type BottomTab = "diplomacy" | "log";
 type MapViewMode = "global" | "local";
 
 type TechDef = {
@@ -104,7 +103,6 @@ export default function HomePage() {
   const [messageText, setMessageText] = useState("");
   const [activeConversationCivId, setActiveConversationCivId] = useState<number | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
-  const [bottomTab, setBottomTab] = useState<BottomTab>("log");
   const [chronicleCollapsed, setChronicleCollapsed] = useState(false);
   const [mapViewMode, setMapViewMode] = useState<MapViewMode>("local");
   const [bannerEvents, setBannerEvents] = useState<TurnEvent[] | null>(null);
@@ -206,11 +204,15 @@ export default function HomePage() {
     setMessageTargetId(otherCivs[0].id);
   }, [messageTargetId, otherCivs]);
 
+  // Drawer is closed by default — only opens when the player clicks a leader.
   useEffect(() => {
-    if (activeConversationCivId !== null) return;
-    if (otherCivs.length === 0) return;
-    setActiveConversationCivId(otherCivs[0].id);
-  }, [activeConversationCivId, otherCivs]);
+    if (activeConversationCivId === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveConversationCivId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeConversationCivId]);
 
   useEffect(() => {
     if (activeConversationCivId === null) return;
@@ -879,10 +881,7 @@ export default function HomePage() {
                       key={civ.id}
                       type="button"
                       className={`leader-row${activeConversationCivId === civ.id ? " is-active" : ""}`}
-                      onClick={() => {
-                        setActiveConversationCivId(civ.id);
-                        setBottomTab("diplomacy");
-                      }}
+                      onClick={() => setActiveConversationCivId(civ.id)}
                     >
                       <span
                         className="leader-row__portrait"
@@ -939,26 +938,19 @@ export default function HomePage() {
         className={`war-room__chronicle${chronicleCollapsed ? " is-collapsed" : ""}`}
       >
         <div className="chronicle-tabs">
-          <button
-            type="button"
-            className={`chronicle-tab${bottomTab === "log" ? " is-active" : ""}`}
-            onClick={() => {
-              setBottomTab("log");
-              if (chronicleCollapsed) setChronicleCollapsed(false);
-            }}
-          >
-            Events
-          </button>
-          <button
-            type="button"
-            className={`chronicle-tab${bottomTab === "diplomacy" ? " is-active" : ""}`}
-            onClick={() => {
-              setBottomTab("diplomacy");
-              if (chronicleCollapsed) setChronicleCollapsed(false);
-            }}
-          >
-            Diplomacy {totalInbox > 0 ? `(${totalInbox})` : ""}
-          </button>
+          <div className="chronicle-tab is-active">Events</div>
+          {totalInbox > 0 && (
+            <button
+              type="button"
+              className="chronicle-tab chronicle-tab--badge"
+              onClick={() => {
+                if (otherCivs[0]) setActiveConversationCivId(otherCivs[0].id);
+              }}
+              title="Open diplomacy drawer"
+            >
+              Inbox ({totalInbox})
+            </button>
+          )}
           <button
             type="button"
             className="chronicle-collapse"
@@ -970,7 +962,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        {!chronicleCollapsed && (bottomTab === "log" ? (
+        {!chronicleCollapsed && (
           <div className="chronicle-grid">
             {eventLog.length === 0 ? (
               <EmptyCopy>No events recorded yet. Resolve a turn to populate the chronicle.</EmptyCopy>
@@ -984,156 +976,7 @@ export default function HomePage() {
               ))
             )}
           </div>
-        ) : (
-          <div className="diplomacy-layout">
-            <div className="diplomacy-list">
-              {otherCivs.length === 0 ? (
-                <EmptyCopy>Meet another civilization to open the diplomatic ledger.</EmptyCopy>
-              ) : (
-                otherCivs.map((civ) => (
-                  <button
-                    key={civ.id}
-                    type="button"
-                    className={`diplomacy-contact${activeConversationCivId === civ.id ? " is-active" : ""}`}
-                    onClick={() => setActiveConversationCivId(civ.id)}
-                  >
-                    <span
-                      className="leader-row__portrait"
-                      style={{ background: CIV_COLORS[civ.id % CIV_COLORS.length] }}
-                    >
-                      {civ.name.slice(0, 1)}
-                    </span>
-                    <span className="leader-row__body">
-                      <strong>{civ.name}</strong>
-                      <span>{civ.leader_name}</span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <div className="diplomacy-thread">
-              <div className="diplomacy-thread__header">
-                <div>
-                  <div className="plate-label">Open Channel</div>
-                  <strong>{activeConversationCiv?.name ?? "No Contact Selected"}</strong>
-                </div>
-                {activeConversationCiv && (
-                  <span className="thread-stance">
-                    {capitalize(activeStance?.stance ?? "peace")}
-                  </span>
-                )}
-              </div>
-
-              {activeConversationCiv && activeStance && (
-                <div className="thread-pills">
-                  <span className="thread-pill">
-                    <span className="thread-pill__label">Status</span>
-                    {capitalize(activeStance.stance)}
-                  </span>
-                  <span
-                    className="thread-pill"
-                    style={{ color: relationshipColor(activeStance.relationship) }}
-                  >
-                    <span className="thread-pill__label">Rel</span>
-                    {activeStance.relationship >= 0 ? "+" : ""}
-                    {activeStance.relationship} {relationshipLabel(activeStance.relationship)}
-                  </span>
-                  {activeStance.truce_active && (
-                    <span className="thread-pill">
-                      <span className="thread-pill__label">Truce</span>
-                      until T{activeStance.truce_until}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="diplomacy-thread__messages">
-                {activeConversation.length === 0 ? (
-                  <EmptyCopy>No messages exchanged. Send the first diplomatic signal.</EmptyCopy>
-                ) : (
-                  [...activeConversation].reverse().map((message, index) => (
-                    <MessageCard
-                      key={`${message.turn}-${message.from_civ_id}-${message.to_civ_id}-${index}`}
-                      message={message}
-                      civs={state.civs}
-                      humanCivId={humanCiv?.id ?? null}
-                    />
-                  ))
-                )}
-              </div>
-
-              <div className="diplomacy-thread__composer">
-                <label className="field">
-                  <span className="field-label">Tone</span>
-                  <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
-                    {availableMessageKinds.map((kind) => (
-                      <option key={kind.id} value={kind.id}>
-                        {kind.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field field--wide">
-                  <span className="field-label">Message</span>
-                  <input
-                    type="text"
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    placeholder={
-                      activeConversationCiv
-                        ? `Reply to ${activeConversationCiv.name}`
-                        : "Choose a civilization to begin"
-                    }
-                  />
-                </label>
-                {activeStance?.truce_active && (
-                  <div className="empty-copy">
-                    Truce is active until turn {activeStance.truce_until}. Threats and war
-                    declarations are disabled.
-                  </div>
-                )}
-                <button
-                  className="button-primary"
-                  onClick={sendMessage}
-                  disabled={
-                    busy ||
-                    !isHumanTurn ||
-                    !messageText.trim() ||
-                    activeConversationCivId === null
-                  }
-                >
-                  Send
-                </button>
-              </div>
-
-              {activeDiplomaticEvents.length > 0 && (
-                <details className="incidents-details">
-                  <summary>
-                    Recent Incidents ({activeDiplomaticEvents.length})
-                  </summary>
-                  <div className="list-stack">
-                    {[...activeDiplomaticEvents].reverse().slice(0, 6).map((event, index) => (
-                      <div
-                        key={`${event.turn}-${event.kind}-${index}`}
-                        className="list-row"
-                        style={{ cursor: "default" }}
-                      >
-                        <span>
-                          T{event.turn} · {capitalize(event.kind)}
-                        </span>
-                        <span>
-                          {event.relationship_delta >= 0 ? "+" : ""}
-                          {event.relationship_delta}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          </div>
-        ))}
+        )}
       </section>
 
       {pending?.kind === "found" && (
@@ -1177,6 +1020,139 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Diplomacy drawer — slides in from the right when a leader is selected. */}
+      <aside
+        className={`diplomacy-drawer${activeConversationCivId !== null ? " is-open" : ""}`}
+        aria-hidden={activeConversationCivId === null}
+      >
+        {activeConversationCiv && (
+          <>
+            <header className="diplomacy-drawer__header">
+              <div className="diplomacy-drawer__heading">
+                <span
+                  className="leader-row__portrait diplomacy-drawer__portrait"
+                  style={{ background: CIV_COLORS[activeConversationCiv.id % CIV_COLORS.length] }}
+                >
+                  {activeConversationCiv.name.slice(0, 1)}
+                </span>
+                <div>
+                  <div className="plate-label">Open Channel</div>
+                  <strong>{activeConversationCiv.name}</strong>
+                  <div className="diplomacy-drawer__leader">
+                    {activeConversationCiv.leader_name}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="diplomacy-drawer__close"
+                onClick={() => setActiveConversationCivId(null)}
+                aria-label="Close diplomacy"
+              >
+                ×
+              </button>
+            </header>
+
+            {activeStance && (
+              <div className="thread-pills">
+                <span className="thread-pill">
+                  <span className="thread-pill__label">Status</span>
+                  {capitalize(activeStance.stance)}
+                </span>
+                <span
+                  className="thread-pill"
+                  style={{ color: relationshipColor(activeStance.relationship) }}
+                >
+                  <span className="thread-pill__label">Rel</span>
+                  {activeStance.relationship >= 0 ? "+" : ""}
+                  {activeStance.relationship} {relationshipLabel(activeStance.relationship)}
+                </span>
+                {activeStance.truce_active && (
+                  <span className="thread-pill">
+                    <span className="thread-pill__label">Truce</span>
+                    until T{activeStance.truce_until}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="diplomacy-drawer__messages">
+              {activeConversation.length === 0 ? (
+                <EmptyCopy>No messages exchanged. Send the first diplomatic signal.</EmptyCopy>
+              ) : (
+                [...activeConversation].reverse().map((message, index) => (
+                  <MessageCard
+                    key={`${message.turn}-${message.from_civ_id}-${message.to_civ_id}-${index}`}
+                    message={message}
+                    civs={state?.civs ?? []}
+                    humanCivId={humanCiv?.id ?? null}
+                  />
+                ))
+              )}
+            </div>
+
+            <div className="diplomacy-drawer__composer">
+              <label className="field">
+                <span className="field-label">Tone</span>
+                <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
+                  {availableMessageKinds.map((kind) => (
+                    <option key={kind.id} value={kind.id}>
+                      {kind.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Message</span>
+                <input
+                  type="text"
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder={`Reply to ${activeConversationCiv.name}`}
+                />
+              </label>
+              {activeStance?.truce_active && (
+                <div className="empty-copy">
+                  Truce until turn {activeStance.truce_until}. Threats and war declarations are disabled.
+                </div>
+              )}
+              <button
+                className="button-primary"
+                onClick={sendMessage}
+                disabled={busy || !isHumanTurn || !messageText.trim()}
+              >
+                Send
+              </button>
+            </div>
+
+            {activeDiplomaticEvents.length > 0 && (
+              <details className="incidents-details">
+                <summary>
+                  Recent Incidents ({activeDiplomaticEvents.length})
+                </summary>
+                <div className="list-stack">
+                  {[...activeDiplomaticEvents].reverse().slice(0, 8).map((event, index) => (
+                    <div
+                      key={`${event.turn}-${event.kind}-${index}`}
+                      className="list-row"
+                      style={{ cursor: "default" }}
+                    >
+                      <span>
+                        T{event.turn} · {capitalize(event.kind)}
+                      </span>
+                      <span>
+                        {event.relationship_delta >= 0 ? "+" : ""}
+                        {event.relationship_delta}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </>
+        )}
+      </aside>
 
       {error && <div className="toast">{error}</div>}
     </main>

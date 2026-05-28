@@ -371,6 +371,7 @@ export function SquareMap(props: StrategyMapProps) {
         if (!drag.moved) {
           drag.moved = true;
           userCameraDirtyRef.current = true;
+          setDragging(true);
         }
       }
 
@@ -433,7 +434,6 @@ export function SquareMap(props: StrategyMapProps) {
       lastY: event.clientY,
       moved: false,
     };
-    setDragging(true);
   };
 
   // Native non-passive wheel listener → we can preventDefault to stop page
