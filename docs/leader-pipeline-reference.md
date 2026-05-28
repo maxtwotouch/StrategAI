@@ -1,8 +1,8 @@
-# Implementation Plan: Leader Image Pipeline
+# Leader Pipeline: Implementation Reference
 
-> **Status:** Planning  
-> **Date:** May 27, 2026  
-> **Based on:** `docs/client-api-leader-guide.md` (with deviations noted)
+> **Status:** Implemented  
+> **Date:** May 2026  
+> **See also:** [`architecture.md`](./architecture.md) for system overview, [`leader-prompt-guide.md`](./leader-prompt-guide.md) for API consumers.
 
 ---
 
@@ -131,7 +131,7 @@ The `LeaderRequest` is deliberately **flat** (matching `GenerationRequest` and `
 | `src/database.py` | **Edit** | 1 |
 | `src/comfyui_client.py` | **Edit** | 5 |
 | `src/main.py` | **Edit** | 7 |
-| `docs/leader_pipeline_plan.md` | **New** (this file) | 0 |
+| `docs/leader-pipeline-reference.md` | **New** (this file) | 0 |
 
 **Untouched files:** `src/generators.py`, `src/storage.py`, `src/inpainting.py`, `src/static_catalog.py`, `src/__init__.py`, `requirements.txt`, `workflows/txt2img.json`, `workflows/inpaint.json`, `workflows/story.json`, `workflows/splash.json`, `static_tiles/`, `generated_assets/`, `splash_assets/`, `mock_assets/`.
 
@@ -1938,15 +1938,16 @@ TopDownMedievalPixelArt-Prod/
 ├── .env
 ├── requirements.txt                    # UNCHANGED
 ├── docs/
-│   ├── architecture.md                 # EDIT: add leader pipeline section
-│   ├── client-api-leader-guide.md      # UNCHANGED (reference)
-│   ├── leader_pipeline_plan.md         # NEW (this document)
-│   ├── migration_plan.md              # UNCHANGED
-│   ├── next_steps.md                  # UNCHANGED
-│   └── inpainting_workflow.md         # UNCHANGED
+│   ├── architecture.md                 # System architecture reference
+│   ├── leader-pipeline-reference.md    # THIS DOCUMENT
+│   ├── leader-prompt-guide.md          # Client-facing prompt writing guide
+│   ├── tile-prompt-guide.md            # Client-facing tile prompt guide
+│   ├── unit-prompt-guide.md            # Client-facing unit prompt guide
+│   ├── testing-plan.md                 # Test case checklist
+│   ├── next_steps.md                   # Roadmap
 └── README.md
 ```
 
 ---
 
-*End of plan.*
+*End of reference.*

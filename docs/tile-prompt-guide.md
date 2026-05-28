@@ -712,4 +712,4 @@ LAYERING MODEL (for game engine integration)
 Generate bottom-up: background tile first, then terrain features
 for elevation, then structures and objects, then units on top.
 
-See docs/client-api-unit-guide.md for the unit generation API.
+See [`unit-prompt-guide.md`](./unit-prompt-guide.md) for the unit generation API.

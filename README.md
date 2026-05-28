@@ -531,10 +531,9 @@ Download a previously generated asset. Returns `image/png`.
 | File | Purpose |
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | Full system architecture, component breakdown |
-| [`docs/migration_plan.md`](docs/migration_plan.md) | Plan and rationale for ComfyUI migration |
-| [`docs/leader_pipeline_plan.md`](docs/leader_pipeline_plan.md) | Leader pipeline implementation plan + checklist |
-| [`docs/client-api-leader-guide.md`](docs/client-api-leader-guide.md) | Original leader API design reference (FLUX-focused) |
-| [`docs/tile_generation_plan.md`](docs/tile_generation_plan.md) | Structure, object, and terrain pipeline design |
-| [`docs/client-api-tile-guide.md`](docs/client-api-tile-guide.md) | Client-facing prompt-writing guide for tile endpoints |
-| [`docs/inpainting_workflow.md`](docs/inpainting_workflow.md) | Inpainting prototyping with ComfyUI vs diffusers |
+| [`docs/leader-pipeline-reference.md`](docs/leader-pipeline-reference.md) | Leader pipeline: API contract, design rationale, redundancy audit |
+| [`docs/leader-prompt-guide.md`](docs/leader-prompt-guide.md) | Client-facing prompt-writing guide for leader endpoints |
+| [`docs/tile-prompt-guide.md`](docs/tile-prompt-guide.md) | Client-facing prompt-writing guide for structure/object/terrain endpoints |
+| [`docs/unit-prompt-guide.md`](docs/unit-prompt-guide.md) | Client-facing prompt-writing guide for unit endpoint |
+| [`docs/testing-plan.md`](docs/testing-plan.md) | Comprehensive testing plan with test case checklist |
 | [`docs/next_steps.md`](docs/next_steps.md) | Future roadmap items |
