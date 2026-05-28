@@ -106,12 +106,12 @@ class Settings(BaseSettings):
     @property
     def workflow_dir(self) -> str:
         """Directory containing ComfyUI workflow JSON templates."""
-        return os.path.join(SRC_DIR, "workflows")
+        return os.path.join(BASE_DIR, "workflows")
 
     @property
     def leader_workflow_dir(self) -> str:
         """Directory containing leader-specific workflow JSONs."""
-        return os.path.join(SRC_DIR, "workflows", "leader")
+        return os.path.join(BASE_DIR, "workflows", "leader")
 
     # ------------------------------------------------------------------
     #  Helpers

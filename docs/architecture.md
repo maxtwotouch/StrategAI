@@ -54,7 +54,7 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 
 ## 4. Workflow JSON Templates
 
-Seven ComfyUI workflows stored in `src/workflows/`, exported in API format:
+Seven ComfyUI workflows stored in `workflows/`, exported in API format:
 
 | Workflow | Purpose | Key injection points |
 |---|---|---|

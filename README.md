@@ -108,15 +108,15 @@ Set in `config.yaml` — no code changes. The game client never knows which mode
 │   ├── tile_prompts.py       # Enum injection maps + prompt builders
 │   ├── tile_registry.py      # SQLite-backed tile CRUD (structure, object, terrain)
 │   ├── tile_engine.py        # Tile generation orchestrator (comfyui/static/placeholder)
-│   └── workflows/            # ComfyUI API-format workflow JSONs
-│       ├── txt2img.json
-│       ├── inpaint.json
-│       ├── story.json
-│       ├── splash.json
-│       └── leader/
-│           ���── leader_splash.json
-│           ├── leader_profile.json
-│           └── leader_action.json
+├── workflows/                # ComfyUI API-format workflow JSONs
+│   ├── txt2img.json
+│   ├── inpaint.json
+│   ├── story.json
+│   ├── splash.json
+│   └── leader/
+│       ├── leader_splash.json
+│       ├── leader_profile.json
+│       └── leader_action.json
 ├── static_tiles/             # Pre-made PNG assets (used in static mode)
 ├── leader_references/        # Runtime reference images for leader pipeline
 ├── generated_assets/         # Output directory (runtime)
@@ -518,7 +518,7 @@ Download a previously generated asset. Returns `image/png`.
 - **Per-family generation modes**: Each asset family can independently use `comfyui`, `static`, `placeholder`, or `random` mode via `config.yaml`. Ops, not code.
 - **YAML-first configuration**: All behavioural settings live in version-controlled `config.yaml`. Only deployment-specific values (ComfyUI IP, bind host/port) go in `.env`, using `__` delimiter for nested overrides.
 - **Drop-in static injection**: Adding a new pre-made asset is creating a PNG in the right `static_tiles/` folder and restarting.
-- **Workflows as version-controlled assets**: ComfyUI workflow JSONs live in `src/workflows/` alongside code.
+- **Workflows as version-controlled assets**: ComfyUI workflow JSONs live in `workflows/` at the project root, version-controlled alongside code.
 - **In-memory caching**: `AssetStore` uses an LRU-backed `OrderedDict` for zero-latency asset serving. Falls back to disk reads transparently.
 - **SQLite**: No external database dependency. Tracks every generation across `AssetRecord`, `LeaderRecord`, `StructureRecord`, `ObjectRecord`, and `TerrainRecord`.
 - **Prompt enrichment happens server-side**: The game client says `"water"` or picks an enum; the service handles making it sound good to the diffusion model.
