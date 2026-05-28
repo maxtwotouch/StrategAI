@@ -55,6 +55,14 @@ class UnitRequest(BaseModel):
         ),
     )
     seed: Optional[int] = None
+    direction: Optional[str] = Field(
+        default=None,
+        description=(
+            "Single direction to generate: 's' (south/front), 'n' (north/back), "
+            "'e' (east/right), or 'w' (west/left). When omitted, all 4 directions "
+            "are generated.  Use 's' for fast single-face generation."
+        ),
+    )
 
 
 # ===========================================================================
@@ -62,11 +70,12 @@ class UnitRequest(BaseModel):
 # ===========================================================================
 
 class UnitDirections(BaseModel):
-    """URLs for each cardinal-facing sprite."""
-    s: str   # south / front (always present)
-    n: str   # north / back
-    e: str   # east / right
-    w: str   # west / left
+    """URLs for each cardinal-facing sprite.  n/e/w may be null when only a single
+    direction was requested (s is always present)."""
+    s: str                                # south / front (always present)
+    n: Optional[str] = None               # north / back  (None if not generated)
+    e: Optional[str] = None               # east / right  (None if not generated)
+    w: Optional[str] = None               # west / left   (None if not generated)
 
 
 class UnitResponse(BaseModel):
@@ -75,6 +84,7 @@ class UnitResponse(BaseModel):
     unit_id: str                                      # "unit_archer_a1b2c3"
     unit_type: str
     directions: UnitDirections
+    generated_directions: list[str] = ["s", "n", "e", "w"]   # e.g. ["s"] when only south generated
     seed: int
     generation_mode: str                              # "comfyui" | "static" | "placeholder"
     status: str = "completed"
@@ -90,4 +100,3 @@ class UnitResponse(BaseModel):
 class UnitCatalog(BaseModel):
     unit_types: list[str]
     directions: list[str]
-

@@ -65,9 +65,23 @@ class TestUnitDirections:
     """Tests for UnitDirections model."""
 
     def test_all_fields_required(self):
-        """Missing n → ValidationError."""
-        with pytest.raises(ValidationError):
-            UnitDirections(s="/assets/s.png")
+        """n/e/w are now optional — constructing with only s succeeds."""
+        d = UnitDirections(s="/assets/s.png")
+        assert d.s == "/assets/s.png"
+        assert d.n is None
+        assert d.e is None
+        assert d.w is None
+
+    def test_single_direction_construction(self):
+        """When only south is generated, n/e/w are None."""
+        d = UnitDirections(
+            s="/assets/s.png",
+            n=None,
+            e=None,
+            w=None,
+        )
+        assert d.s == "/assets/s.png"
+        assert d.n is None
 
     def test_construction(self):
         d = UnitDirections(
@@ -122,4 +136,3 @@ class TestEnums:
 
     def test_direction_all(self):
         assert Direction.ALL == {"s", "n", "e", "w"}
-

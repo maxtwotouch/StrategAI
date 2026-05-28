@@ -76,22 +76,38 @@ def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
 # ===========================================================================
 
 class UnitEngine:
-    """Generates unit sprites via ComfyUI — 4 directional facings per unit."""
+    """Generates unit sprites via ComfyUI — 1-4 directional facings per unit."""
 
     def __init__(self, client: ComfyUIClient) -> None:
         self._client = client
 
     async def generate(self, req: UnitRequest) -> UnitResponse:
-        """Generate all 4 direction sprites for a unit type."""
+        """Generate directional sprites for a unit type.
+
+        When ``req.direction`` is set (e.g. ``"s"``), only that single facing
+        is generated — useful for fast iteration.  When omitted, all 4
+        directions (s/n/e/w) are generated.
+        """
         prompt = build_unit_prompt(req.unit_type, Direction.SOUTH, req.description)
         unit_id = generate_unit_id(req.unit_type)
         seed = req.seed or random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 
-        # Generate each direction — reuse the same seed for visual consistency
+        # Determine which directions to generate
+        if req.direction:
+            if req.direction not in Direction.ALL:
+                raise ValueError(
+                    f"Invalid direction '{req.direction}'. Must be one of: "
+                    f"{', '.join(sorted(Direction.ALL))}"
+                )
+            directions_to_generate = [req.direction]
+        else:
+            directions_to_generate = _ALL_DIRECTIONS
+
+        # Generate each requested direction — reuse the same seed for visual consistency
         image_ids: dict[str, str] = {}
-        for direction in _ALL_DIRECTIONS:
+        for direction in directions_to_generate:
             dir_prompt = build_unit_prompt(req.unit_type, direction, req.description)
             img = await self._client.generate(
                 os.path.join(settings.workflow_dir, "txt2img.json"),
@@ -114,32 +130,33 @@ class UnitEngine:
 
             image_ids[direction] = filename
 
-        # Register unit with all 4 directional image IDs
+        # Register unit — null out directions that weren't generated
         UnitRegistry.register(
             unit_id=unit_id,
             unit_type=req.unit_type,
             description=req.description,
-            image_id_s=image_ids[Direction.SOUTH],
-            image_id_n=image_ids[Direction.NORTH],
-            image_id_e=image_ids[Direction.EAST],
-            image_id_w=image_ids[Direction.WEST],
+            image_id_s=image_ids.get(Direction.SOUTH),
             seed=seed,
             prompt_used=prompt,
             generation_mode="comfyui",
+            image_id_n=image_ids.get(Direction.NORTH),
+            image_id_e=image_ids.get(Direction.EAST),
+            image_id_w=image_ids.get(Direction.WEST),
         )
 
         elapsed = int((time.time() - start) * 1000)
 
         return UnitResponse(
-            url=f"/assets/{image_ids[Direction.SOUTH]}",
+            url=f"/assets/{image_ids.get(Direction.SOUTH, '')}",
             unit_id=unit_id,
             unit_type=req.unit_type,
             directions=UnitDirections(
-                s=f"/assets/{image_ids[Direction.SOUTH]}",
-                n=f"/assets/{image_ids[Direction.NORTH]}",
-                e=f"/assets/{image_ids[Direction.EAST]}",
-                w=f"/assets/{image_ids[Direction.WEST]}",
+                s=f"/assets/{image_ids[Direction.SOUTH]}" if Direction.SOUTH in image_ids else "",
+                n=f"/assets/{image_ids[Direction.NORTH]}" if Direction.NORTH in image_ids else None,
+                e=f"/assets/{image_ids[Direction.EAST]}" if Direction.EAST in image_ids else None,
+                w=f"/assets/{image_ids[Direction.WEST]}" if Direction.WEST in image_ids else None,
             ),
+            generated_directions=list(image_ids.keys()),
             seed=seed,
             generation_mode="comfyui",
             prompt_used=prompt,
@@ -206,12 +223,12 @@ class StaticUnitEngine:
             unit_type=req.unit_type,
             description=req.description,
             image_id_s=image_ids[Direction.SOUTH],
-            image_id_n=image_ids[Direction.NORTH],
-            image_id_e=image_ids[Direction.EAST],
-            image_id_w=image_ids[Direction.WEST],
             seed=seed,
             prompt_used=prompt,
             generation_mode="static",
+            image_id_n=image_ids[Direction.NORTH],
+            image_id_e=image_ids[Direction.EAST],
+            image_id_w=image_ids[Direction.WEST],
         )
 
         elapsed = int((time.time() - start) * 1000)
@@ -298,12 +315,12 @@ class _PlaceholderUnitEngine:
             unit_type=req.unit_type,
             description=req.description,
             image_id_s=image_ids[Direction.SOUTH],
-            image_id_n=image_ids[Direction.NORTH],
-            image_id_e=image_ids[Direction.EAST],
-            image_id_w=image_ids[Direction.WEST],
             seed=seed,
             prompt_used=prompt,
             generation_mode="placeholder",
+            image_id_n=image_ids[Direction.NORTH],
+            image_id_e=image_ids[Direction.EAST],
+            image_id_w=image_ids[Direction.WEST],
         )
 
         elapsed = int((time.time() - start) * 1000)

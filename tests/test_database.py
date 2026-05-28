@@ -234,13 +234,36 @@ class TestUnitRecord:
         assert result.image_id_n == result.image_id_s
 
     def test_all_directions_required(self, db_session):
-        """All 4 image_id_* columns NOT NULL — missing one raises."""
+        """n/e/w are now optional (nullable=True).  Inserting with None succeeds."""
         record = UnitRecord(
-            unit_id="unit_bad",
+            unit_id="unit_partial",
             unit_type="archer",
-            description="bad",
+            description="partial directions",
             image_id_s="s.png",
             image_id_n=None,
+            image_id_e=None,
+            image_id_w=None,
+            seed=1,
+            prompt_used="p",
+        )
+        db_session.add(record)
+        db_session.commit()
+
+        result = db_session.query(UnitRecord).filter(UnitRecord.unit_id == "unit_partial").first()
+        assert result is not None
+        assert result.image_id_s == "s.png"
+        assert result.image_id_n is None
+        assert result.image_id_e is None
+        assert result.image_id_w is None
+
+    def test_south_still_required(self, db_session):
+        """image_id_s remains NOT NULL — omitting it raises."""
+        record = UnitRecord(
+            unit_id="unit_no_south",
+            unit_type="archer",
+            description="missing south",
+            image_id_s=None,
+            image_id_n="n.png",
             image_id_e="e.png",
             image_id_w="w.png",
             seed=1,
@@ -265,4 +288,3 @@ class TestGetDb:
             next(db_gen)
         except StopIteration:
             pass
-

@@ -34,14 +34,15 @@ class UnitRegistry:
         unit_type: str,
         description: str,
         image_id_s: str,
-        image_id_n: str,
-        image_id_e: str,
-        image_id_w: str,
         seed: int,
         prompt_used: str,
         generation_mode: str,
+        image_id_n: str | None = None,
+        image_id_e: str | None = None,
+        image_id_w: str | None = None,
     ) -> None:
-        """Persist a new unit record."""
+        """Persist a new unit record.  n/e/w image IDs may be None when only a
+        single direction was generated."""
         with SessionLocal() as db:
             record = UnitRecord(
                 unit_id=unit_id,
