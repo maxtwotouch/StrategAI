@@ -3,25 +3,23 @@ for the structure, object, and terrain pipelines.
 
 The client never writes raw prompts.  The server builds them from
 structured enums plus the free-form description field, then wraps them
-in a template from ``config/prompt_templates.json`` via the centralized
-``PromptTemplateLoader``.
+in a template from ``config/prompt_templates.json`` via ``render()``.
 """
 
-from src.prompt_templates import assemble as _assemble
+from src.prompt_templates import render as _render, get_placeholders
 from .models import (
     StructureRequest, ObjectRequest, TerrainRequest,
 )
 
 
 def load_template(family: str) -> str:
-    """Return the full template text with {PROMPT_HERE} placeholder for testing.
+    """Return the full template text with {inner} placeholder for testing.
 
-    For production use, prefer :func:`_assemble` which handles prefix/suffix
-    separation automatically.
+    This is a convenience for test assertions — tests can call this to
+    see what template structure a family uses.
     """
     from src.prompt_templates import get_template
-    tmpl = get_template(family)
-    return f"{tmpl['prefix']}{{PROMPT_HERE}}{tmpl['suffix']}"
+    return get_template(family)["template"]
 
 
 # ===========================================================================
@@ -263,7 +261,7 @@ def build_structure_prompt(req: StructureRequest) -> str:
         STRUCTURE_CONDITION[req.condition],
         req.description.strip(),
     ])
-    return _assemble("structure", inner)
+    return _render("structure", inner=inner)
 
 
 def build_object_prompt(req: ObjectRequest) -> str:
@@ -273,7 +271,7 @@ def build_object_prompt(req: ObjectRequest) -> str:
         f"during {SEASON[req.season]}",
         req.description.strip(),
     ])
-    return _assemble("object", inner)
+    return _render("object", inner=inner)
 
 
 def build_terrain_prompt(req: TerrainRequest) -> str:
@@ -282,4 +280,4 @@ def build_terrain_prompt(req: TerrainRequest) -> str:
         f"with {TERRAIN_MATERIAL[req.material]} material",
         req.description.strip(),
     ])
-    return _assemble("terrain", inner)
+    return _render("terrain", inner=inner)

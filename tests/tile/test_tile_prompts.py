@@ -58,12 +58,12 @@ class TestBuildStructurePrompt:
         assert "freshly built" in prompt.lower()  # pristine prose
 
     def test_uses_template(self):
-        """Prompt is wrapped by the structure template (prefix and suffix present)."""
+        """Prompt is wrapped by the structure template (prefix and suffix parts present)."""
         req = _make_structure_req()
         prompt = build_structure_prompt(req)
         template = load_template("structure")
-        parts = template.split("{PROMPT_HERE}")
-        assert len(parts) == 2, "Template must have exactly one {PROMPT_HERE} placeholder"
+        parts = template.split("{inner}")
+        assert len(parts) == 2, "Template must have exactly one {inner} placeholder"
         assert parts[0].strip() in prompt
         assert parts[1].strip() in prompt
 

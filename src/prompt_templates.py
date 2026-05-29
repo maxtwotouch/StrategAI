@@ -1,18 +1,23 @@
 """Centralized prompt template loader.
 
 Loads and caches templates from ``config/prompt_templates.json``.
-Each template has a ``prefix`` and ``suffix`` field.  The caller
-provides the prose that goes between them (enum-injected descriptions,
-free-form user text), and ``assemble()`` returns the final prompt string.
+Each template has a ``template`` field containing a string with
+``{placeholder}`` variables.  The caller provides keyword arguments
+matching the placeholders, and ``render()`` returns the final prompt string.
 
-All prompt text lives in the JSON file.  Python code only contributes
-enum injection maps and assembly logic — never hardcoded style directives.
+Enum-injected prose and user descriptions are prepared by the per-pipeline
+prompt builders (``src/leader/prompts.py``, ``src/tile/prompts.py``, etc.)
+and passed as keyword arguments.  All prompt text lives in the JSON file.
+Python code only contributes enum injection maps and assembly logic —
+never hardcoded style directives.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -34,6 +39,9 @@ _PROMPT_TEMPLATES_PATH = (
 _templates: dict[str, dict[str, str]] | None = None
 _templates_lock = threading.Lock()
 
+# Regex to extract {placeholder} names from template strings
+_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+
 
 def _load() -> dict[str, dict[str, str]]:
     """Load and cache the template JSON (called once, lazily, thread-safe)."""
@@ -53,7 +61,7 @@ def _load() -> dict[str, dict[str, str]]:
 
 
 def get_template(family: str) -> dict[str, str]:
-    """Return ``{"prefix": ..., "suffix": ...}`` for a prompt family.
+    """Return ``{"template": "..."}`` for a prompt family.
 
     Raises ``KeyError`` if the family is not defined.
     """
@@ -67,27 +75,62 @@ def get_template(family: str) -> dict[str, str]:
     return tmpl
 
 
-def assemble(family: str, inner: str) -> str:
-    """Build a complete prompt by wrapping *inner* prose in the template.
+def get_placeholders(family: str) -> list[str]:
+    """Return the ordered list of ``{placeholder}`` names in a template.
+
+    Useful for validation and introspection — callers can check which
+    keyword arguments a template expects.
+    """
+    tmpl = get_template(family)
+    return _PLACEHOLDER_RE.findall(tmpl["template"])
+
+
+def render(family: str, **kwargs: str) -> str:
+    """Build a complete prompt by substituting placeholders in the template.
 
     Parameters
     ----------
     family : str
         Template key (e.g. ``"structure"``, ``"leader_splash"``).
-    inner : str
-        The enum-injected prose + user description that goes between
-        ``prefix`` and ``suffix``.
+    **kwargs : str
+        Keyword arguments whose names match the ``{placeholders}`` in the
+        template string.
 
     Returns
     -------
     str
         The final prompt string ready for ComfyUI injection.
+
+    Raises
+    ------
+    KeyError
+        If a placeholder in the template has no corresponding keyword argument,
+        or if the template family is unknown.
     """
     tmpl = get_template(family)
-    prefix = tmpl["prefix"]
-    suffix = tmpl["suffix"]
-    # Insert inner prose between prefix and suffix with natural spacing
-    return f"{prefix}{inner}{suffix}"
+    template_str = tmpl["template"]
+    return template_str.format_map(kwargs)
+
+
+def assemble(family: str, inner: str) -> str:
+    """Legacy wrapper — build a prompt using ``{inner}`` placeholder.
+
+    Deprecated in favor of ``render()``.  Provided for backward compatibility
+    with code that has not yet been migrated to the new placeholder API.
+
+    Parameters
+    ----------
+    family : str
+        Template key (e.g. ``"structure"``).
+    inner : str
+        The prose to substitute for ``{inner}`` in the template.
+
+    Returns
+    -------
+    str
+        The final prompt string.
+    """
+    return render(family, inner=inner)
 
 
 def list_families() -> list[str]:
@@ -99,16 +142,16 @@ def list_families() -> list[str]:
 #  Startup validation
 # ---------------------------------------------------------------------------
 
-_REQUIRED_TEMPLATE_KEYS = {"prefix", "suffix"}
+_REQUIRED_TEMPLATE_KEYS = {"template"}
 
 
 def validate_all_templates() -> list[str]:
     """Validate every loaded template at startup.
 
     Checks that:
-    - Every template has ``prefix`` and ``suffix`` keys.
-    - Both ``prefix`` and ``suffix`` are non-empty strings
-      (degenerate templates would produce broken prompts).
+    - Every template has a ``template`` key.
+    - The ``template`` value is a non-empty string.
+    - Every ``{placeholder}`` in the template is a valid Python identifier.
 
     Returns a list of error messages (empty = all good).  The application
     should refuse to start if any errors are returned.
@@ -135,17 +178,26 @@ def validate_all_templates() -> list[str]:
             )
             continue
 
-        # Check that prefix and suffix are non-empty
-        for key in _REQUIRED_TEMPLATE_KEYS:
-            val = tmpl.get(key, "")
-            if not isinstance(val, str) or not val.strip():
+        # Check that template is a non-empty string
+        template_str = tmpl.get("template", "")
+        if not isinstance(template_str, str) or not template_str.strip():
+            errors.append(
+                f"Template '{family}' has empty or non-string 'template' — "
+                f"prompt assembly would produce incomplete output"
+            )
+            continue
+
+        # Check that all placeholders are valid identifiers
+        placeholders = _PLACEHOLDER_RE.findall(template_str)
+        for ph in placeholders:
+            if not ph.isidentifier():
                 errors.append(
-                    f"Template '{family}' has empty or non-string '{key}' — "
-                    f"prompt assembly would produce incomplete output"
+                    f"Template '{family}' has invalid placeholder '{{{ph}}}' — "
+                    f"must be a valid Python identifier"
                 )
 
     if errors:
-        logger = __import__("logging").getLogger(__name__)
+        logger = logging.getLogger(__name__)
         for err in errors:
             logger.error("Template validation error: %s", err)
 

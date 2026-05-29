@@ -42,7 +42,7 @@ from src.unit.models import (
     UnitType,
 )
 from src.unit.registry import UnitRegistry
-from src.prompt_templates import assemble as _assemble
+from src.prompt_templates import render as _render
 from src.prompt_templates import validate_all_templates
 
 # Setup production logging
@@ -852,7 +852,7 @@ async def generate_background_tile(request: BackgroundTileRequest):
 
     try:
         # Build prompt (same logic as in BackgroundTileEngine.generate)
-        prompt = _assemble("background_tile", f"{request.tile_type} ground texture")
+        prompt = _render("background_tile", tile_type=request.tile_type)
         seed = request.seed if request.seed is not None else secrets.randbits(31)
 
         t0 = time.time()

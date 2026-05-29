@@ -24,7 +24,7 @@ from PIL import Image, ImageDraw
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
 from src.database import SessionLocal, AssetRecord
-from src.prompt_templates import assemble as _assemble
+from src.prompt_templates import render as _render
 from src.static_catalog import catalog as static_catalog
 from src.storage import store
 
@@ -82,7 +82,7 @@ class BackgroundTileEngine:
                 f"Unknown tile_type '{tile_type}'. Valid: {sorted(TILE_TYPES)}"
             )
 
-        prompt = _assemble("background_tile", f"{tile_type} ground texture")
+        prompt = _render("background_tile", tile_type=tile_type)
         seed = seed if seed is not None else secrets.randbits(31)
 
         start = time.time()

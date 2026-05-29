@@ -4,11 +4,12 @@ The client never writes raw prompts. The server builds them from structured
 enums (archetype, culture, time_of_day, mood, action_category) plus the
 leader_description and action_description prose fields.
 
-Prompt templates (prefix + suffix) live in ``config/prompt_templates.json``.
-This module only contributes the enum injection maps and assembly logic.
+Prompt templates live in ``config/prompt_templates.json`` and use
+``{placeholder}`` variables.  This module prepares the keyword arguments
+(enum-injected prose + user descriptions) and calls ``render()``.
 """
 
-from src.prompt_templates import assemble as _assemble
+from src.prompt_templates import render as _render
 from .models import LeaderRequest
 
 # ---------------------------------------------------------------------------
@@ -200,41 +201,41 @@ ACTION_CATEGORY = {
 # Prompt builders
 # ---------------------------------------------------------------------------
 # Style directives live exclusively in config/prompt_templates.json —
-# the Python layer only assembles enum-injected prose between the
-# template prefix and suffix.  No hardcoded tail strings.
+# the Python layer only passes enum-injected prose as keyword arguments
+# to ``_render()``.  No hardcoded style directives.
 # ---------------------------------------------------------------------------
 
 def build_splash_prompt(req: LeaderRequest) -> str:
-    inner = ", ".join([
-        req.leader_description.strip(),
-        ARCHETYPE[req.archetype],
-        f"in {CULTURE[req.culture]}",
-        TIME_OF_DAY[req.time_of_day],
-        MOOD[req.mood],
-    ])
-    return _assemble("leader_splash", inner)
+    return _render(
+        "leader_splash",
+        leader_description=req.leader_description.strip(),
+        archetype=ARCHETYPE[req.archetype],
+        culture=CULTURE[req.culture],
+        time_of_day=TIME_OF_DAY[req.time_of_day],
+        mood=MOOD[req.mood],
+    )
 
 
 def build_profile_prompt(req: LeaderRequest) -> str:
     # Composition directives (face filling the frame, headpiece visible) live
-    # in the leader_profile template suffix — see config/prompt_templates.json.
-    inner = ", ".join([
-        req.leader_description.strip(),
-        MOOD[req.mood],
-    ])
-    return _assemble("leader_profile", inner)
+    # in the leader_profile template — see config/prompt_templates.json.
+    return _render(
+        "leader_profile",
+        leader_description=req.leader_description.strip(),
+        mood=MOOD[req.mood],
+    )
 
 
 def build_action_prompt(req: LeaderRequest) -> str:
-    inner = ", ".join([
-        req.leader_description.strip(),
-        req.action_description.strip(),
-        f"in {CULTURE[req.culture]}",
-        TIME_OF_DAY[req.time_of_day],
-        MOOD[req.mood],
-        ACTION_CATEGORY[req.action_category],
-    ])
-    return _assemble("leader_action", inner)
+    return _render(
+        "leader_action",
+        leader_description=req.leader_description.strip(),
+        action_description=req.action_description.strip() if req.action_description else "",
+        culture=CULTURE[req.culture],
+        time_of_day=TIME_OF_DAY[req.time_of_day],
+        mood=MOOD[req.mood],
+        action_category=ACTION_CATEGORY[req.action_category] if req.action_category else "",
+    )
 
 
 def build_multi_action_prompt(
@@ -247,9 +248,6 @@ def build_multi_action_prompt(
     Composes all leader descriptions into a single prompt describing
     their interaction within the action scene.
     """
-    # The template prefix (config/prompt_templates.json → leader_action)
-    # already contributes "epic cinematic scene depicting" — Python only
-    # assembles WHO is in the scene, not HOW it is framed.
     if len(leader_descriptions) == 1:
         char_part = leader_descriptions[0].strip()
     elif len(leader_descriptions) == 2:
@@ -265,15 +263,15 @@ def build_multi_action_prompt(
         )
         char_part = f"multiple leaders: {named}"
 
-    inner = ", ".join([
-        char_part,
-        req.action_description.strip(),
-        f"in {CULTURE[req.culture]}",
-        TIME_OF_DAY[req.time_of_day],
-        MOOD[req.mood],
-        ACTION_CATEGORY[req.action_category],
-    ])
-    return _assemble("leader_action", inner)
+    return _render(
+        "leader_action",
+        leader_description=char_part,
+        action_description=req.action_description.strip() if req.action_description else "",
+        culture=CULTURE[req.culture],
+        time_of_day=TIME_OF_DAY[req.time_of_day],
+        mood=MOOD[req.mood],
+        action_category=ACTION_CATEGORY[req.action_category] if req.action_category else "",
+    )
 
 
 def build_prompt(req: LeaderRequest) -> str:

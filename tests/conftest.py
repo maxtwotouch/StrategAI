@@ -43,11 +43,11 @@ def tmp_project_root():
 
     # prompt_templates.json
     templates = {
-        "schema_version": 1,
+        "schema_version": 3,
         "templates": {
-            "structure": "<tdp> {PROMPT_HERE}. Pixel art.",
-            "object": "<tdp> {PROMPT_HERE}. Pixel art.",
-            "terrain": "<tdp> {PROMPT_HERE}. Pixel art.",
+            "structure": {"template": "<tdp> Top-down overhead view. {inner}. Pixel art."},
+            "object": {"template": "<tdp> Top-down overhead view. {inner}. Pixel art."},
+            "terrain": {"template": "<tdp> Top-down overhead view. {inner}. Pixel art."},
         },
     }
     import json

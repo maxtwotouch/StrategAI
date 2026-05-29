@@ -6,11 +6,12 @@ with the same txt2img.json workflow used by structure/object/terrain.
 
 All sprites are south-facing (front view) — the canonical game-facing direction.
 
-Prompt templates (prefix + suffix) live in ``config/prompt_templates.json``.
-This module only contributes the enum injection map and assembly logic.
+Prompt templates live in ``config/prompt_templates.json`` and use
+``{placeholder}`` variables.  This module prepares the keyword arguments
+and calls ``render()``.
 """
 
-from src.prompt_templates import assemble as _assemble
+from src.prompt_templates import render as _render
 from .models import UnitType
 
 
@@ -45,8 +46,7 @@ _UNIT_PROMPTS: dict[str, str] = {
 def build_unit_prompt(unit_type: str, description: str) -> str:
     """Build a rich txt2img prompt from unit type and free-form description.
 
-    The template (prefix: <tdp> trigger + style direction, suffix: format
-    constraints) is loaded from ``config/prompt_templates.json``.  This
+    The template is loaded from ``config/prompt_templates.json``.  This
     function only contributes the unit archetype prose and user description.
 
     Parameters
@@ -64,7 +64,4 @@ def build_unit_prompt(unit_type: str, description: str) -> str:
     """
     unit_desc = _UNIT_PROMPTS.get(unit_type, "medieval character sprite")
 
-    # Inner prose: archetype description + user-provided specifics
-    inner = f"{unit_desc}, {description}"
-
-    return _assemble("unit", inner)
+    return _render("unit", unit_archetype=unit_desc, description=description)
