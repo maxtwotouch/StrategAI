@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.config import settings, DeploymentMode
-from src.database import SessionLocal, AssetRecord, verify_db_connectivity
+from src.database import SessionLocal, AssetRecord, verify_db_connectivity, verify_schema_health, reset_database
 from src.comfyui_client import close_comfyui_client, get_comfyui_loadbalancer
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
 from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
@@ -53,6 +54,10 @@ logger = logging.getLogger(__name__)
 # Leader engine (initialized in lifespan — comfyui or static mode)
 leader_engine: LeaderEngine | StaticLeaderEngine | None = None
 
+# Database schema health flag — set during lifespan startup.
+# When False, all asset-persistence endpoints return 503.
+_db_schema_ok: bool = True
+
 # Tile engine (initialized in lifespan)
 tile_engine: TileEngine | StaticTileEngine | None = None
 
@@ -94,12 +99,25 @@ async def lifespan(app: FastAPI):
         for err in template_errors:
             logger.critical("  • %s", err)
 
+    # --- Database initialisation ---
+    global _db_schema_ok
+
+    # Optional full reset (escape hatch when schema has diverged)
+    if os.environ.get("DATABASE_RESET", "").lower() in ("1", "true", "yes"):
+        logger.info("DATABASE_RESET=true — dropping and recreating all tables.")
+        reset_database()
+
     # Verify database connectivity
     db_ok = verify_db_connectivity()
     if not db_ok:
         logger.critical(
             "Database connectivity check FAILED — asset persistence will not work."
         )
+        _db_schema_ok = False
+    else:
+        # Verify that the on-disk schema matches the current model definitions
+        schema_ok, schema_mismatches = verify_schema_health()
+        _db_schema_ok = schema_ok
 
     # --- Engine initialization ---
     # For single-node configs this is equivalent to a plain ComfyUIClient.
@@ -236,6 +254,18 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+def _require_db() -> None:
+    """Raise 503 if the database schema is out of sync with the models.
+
+    Call at the top of any endpoint that reads or writes the database.
+    """
+    if not _db_schema_ok:
+        raise HTTPException(
+            status_code=503,
+            detail="Database schema mismatch — restart with DATABASE_RESET=true or delete tilemap.db",
+        )
+
+
 # ---------------------------------------------------------------------------
 #  Assets
 # ---------------------------------------------------------------------------
@@ -284,6 +314,7 @@ async def get_catalog():
 @app.get("/health")
 async def health_check():
     """Report service status including ComfyUI connectivity and registered assets."""
+    _require_db()
     lb = get_comfyui_loadbalancer()
     comfyui_ok = False
     if lb is not None:
@@ -352,6 +383,7 @@ async def generate_leader(request: LeaderRequest):
     composite scene depicting all listed leaders via a combined prompt.
     """
     logger.info("Received leader request for type: %s", request.asset_type)
+    _require_db()
 
     if leader_engine is None:
         raise HTTPException(503, "Leader generation not available (ComfyUI unreachable)")
@@ -402,6 +434,7 @@ async def generate_leader(request: LeaderRequest):
 @app.get("/leader", response_model=list[LeaderInfo])
 async def list_leaders():
     """Return all registered leaders. Parallels GET /catalog."""
+    _require_db()
     records = LeaderRegistry.list_all()
     return [
         LeaderInfo(
@@ -422,6 +455,7 @@ async def list_leaders():
 @app.get("/leader/{leader_id}", response_model=LeaderInfo)
 async def get_leader(leader_id: str):
     """Get a specific leader's info + asset URLs."""
+    _require_db()
     leader = LeaderRegistry.get(leader_id)
     if not leader:
         raise HTTPException(404, f"Leader '{leader_id}' not found")
@@ -441,6 +475,7 @@ async def get_leader(leader_id: str):
 @app.delete("/leader/{leader_id}")
 async def delete_leader(leader_id: str):
     """Remove a leader and their reference image. Generated assets remain on disk."""
+    _require_db()
     deleted = LeaderRegistry.delete(leader_id)
     if not deleted:
         raise HTTPException(404, f"Leader '{leader_id}' not found")
@@ -456,6 +491,7 @@ async def delete_leader(leader_id: str):
 async def generate_structure(request: StructureRequest):
     """Generate a structure tile (fortification, production, housing, sacred)."""
     logger.info("Received structure request: category=%s style=%s", request.category, request.style)
+    _require_db()
 
     if tile_engine is None:
         raise HTTPException(503, "Tile generation not available (ComfyUI unreachable)")
@@ -479,6 +515,7 @@ async def generate_structure(request: StructureRequest):
 @app.get("/structure", response_model=list[StructureResponse])
 async def list_structures():
     """Return all generated structures."""
+    _require_db()
     records = StructureRegistry.list_all()
     return [
         StructureResponse(
@@ -510,6 +547,7 @@ async def structure_catalog():
 @app.get("/structure/{structure_id}", response_model=StructureResponse)
 async def get_structure(structure_id: str):
     """Get a specific structure by ID."""
+    _require_db()
     record = StructureRegistry.get(structure_id)
     if not record:
         raise HTTPException(404, f"Structure '{structure_id}' not found")
@@ -529,6 +567,7 @@ async def get_structure(structure_id: str):
 @app.delete("/structure/{structure_id}")
 async def delete_structure(structure_id: str):
     """Remove a structure record. Generated asset remains on disk."""
+    _require_db()
     deleted = StructureRegistry.delete(structure_id)
     if not deleted:
         raise HTTPException(404, f"Structure '{structure_id}' not found")
@@ -539,6 +578,7 @@ async def delete_structure(structure_id: str):
 async def generate_object(request: ObjectRequest):
     """Generate an object tile (vegetation, geological, rural/urban props, debris)."""
     logger.info("Received object request: category=%s biome=%s", request.category, request.biome)
+    _require_db()
 
     if tile_engine is None:
         raise HTTPException(503, "Tile generation not available (ComfyUI unreachable)")
@@ -562,6 +602,7 @@ async def generate_object(request: ObjectRequest):
 @app.get("/object", response_model=list[ObjectResponse])
 async def list_objects():
     """Return all generated objects."""
+    _require_db()
     records = ObjectRegistry.list_all()
     return [
         ObjectResponse(
@@ -591,6 +632,7 @@ async def object_catalog():
 @app.get("/object/{object_id}", response_model=ObjectResponse)
 async def get_object(object_id: str):
     """Get a specific object by ID."""
+    _require_db()
     record = ObjectRegistry.get(object_id)
     if not record:
         raise HTTPException(404, f"Object '{object_id}' not found")
@@ -609,6 +651,7 @@ async def get_object(object_id: str):
 @app.delete("/object/{object_id}")
 async def delete_object(object_id: str):
     """Remove an object record. Generated asset remains on disk."""
+    _require_db()
     deleted = ObjectRegistry.delete(object_id)
     if not deleted:
         raise HTTPException(404, f"Object '{object_id}' not found")
@@ -619,6 +662,7 @@ async def delete_object(object_id: str):
 async def generate_terrain(request: TerrainRequest):
     """Generate a terrain tile (hill, slope, cliff, ridge, depression)."""
     logger.info("Received terrain request: category=%s material=%s", request.category, request.material)
+    _require_db()
 
     if tile_engine is None:
         raise HTTPException(503, "Tile generation not available (ComfyUI unreachable)")
@@ -642,6 +686,7 @@ async def generate_terrain(request: TerrainRequest):
 @app.get("/terrain", response_model=list[TerrainResponse])
 async def list_terrains():
     """Return all generated terrains."""
+    _require_db()
     records = TerrainRegistry.list_all()
     return [
         TerrainResponse(
@@ -671,6 +716,7 @@ async def terrain_catalog():
 @app.get("/terrain/{terrain_id}", response_model=TerrainResponse)
 async def get_terrain(terrain_id: str):
     """Get a specific terrain by ID."""
+    _require_db()
     record = TerrainRegistry.get(terrain_id)
     if not record:
         raise HTTPException(404, f"Terrain '{terrain_id}' not found")
@@ -689,6 +735,7 @@ async def get_terrain(terrain_id: str):
 @app.delete("/terrain/{terrain_id}")
 async def delete_terrain(terrain_id: str):
     """Remove a terrain record. Generated asset remains on disk."""
+    _require_db()
     deleted = TerrainRegistry.delete(terrain_id)
     if not deleted:
         raise HTTPException(404, f"Terrain '{terrain_id}' not found")
@@ -703,6 +750,7 @@ async def generate_unit(request: UnitRequest):
     (front view) sprite is the canonical game-facing direction.
     """
     logger.info("Received unit request: type=%s", request.unit_type)
+    _require_db()
 
     if unit_engine is None:
         raise HTTPException(503, "Unit generation not available (ComfyUI unreachable)")
@@ -731,6 +779,7 @@ async def generate_unit(request: UnitRequest):
 @app.get("/unit", response_model=list[UnitResponse])
 async def list_units():
     """Return all generated units."""
+    _require_db()
     records = UnitRegistry.list_all()
     return [
         UnitResponse(
@@ -757,6 +806,7 @@ async def unit_catalog():
 @app.get("/unit/{unit_id}", response_model=UnitResponse)
 async def get_unit(unit_id: str):
     """Get a specific unit by ID."""
+    _require_db()
     record = UnitRegistry.get(unit_id)
     if not record:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
@@ -774,6 +824,7 @@ async def get_unit(unit_id: str):
 @app.delete("/unit/{unit_id}")
 async def delete_unit(unit_id: str):
     """Remove a unit record. Generated assets remain on disk."""
+    _require_db()
     deleted = UnitRegistry.delete(unit_id)
     if not deleted:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
@@ -793,6 +844,7 @@ async def generate_background_tile(request: BackgroundTileRequest):
     Returns a 128×128 seamless PNG suitable for tiling on a game map.
     """
     logger.info("Received background_tile request: type=%s", request.tile_type)
+    _require_db()
 
     if background_tile_engine is None:
         raise HTTPException(503, "Background tile generation not available (ComfyUI unreachable)")
@@ -832,6 +884,7 @@ async def generate_background_tile(request: BackgroundTileRequest):
 @app.get("/background_tile", response_model=list[BackgroundTileResponse])
 async def list_background_tiles():
     """Return all generated background tiles (from AssetRecord)."""
+    _require_db()
     with SessionLocal() as db:
         records = (
             db.query(AssetRecord)
@@ -861,6 +914,7 @@ async def background_tile_catalog():
 @app.delete("/background_tile/{filename}")
 async def delete_background_tile(filename: str):
     """Remove a background tile record. Generated asset remains on disk."""
+    _require_db()
     with SessionLocal() as db:
         record = db.query(AssetRecord).filter(AssetRecord.id == filename).first()
         if not record:

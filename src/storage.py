@@ -113,5 +113,31 @@ class AssetStore:
         img = Image.open(src_path).convert("RGBA")
         self.save_image(filename, img)
 
+    def delete(self, filename: str) -> bool:
+        """Remove an image from disk and the in-memory cache.
+
+        Returns True if the file existed on disk and was removed.
+        Returns False if the file was only in cache (or not found at all).
+        Never raises — missing files are silently ignored.
+        """
+        filename = _safe_filename(filename)
+        path = os.path.join(self._output_dir, filename)
+        existed = False
+
+        # Disk cleanup
+        try:
+            if os.path.exists(path):
+                os.unlink(path)
+                existed = True
+                logger.info("Deleted asset from disk: %s", filename)
+        except OSError as exc:
+            logger.warning("Failed to delete asset from disk %s: %s", filename, exc)
+
+        # Memory cache cleanup
+        with self._lock:
+            self._memory_cache.pop(filename, None)
+
+        return existed
+
 # Global instance
 store = AssetStore()

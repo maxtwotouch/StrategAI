@@ -241,3 +241,147 @@ class TestGetDb:
             next(db_gen)
         except StopIteration:
             pass
+
+
+# ===========================================================================
+#  Database connectivity verification
+# ===========================================================================
+
+
+class TestVerifyDbConnectivity:
+    """Tests for verify_db_connectivity()."""
+
+    def test_healthy_db_returns_true(self, test_db, monkeypatch):
+        """All expected tables exist → True."""
+        from src.database import verify_db_connectivity
+        monkeypatch.setattr("src.database.engine", test_db)
+        assert verify_db_connectivity() is True
+
+    def test_missing_tables_returns_false(self, test_db, monkeypatch):
+        """Drop a table → False."""
+        from src.database import verify_db_connectivity, Base
+        monkeypatch.setattr("src.database.engine", test_db)
+        # Drop the unit_records table to simulate a missing table
+        Base.metadata.tables["unit_records"].drop(bind=test_db)
+        assert verify_db_connectivity() is False
+        # Recreate for subsequent tests
+        Base.metadata.tables["unit_records"].create(bind=test_db)
+
+
+# ===========================================================================
+#  Schema health verification
+# ===========================================================================
+
+
+class TestVerifySchemaHealth:
+    """Tests for verify_schema_health()."""
+
+    def test_matching_schema_returns_true(self, test_db, monkeypatch):
+        """Freshly created tables match models → (True, [])."""
+        from src.database import verify_schema_health
+        monkeypatch.setattr("src.database.engine", test_db)
+        ok, mismatches = verify_schema_health()
+        assert ok is True
+        assert mismatches == []
+
+    def test_extra_column_in_db_detected(self, test_db, monkeypatch):
+        """A column in the DB but not in the model → mismatch reported."""
+        from src.database import verify_schema_health
+        monkeypatch.setattr("src.database.engine", test_db)
+
+        # Manually add an extra column to asset_records via raw SQL
+        with test_db.connect() as conn:
+            conn.execute(
+                __import__("sqlalchemy").text(
+                    "ALTER TABLE asset_records ADD COLUMN stray_column VARCHAR"
+                )
+            )
+            conn.commit()
+
+        ok, mismatches = verify_schema_health()
+        assert ok is False
+        assert any("stray_column" in m for m in mismatches)
+
+    def test_missing_column_in_db_detected(self, test_db, monkeypatch):
+        """Simulate a column missing from DB but present in model.
+
+        We create a temporary in-memory engine whose asset_records table
+        lacks one column that the real model has, then verify that
+        verify_schema_health() detects the discrepancy.
+        """
+        from sqlalchemy import create_engine as sa_create_engine, Column, String, Integer, inspect as sa_inspect
+        from sqlalchemy.orm import declarative_base as sa_declarative_base
+
+        # Create a separate engine with a deliberately incomplete schema
+        stale_engine = sa_create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+
+        # Copy the real Base metadata but tweak one table
+        from src.database import Base
+        # Clone metadata to a fresh Base so we don't mutate the real models
+        stale_base = sa_declarative_base()
+        # Create only asset_records with one fewer column (omit 'coords_y')
+        stale_asset = type("StaleAssetRecord", (stale_base,), {
+            "__tablename__": "asset_records",
+            "__table_args__": {"extend_existing": True},
+            "id": Column(String, primary_key=True),
+            "asset_family": Column(String, nullable=False, default="unknown"),
+            "base_image_id": Column(String, nullable=True),
+            "coords_x": Column(Integer, nullable=True),
+            # coords_y intentionally omitted
+            "inpaints": Column(__import__("sqlalchemy").JSON, nullable=True),
+            "created_at": Column(__import__("sqlalchemy").DateTime),
+            "updated_at": Column(__import__("sqlalchemy").DateTime),
+        })
+        stale_base.metadata.create_all(bind=stale_engine)
+
+        # Run schema health against the stale engine
+        monkeypatch.setattr("src.database.engine", stale_engine)
+        from src.database import verify_schema_health
+        ok, mismatches = verify_schema_health()
+        # The real AssetRecord model has coords_y, but the stale DB doesn't
+        assert ok is False
+        assert any("coords_y" in m for m in mismatches)
+
+        # Restore the real test_db engine
+        monkeypatch.setattr("src.database.engine", test_db)
+
+
+# ===========================================================================
+#  Database reset
+# ===========================================================================
+
+
+class TestResetDatabase:
+    """Tests for reset_database()."""
+
+    def test_reset_preserves_all_tables(self, test_db, monkeypatch):
+        """After reset, all expected tables exist and are empty."""
+        from src.database import reset_database, Base, SessionLocal
+        from sqlalchemy import inspect as sa_inspect
+
+        monkeypatch.setattr("src.database.engine", test_db)
+        monkeypatch.setattr("src.database.SessionLocal", SessionLocal)
+
+        # Insert data first
+        session = SessionLocal()
+        session.add(AssetRecord(id="pre_reset.png", asset_family="test"))
+        session.commit()
+        session.close()
+
+        # Reset
+        reset_database()
+
+        # Verify all tables exist
+        inspector = sa_inspect(test_db)
+        table_names = set(inspector.get_table_names())
+        expected = {
+            "asset_records", "leader_records", "structure_records",
+            "object_records", "terrain_records", "unit_records",
+        }
+        assert expected.issubset(table_names)
+
+        # Verify data is gone
+        session = SessionLocal()
+        count = session.query(AssetRecord).count()
+        session.close()
+        assert count == 0

@@ -95,3 +95,47 @@ class TestCacheBehavior:
         data = test_store.get_image_bytes("disk1.png")
         assert data is not None
         assert "disk1.png" in test_store._memory_cache
+
+
+# ===========================================================================
+#  Delete
+# ===========================================================================
+
+
+class TestDelete:
+    """Tests for AssetStore.delete()."""
+
+    def test_delete_existing_file(self, test_store, sample_png):
+        """delete() removes the file from disk and memory cache."""
+        test_store.save_image("to_delete.png", sample_png)
+        disk_path = os.path.join(test_store._output_dir, "to_delete.png")
+        assert os.path.exists(disk_path)
+        assert "to_delete.png" in test_store._memory_cache
+
+        result = test_store.delete("to_delete.png")
+        assert result is True
+        assert not os.path.exists(disk_path)
+        assert "to_delete.png" not in test_store._memory_cache
+
+    def test_delete_nonexistent_returns_false(self, test_store):
+        """delete() on a missing file returns False without error."""
+        result = test_store.delete("never_saved.png")
+        assert result is False
+
+    def test_delete_removes_from_cache_only(self, test_store, sample_png):
+        """If file only in cache (disk already gone), delete() still cleans cache."""
+        test_store.save_image("cache_only.png", sample_png)
+        disk_path = os.path.join(test_store._output_dir, "cache_only.png")
+        # Remove from disk but leave in cache
+        os.unlink(disk_path)
+        assert "cache_only.png" in test_store._memory_cache
+
+        result = test_store.delete("cache_only.png")
+        assert result is False  # file wasn't on disk
+        assert "cache_only.png" not in test_store._memory_cache
+
+    def test_delete_is_idempotent(self, test_store, sample_png):
+        """Calling delete() twice on the same file is safe."""
+        test_store.save_image("idem.png", sample_png)
+        assert test_store.delete("idem.png") is True
+        assert test_store.delete("idem.png") is False  # second call: already gone

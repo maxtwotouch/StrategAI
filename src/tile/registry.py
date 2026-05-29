@@ -114,7 +114,7 @@ class StructureRegistry:
                 # Best-effort cleanup of the image file on disk
                 try:
                     store.delete(image_id)
-                except Exception as exc:
+                except (FileNotFoundError, OSError) as exc:
                     logger.warning(
                         "Failed to delete image file %s for structure %s: %s",
                         image_id, structure_id, exc,
@@ -191,7 +191,7 @@ class ObjectRegistry:
                 db.commit()
                 try:
                     store.delete(image_id)
-                except Exception as exc:
+                except (FileNotFoundError, OSError) as exc:
                     logger.warning(
                         "Failed to delete image file %s for object %s: %s",
                         image_id, object_id, exc,
@@ -268,7 +268,7 @@ class TerrainRegistry:
                 db.commit()
                 try:
                     store.delete(image_id)
-                except Exception as exc:
+                except (FileNotFoundError, OSError) as exc:
                     logger.warning(
                         "Failed to delete image file %s for terrain %s: %s",
                         image_id, terrain_id, exc,

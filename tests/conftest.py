@@ -330,6 +330,53 @@ def sample_png():
 
 
 # ===========================================================================
+#  Persistent on-disk SQLite (for schema-mismatch tests)
+# ===========================================================================
+
+
+@pytest.fixture
+def test_db_file(monkeypatch):
+    """Create a real SQLite file on disk (not in-memory) with all tables.
+
+    Unlike ``test_db`` (which uses ``:memory:``), this creates a temporary
+    file so tests can verify behaviour against a persistent database —
+    including stale-schema detection and the DATABASE_RESET escape hatch.
+
+    Yields the engine; the temp file is cleaned up after the test.
+    """
+    import tempfile
+    fd, db_path = tempfile.mkstemp(suffix=".db", prefix="test_tilemap_")
+    os.close(fd)
+
+    try:
+        engine = create_engine(
+            f"sqlite:///{db_path}",
+            connect_args={"check_same_thread": False},
+        )
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+        from src.database import Base
+        Base.metadata.create_all(bind=engine)
+
+        monkeypatch.setattr("src.database.engine", engine)
+        monkeypatch.setattr("src.database.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.leader.registry.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.tile.registry.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.unit.registry.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.tile.engine.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.leader.engine.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.unit.engine.SessionLocal", SessionLocal)
+        monkeypatch.setattr("src.main.SessionLocal", SessionLocal)
+
+        yield engine
+    finally:
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+# ===========================================================================
 #  Helpers
 # ===========================================================================
 

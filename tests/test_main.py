@@ -833,3 +833,52 @@ class TestUnitEndpoints:
         assert "archer" in data["unit_types"]
 
 
+# ===========================================================================
+#  Schema health — endpoint-level 503 guard
+# ===========================================================================
+
+
+class TestSchemaHealthEndpoint:
+    """Verify that DB-dependent endpoints return 503 when _db_schema_ok is False."""
+
+    @pytest.mark.asyncio
+    async def test_db_endpoint_503_when_schema_bad(self, async_client, monkeypatch):
+        """Any DB-dependent endpoint returns 503 when schema check fails."""
+        monkeypatch.setattr("src.main._db_schema_ok", False)
+
+        # Try a few DB-dependent endpoints — all should return 503
+        for method, url, payload in [
+            ("GET", "/leader", None),
+            ("GET", "/structure", None),
+            ("GET", "/object", None),
+            ("GET", "/terrain", None),
+            ("GET", "/unit", None),
+            ("DELETE", "/structure/nonexistent", None),
+        ]:
+            if payload is not None:
+                resp = await async_client.request(method, url, json=payload)
+            else:
+                resp = await async_client.request(method, url)
+            assert resp.status_code == 503, f"{method} {url} should return 503"
+            detail = resp.json()["detail"]
+            assert "DATABASE_RESET" in detail
+
+        # Reset for other tests
+        monkeypatch.setattr("src.main._db_schema_ok", True)
+
+    @pytest.mark.asyncio
+    async def test_non_db_endpoints_unaffected(self, async_client, monkeypatch):
+        """Endpoints that don't touch DB still work when schema is bad."""
+        monkeypatch.setattr("src.main._db_schema_ok", False)
+
+        # These endpoints don't read/write the database
+        resp = await async_client.get("/modes")
+        assert resp.status_code == 200
+
+        resp = await async_client.get("/structure/catalog")
+        assert resp.status_code == 200
+
+        # Reset
+        monkeypatch.setattr("src.main._db_schema_ok", True)
+
+

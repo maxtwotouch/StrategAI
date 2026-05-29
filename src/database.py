@@ -224,3 +224,76 @@ def verify_db_connectivity() -> bool:
     except Exception as exc:
         logger.error("Database connectivity check failed: %s", exc)
         return False
+
+
+def verify_schema_health() -> tuple[bool, list[str]]:
+    """Compare live DB columns against SQLAlchemy model definitions.
+
+    Returns (ok, mismatches) where *ok* is True when every table's columns
+    match the corresponding model, and *mismatches* is a list of
+    human-readable descriptions of any discrepancies found.
+
+    This catches the common case where ``tilemap.db`` was created by an
+    older version of the code and ``create_all()`` silently skipped it.
+    """
+    from sqlalchemy import inspect as sa_inspect
+
+    inspector = sa_inspect(engine)
+    mismatches: list[str] = []
+
+    model_map = {
+        "asset_records": AssetRecord,
+        "leader_records": LeaderRecord,
+        "structure_records": StructureRecord,
+        "object_records": ObjectRecord,
+        "terrain_records": TerrainRecord,
+        "unit_records": UnitRecord,
+    }
+
+    for table_name, model in model_map.items():
+        try:
+            db_columns = {col["name"] for col in inspector.get_columns(table_name)}
+        except Exception as exc:
+            mismatches.append(f"{table_name}: cannot inspect columns — {exc}")
+            continue
+
+        model_columns = {c.name for c in model.__table__.columns}
+
+        missing_in_db = model_columns - db_columns
+        extra_in_db = db_columns - model_columns
+
+        if missing_in_db:
+            mismatches.append(
+                f"{table_name}: columns in model but missing from DB: "
+                + ", ".join(sorted(missing_in_db))
+            )
+        if extra_in_db:
+            mismatches.append(
+                f"{table_name}: columns in DB but not in model: "
+                + ", ".join(sorted(extra_in_db))
+            )
+
+    if mismatches:
+        for msg in mismatches:
+            logger.critical("Schema mismatch: %s", msg)
+        logger.critical(
+            "Database schema is out of sync with models. "
+            "Restart with DATABASE_RESET=true or delete tilemap.db to recreate."
+        )
+        return False, mismatches
+
+    logger.info("Schema health check passed — %d tables match models", len(model_map))
+    return True, []
+
+
+def reset_database() -> None:
+    """Drop all tables and recreate them from the current model definitions.
+
+    **Destructive** — all data is lost.  Intended for development and as
+    an escape hatch when the schema has diverged and no migration system
+    is in place.
+    """
+    logger.warning("Resetting database — dropping all tables and recreating.")
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database reset complete — all tables recreated from models.")

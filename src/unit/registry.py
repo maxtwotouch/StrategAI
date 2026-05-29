@@ -116,7 +116,7 @@ class UnitRegistry:
             # Best-effort cleanup of the image file on disk
             try:
                 store.delete(image_id)
-            except Exception as exc:
+            except (FileNotFoundError, OSError) as exc:
                 logger.warning(
                     "Failed to delete image file %s for unit %s: %s",
                     image_id, unit_id, exc,
