@@ -54,8 +54,8 @@ class TestUnitType:
     """Verify UnitType enum."""
 
     def test_all_types(self):
-        assert len(UnitType.ALL) == 4
-        assert "archer" in UnitType.ALL
-        assert "scout" in UnitType.ALL
-        assert "settler" in UnitType.ALL
-        assert "warrior" in UnitType.ALL
+        assert len(UnitType) == 4
+        assert "archer" in {e.value for e in UnitType}
+        assert "scout" in {e.value for e in UnitType}
+        assert "settler" in {e.value for e in UnitType}
+        assert "warrior" in {e.value for e in UnitType}

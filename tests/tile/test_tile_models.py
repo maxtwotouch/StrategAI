@@ -86,31 +86,31 @@ class TestEnums:
     """Verify enum sets."""
 
     def test_structure_category_all(self):
-        assert len(StructureCategory.ALL) == 4
+        assert len(StructureCategory) == 4
 
     def test_structure_style_all(self):
-        assert len(StructureStyle.ALL) == 7
+        assert len(StructureStyle) == 7
 
     def test_structure_condition_all(self):
-        assert len(StructureCondition.ALL) == 5
+        assert len(StructureCondition) == 5
 
     def test_structure_scale_all(self):
-        assert len(StructureScale.ALL) == 3
+        assert len(StructureScale) == 3
 
     def test_object_category_all(self):
-        assert len(ObjectCategory.ALL) == 5
+        assert len(ObjectCategory) == 5
 
     def test_biome_all(self):
-        assert len(Biome.ALL) == 7
+        assert len(Biome) == 7
 
     def test_season_all(self):
-        assert len(Season.ALL) == 4
+        assert len(Season) == 4
 
     def test_terrain_category_all(self):
-        assert len(TerrainCategory.ALL) == 5
+        assert len(TerrainCategory) == 5
 
     def test_terrain_scale_all(self):
-        assert len(TerrainScale.ALL) == 3
+        assert len(TerrainScale) == 3
 
     def test_terrain_material_all(self):
-        assert len(TerrainMaterial.ALL) == 5
+        assert len(TerrainMaterial) == 5

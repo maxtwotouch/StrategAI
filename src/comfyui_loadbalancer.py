@@ -173,7 +173,12 @@ class ComfyUILoadBalancer:
                 # dead the cancel POST also fails, and if it recovers the
                 # stale job will complete harmlessly (or timeout).
                 # Fire-and-forget, don't block the retry.
-                asyncio.create_task(self._cancel_all_on_node(node))
+                task = asyncio.create_task(self._cancel_all_on_node(node))
+                task.add_done_callback(
+                    lambda t: logger.warning(
+                        "Cancel-on-failure task failed: %s", t.exception()
+                    ) if t.exception() else None
+                )
 
         raise RuntimeError(
             f"All {self._max_retries} ComfyUI node attempts failed:\n"
@@ -217,7 +222,15 @@ class ComfyUILoadBalancer:
         2. Ping ``GET /queue`` on all candidates in parallel.
         3. Return the node with the smallest ``running + pending``.
         4. Tie-break with round-robin counter to avoid thundering-herd.
+
+        Thread-safe via ``_select_lock`` to prevent concurrent selection
+        from corrupting health state or round-robin counter.
         """
+        async with self._select_lock:
+            return await self._select_node_impl()
+
+    async def _select_node_impl(self) -> _Node:
+        """Internal node selection logic (called under lock)."""
         candidates = await self._get_healthy_nodes(lazy_recover=True)
 
         if not candidates:

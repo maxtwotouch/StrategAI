@@ -5,6 +5,8 @@ CRUD operations through the same pattern as StructureRegistry / ObjectRegistry /
 TerrainRegistry.
 """
 
+from __future__ import annotations
+
 import uuid
 import logging
 

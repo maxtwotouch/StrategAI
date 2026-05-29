@@ -110,25 +110,25 @@ class TestEnumMaps:
 
     def test_archetype_map_complete(self):
         from src.leader.models import Archetype
-        for key in Archetype.ALL:
-            assert key in ARCHETYPE, f"Missing archetype: {key}"
+        for member in Archetype:
+            assert member.value in ARCHETYPE, f"Missing archetype: {member.value}"
 
     def test_culture_map_complete(self):
         from src.leader.models import Culture
-        for key in Culture.ALL:
-            assert key in CULTURE, f"Missing culture: {key}"
+        for member in Culture:
+            assert member.value in CULTURE, f"Missing culture: {member.value}"
 
     def test_time_of_day_map_complete(self):
         from src.leader.models import TimeOfDay
-        for key in TimeOfDay.ALL:
-            assert key in TIME_OF_DAY, f"Missing time_of_day: {key}"
+        for member in TimeOfDay:
+            assert member.value in TIME_OF_DAY, f"Missing time_of_day: {member.value}"
 
     def test_mood_map_complete(self):
         from src.leader.models import Mood
-        for key in Mood.ALL:
-            assert key in MOOD, f"Missing mood: {key}"
+        for member in Mood:
+            assert member.value in MOOD, f"Missing mood: {member.value}"
 
     def test_action_category_map_complete(self):
         from src.leader.models import ActionCategory
-        for key in ActionCategory.ALL:
-            assert key in ACTION_CATEGORY, f"Missing action_category: {key}"
+        for member in ActionCategory:
+            assert member.value in ACTION_CATEGORY, f"Missing action_category: {member.value}"

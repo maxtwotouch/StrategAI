@@ -28,28 +28,28 @@ class TestLeaderDocEnums:
 
     def test_archetype_all_in_doc(self, doc_text):
         from src.leader.models import Archetype
-        for val in sorted(Archetype.ALL):
-            assert val in doc_text, f"ARCHETYPE: '{val}' missing from leader-prompt-guide.md"
+        for member in Archetype:
+            assert member.value in doc_text, f"ARCHETYPE: '{member.value}' missing from leader-prompt-guide.md"
 
     def test_culture_all_in_doc(self, doc_text):
         from src.leader.models import Culture
-        for val in sorted(Culture.ALL):
-            assert val in doc_text, f"CULTURE: '{val}' missing from leader-prompt-guide.md"
+        for member in Culture:
+            assert member.value in doc_text, f"CULTURE: '{member.value}' missing from leader-prompt-guide.md"
 
     def test_time_of_day_all_in_doc(self, doc_text):
         from src.leader.models import TimeOfDay
-        for val in sorted(TimeOfDay.ALL):
-            assert val in doc_text, f"TIME_OF_DAY: '{val}' missing from leader-prompt-guide.md"
+        for member in TimeOfDay:
+            assert member.value in doc_text, f"TIME_OF_DAY: '{member.value}' missing from leader-prompt-guide.md"
 
     def test_mood_all_in_doc(self, doc_text):
         from src.leader.models import Mood
-        for val in sorted(Mood.ALL):
-            assert val in doc_text, f"MOOD: '{val}' missing from leader-prompt-guide.md"
+        for member in Mood:
+            assert member.value in doc_text, f"MOOD: '{member.value}' missing from leader-prompt-guide.md"
 
     def test_action_category_all_in_doc(self, doc_text):
         from src.leader.models import ActionCategory
-        for val in sorted(ActionCategory.ALL):
-            assert val in doc_text, f"ACTION_CATEGORY: '{val}' missing from leader-prompt-guide.md"
+        for member in ActionCategory:
+            assert member.value in doc_text, f"ACTION_CATEGORY: '{member.value}' missing from leader-prompt-guide.md"
 
 
 # ===========================================================================
@@ -68,53 +68,53 @@ class TestTileDocEnums:
 
     def test_structure_category_all_in_doc(self, doc_text):
         from src.tile.models import StructureCategory
-        for val in sorted(StructureCategory.ALL):
-            assert val in doc_text, f"StructureCategory: '{val}' missing from tile-prompt-guide.md"
+        for member in StructureCategory:
+            assert member.value in doc_text, f"StructureCategory: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_structure_style_all_in_doc(self, doc_text):
         from src.tile.models import StructureStyle
-        for val in sorted(StructureStyle.ALL):
-            assert val in doc_text, f"StructureStyle: '{val}' missing from tile-prompt-guide.md"
+        for member in StructureStyle:
+            assert member.value in doc_text, f"StructureStyle: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_structure_condition_all_in_doc(self, doc_text):
         from src.tile.models import StructureCondition
-        for val in sorted(StructureCondition.ALL):
-            assert val in doc_text, f"StructureCondition: '{val}' missing from tile-prompt-guide.md"
+        for member in StructureCondition:
+            assert member.value in doc_text, f"StructureCondition: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_structure_scale_all_in_doc(self, doc_text):
         from src.tile.models import StructureScale
-        for val in sorted(StructureScale.ALL):
-            assert val in doc_text, f"StructureScale: '{val}' missing from tile-prompt-guide.md"
+        for member in StructureScale:
+            assert member.value in doc_text, f"StructureScale: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_object_category_all_in_doc(self, doc_text):
         from src.tile.models import ObjectCategory
-        for val in sorted(ObjectCategory.ALL):
-            assert val in doc_text, f"ObjectCategory: '{val}' missing from tile-prompt-guide.md"
+        for member in ObjectCategory:
+            assert member.value in doc_text, f"ObjectCategory: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_biome_all_in_doc(self, doc_text):
         from src.tile.models import Biome
-        for val in sorted(Biome.ALL):
-            assert val in doc_text, f"Biome: '{val}' missing from tile-prompt-guide.md"
+        for member in Biome:
+            assert member.value in doc_text, f"Biome: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_season_all_in_doc(self, doc_text):
         from src.tile.models import Season
-        for val in sorted(Season.ALL):
-            assert val in doc_text, f"Season: '{val}' missing from tile-prompt-guide.md"
+        for member in Season:
+            assert member.value in doc_text, f"Season: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_terrain_category_all_in_doc(self, doc_text):
         from src.tile.models import TerrainCategory
-        for val in sorted(TerrainCategory.ALL):
-            assert val in doc_text, f"TerrainCategory: '{val}' missing from tile-prompt-guide.md"
+        for member in TerrainCategory:
+            assert member.value in doc_text, f"TerrainCategory: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_terrain_scale_all_in_doc(self, doc_text):
         from src.tile.models import TerrainScale
-        for val in sorted(TerrainScale.ALL):
-            assert val in doc_text, f"TerrainScale: '{val}' missing from tile-prompt-guide.md"
+        for member in TerrainScale:
+            assert member.value in doc_text, f"TerrainScale: '{member.value}' missing from tile-prompt-guide.md"
 
     def test_terrain_material_all_in_doc(self, doc_text):
         from src.tile.models import TerrainMaterial
-        for val in sorted(TerrainMaterial.ALL):
-            assert val in doc_text, f"TerrainMaterial: '{val}' missing from tile-prompt-guide.md"
+        for member in TerrainMaterial:
+            assert member.value in doc_text, f"TerrainMaterial: '{member.value}' missing from tile-prompt-guide.md"
 
 
 # ===========================================================================
@@ -133,5 +133,5 @@ class TestUnitDocEnums:
 
     def test_unit_type_all_in_doc(self, doc_text):
         from src.unit.models import UnitType
-        for val in sorted(UnitType.ALL):
-            assert val in doc_text, f"UnitType: '{val}' missing from unit-prompt-guide.md"
+        for member in UnitType:
+            assert member.value in doc_text, f"UnitType: '{member.value}' missing from unit-prompt-guide.md"

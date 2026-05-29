@@ -14,6 +14,8 @@ Resolution (1024→128) and all sampling parameters are baked into the
 workflow JSON.  The engine only injects: positive_prompt, seed.
 """
 
+from __future__ import annotations
+
 import logging
 import random
 import time
@@ -82,7 +84,7 @@ class UnitEngine:
         """Generate a single south-facing sprite for a unit type."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed or random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 
@@ -137,7 +139,7 @@ class StaticUnitEngine:
         """Resolve a unit sprite from static_tiles/unit/, falling back to placeholder."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed or 0
+        seed = req.seed if req.seed is not None else 0
 
         start = time.time()
 
@@ -192,7 +194,7 @@ class _PlaceholderUnitEngine:
     async def generate(self, req: UnitRequest) -> UnitResponse:
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed or random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 

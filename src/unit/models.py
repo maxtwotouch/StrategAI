@@ -6,6 +6,7 @@ picks from, with rich field descriptions so clients know exactly what to send.
 Each unit generates a single south-facing (front view) sprite at 512×512.
 """
 
+from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
@@ -14,12 +15,11 @@ from typing import Optional
 #  Unit type enum
 # ===========================================================================
 
-class UnitType:
+class UnitType(str, Enum):
     ARCHER  = "archer"
     SCOUT   = "scout"
     SETTLER = "settler"
     WARRIOR = "warrior"
-    ALL = {ARCHER, SCOUT, SETTLER, WARRIOR}
 
 
 # ===========================================================================
@@ -29,7 +29,7 @@ class UnitType:
 class UnitRequest(BaseModel):
     unit_type: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(UnitType.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in UnitType))}",
     )
     description: str = Field(
         ...,
@@ -46,9 +46,10 @@ class UnitRequest(BaseModel):
     @field_validator("unit_type")
     @classmethod
     def validate_unit_type(cls, v: str) -> str:
-        if v not in UnitType.ALL:
+        valid = {e.value for e in UnitType}
+        if v not in valid:
             raise ValueError(
-                f"Unknown unit_type '{v}'. Must be one of: {', '.join(sorted(UnitType.ALL))}"
+                f"Unknown unit_type '{v}'. Must be one of: {', '.join(sorted(valid))}"
             )
         return v
 

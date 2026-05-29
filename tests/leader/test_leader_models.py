@@ -172,16 +172,16 @@ class TestEnums:
     """Verify enum sets are complete."""
 
     def test_archetype_all(self):
-        assert len(Archetype.ALL) == 8
+        assert len(Archetype) == 8
 
     def test_culture_all(self):
-        assert len(Culture.ALL) == 12
+        assert len(Culture) == 12
 
     def test_time_of_day_all(self):
-        assert len(TimeOfDay.ALL) == 6
+        assert len(TimeOfDay) == 6
 
     def test_mood_all(self):
-        assert len(Mood.ALL) == 8
+        assert len(Mood) == 8
 
     def test_action_category_all(self):
-        assert len(ActionCategory.ALL) == 7
+        assert len(ActionCategory) == 7

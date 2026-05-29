@@ -11,6 +11,8 @@ tiles (``config/prompt_templates.json → background_tile``) also omits the
 ``<tdp>`` LoRA trigger phrase.
 """
 
+from __future__ import annotations
+
 import logging
 import random
 import time
@@ -97,7 +99,7 @@ class BackgroundTileEngine:
             )
 
         prompt = _assemble("background_tile", f"{tile_type} ground texture")
-        seed = seed or random.randint(10**14, 10**15 - 1)
+        seed = seed if seed is not None else random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 

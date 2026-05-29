@@ -4,6 +4,7 @@ import os
 import pytest
 from unittest.mock import AsyncMock, patch
 from PIL import Image
+from pydantic import ValidationError
 
 from src.leader.models import LeaderRequest
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
@@ -111,27 +112,24 @@ class TestLeaderEngineAction:
 
     @pytest.mark.asyncio
     async def test_action_requires_leader_id(self, mock_comfyui_client, test_store, test_db, monkeypatch):
+        """leader_id + leader_ids both None → ValidationError."""
         monkeypatch.setattr("src.leader.engine.store", test_store)
-        engine = LeaderEngine(mock_comfyui_client)
-        req = _make_leader_req("action", leader_id=None)
-        with pytest.raises(ValueError, match="leader_id"):
-            await engine.generate(req)
+        with pytest.raises(ValidationError, match="leader_id"):
+            _make_leader_req("action", leader_id=None)
 
     @pytest.mark.asyncio
     async def test_action_requires_category(self, mock_comfyui_client, test_store, test_db, monkeypatch):
+        """action_category None → ValidationError."""
         monkeypatch.setattr("src.leader.engine.store", test_store)
-        engine = LeaderEngine(mock_comfyui_client)
-        req = _make_leader_req("action", action_category=None)
-        with pytest.raises(ValueError, match="action_category"):
-            await engine.generate(req)
+        with pytest.raises(ValidationError, match="action_category"):
+            _make_leader_req("action", action_category=None)
 
     @pytest.mark.asyncio
     async def test_action_requires_description(self, mock_comfyui_client, test_store, test_db, monkeypatch):
+        """action_description None → ValidationError."""
         monkeypatch.setattr("src.leader.engine.store", test_store)
-        engine = LeaderEngine(mock_comfyui_client)
-        req = _make_leader_req("action", action_description=None)
-        with pytest.raises(ValueError, match="action_description"):
-            await engine.generate(req)
+        with pytest.raises(ValidationError, match="action_description"):
+            _make_leader_req("action", action_description=None)
 
 
 class TestStaticLeaderEngine:
@@ -223,8 +221,7 @@ class TestStaticLeaderEngine:
 
     @pytest.mark.asyncio
     async def test_action_requires_leader_id(self, test_store, test_db, monkeypatch):
+        """leader_id None → ValidationError (caught at model level)."""
         monkeypatch.setattr("src.leader.engine.store", test_store)
-        engine = StaticLeaderEngine()
-        req = _make_leader_req("action", leader_id=None)
-        with pytest.raises(ValueError, match="leader_id"):
-            await engine.generate(req)
+        with pytest.raises(ValidationError, match="leader_id"):
+            _make_leader_req("action", leader_id=None)

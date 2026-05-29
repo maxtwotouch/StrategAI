@@ -12,7 +12,7 @@ The engine only injects: positive_prompt, seed, and
 All generation methods are **async** and can be awaited directly from
 FastAPI endpoints -- no thread-pool required.
 """
-
+from __future__ import annotations
 import logging
 import random
 import time
@@ -66,7 +66,7 @@ class LeaderEngine:
         leader_id = generate_leader_id(req.leader_name)
 
         # 3. Seed
-        seed = req.seed or random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         # 4. Workflow path
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_splash.json")
@@ -136,13 +136,18 @@ class LeaderEngine:
             )
 
         # 2. Seed: use canonical unless overridden
-        seed = req.seed or leader.splash_seed
+        seed = req.seed if req.seed is not None else leader.splash_seed
 
         # 3. Upload reference image
         ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / leader.reference_filename
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
-        ref_img = Image.open(ref_path).convert("RGBA")
+        try:
+            ref_img = Image.open(ref_path).convert("RGBA")
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to open reference image at {ref_path}: {exc}"
+            ) from exc
         await self._client.upload_reference_image(ref_img, leader.reference_filename)
 
         # 4. Build prompt
@@ -212,13 +217,18 @@ class LeaderEngine:
             )
 
         # 2. Seed
-        seed = req.seed or leader.splash_seed
+        seed = req.seed if req.seed is not None else leader.splash_seed
 
         # 3. Upload reference image
         ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / leader.reference_filename
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
-        ref_img = Image.open(ref_path).convert("RGBA")
+        try:
+            ref_img = Image.open(ref_path).convert("RGBA")
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to open reference image at {ref_path}: {exc}"
+            ) from exc
         await self._client.upload_reference_image(ref_img, leader.reference_filename)
 
         # 4. Build prompt
@@ -302,7 +312,7 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            seed=req.seed or random.randint(10**14, 10**15 - 1),
+            seed=req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1),
         )
 
         # Save
@@ -329,7 +339,7 @@ class LeaderEngine:
             leader_id=asset_id,
             leader_ids=leader_ids,
             leader_names=leader_names,
-            seed=req.seed or 0,
+            seed=seed,
             generation_mode="comfyui",
             prompt_used=prompt,
             resolution=f"{img.width}x{img.height}",
@@ -432,7 +442,7 @@ class StaticLeaderEngine:
     async def _generate_splash(self, req: LeaderRequest) -> LeaderResponse:
         prompt = build_prompt(req)
         leader_id = generate_leader_id(req.leader_name)
-        seed = req.seed or random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 
@@ -495,7 +505,7 @@ class StaticLeaderEngine:
                 f"Leader '{req.leader_id}' not found. Generate a splash first."
             )
 
-        seed = req.seed or leader.splash_seed
+        seed = req.seed if req.seed is not None else leader.splash_seed
         prompt = build_prompt(req)
 
         start = time.time()
@@ -554,7 +564,7 @@ class StaticLeaderEngine:
                 f"Leader '{req.leader_id}' not found. Generate a splash first."
             )
 
-        seed = req.seed or leader.splash_seed
+        seed = req.seed if req.seed is not None else leader.splash_seed
         prompt = build_prompt(req)
 
         # Pick category-specific colours, fall back to a neutral palette

@@ -97,50 +97,50 @@ class TestEnumMaps:
 
     def test_structure_category_map_complete(self):
         from src.tile.models import StructureCategory
-        for key in StructureCategory.ALL:
-            assert key in STRUCTURE_CATEGORY, f"Missing structure category: {key}"
+        for member in StructureCategory:
+            assert member.value in STRUCTURE_CATEGORY, f"Missing structure category: {member.value}"
 
     def test_structure_style_map_complete(self):
         from src.tile.models import StructureStyle
-        for key in StructureStyle.ALL:
-            assert key in STRUCTURE_STYLE, f"Missing structure style: {key}"
+        for member in StructureStyle:
+            assert member.value in STRUCTURE_STYLE, f"Missing structure style: {member.value}"
 
     def test_structure_condition_map_complete(self):
         from src.tile.models import StructureCondition
-        for key in StructureCondition.ALL:
-            assert key in STRUCTURE_CONDITION, f"Missing structure condition: {key}"
+        for member in StructureCondition:
+            assert member.value in STRUCTURE_CONDITION, f"Missing structure condition: {member.value}"
 
     def test_structure_scale_map_complete(self):
         from src.tile.models import StructureScale
-        for key in StructureScale.ALL:
-            assert key in STRUCTURE_SCALE, f"Missing structure scale: {key}"
+        for member in StructureScale:
+            assert member.value in STRUCTURE_SCALE, f"Missing structure scale: {member.value}"
 
     def test_object_category_map_complete(self):
         from src.tile.models import ObjectCategory
-        for key in ObjectCategory.ALL:
-            assert key in OBJECT_CATEGORY, f"Missing object category: {key}"
+        for member in ObjectCategory:
+            assert member.value in OBJECT_CATEGORY, f"Missing object category: {member.value}"
 
     def test_biome_map_complete(self):
         from src.tile.models import Biome
-        for key in Biome.ALL:
-            assert key in BIOME, f"Missing biome: {key}"
+        for member in Biome:
+            assert member.value in BIOME, f"Missing biome: {member.value}"
 
     def test_season_map_complete(self):
         from src.tile.models import Season
-        for key in Season.ALL:
-            assert key in SEASON, f"Missing season: {key}"
+        for member in Season:
+            assert member.value in SEASON, f"Missing season: {member.value}"
 
     def test_terrain_category_map_complete(self):
         from src.tile.models import TerrainCategory
-        for key in TerrainCategory.ALL:
-            assert key in TERRAIN_CATEGORY, f"Missing terrain category: {key}"
+        for member in TerrainCategory:
+            assert member.value in TERRAIN_CATEGORY, f"Missing terrain category: {member.value}"
 
     def test_terrain_scale_map_complete(self):
         from src.tile.models import TerrainScale
-        for key in TerrainScale.ALL:
-            assert key in TERRAIN_SCALE, f"Missing terrain scale: {key}"
+        for member in TerrainScale:
+            assert member.value in TERRAIN_SCALE, f"Missing terrain scale: {member.value}"
 
     def test_terrain_material_map_complete(self):
         from src.tile.models import TerrainMaterial
-        for key in TerrainMaterial.ALL:
-            assert key in TERRAIN_MATERIAL, f"Missing terrain material: {key}"
+        for member in TerrainMaterial:
+            assert member.value in TERRAIN_MATERIAL, f"Missing terrain material: {member.value}"

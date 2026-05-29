@@ -1,5 +1,7 @@
 """Static asset catalog -- scans static_tiles/ and resolves PNGs by family and subtype."""
 
+from __future__ import annotations
+
 import os
 import random
 from collections import defaultdict

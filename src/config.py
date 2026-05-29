@@ -74,6 +74,22 @@ class LeaderSettings(BaseModel):
     pass
 
 
+class ServerSettings(BaseModel):
+    """HTTP server configuration."""
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description="CORS allowed origins. Set to specific domains in production.",
+    )
+    max_request_body_mb: int = Field(
+        default=10,
+        description="Maximum request body size in megabytes.",
+    )
+    assets_url_prefix: str = Field(
+        default="/assets",
+        description="URL prefix for serving generated assets.",
+    )
+
+
 # ---------------------------------------------------------------------------
 #  Top-level Settings
 # ---------------------------------------------------------------------------
@@ -106,6 +122,7 @@ class Settings(BaseSettings):
     paths: PathSettings = Field(default_factory=PathSettings)
     generation: GenerationSettings = Field(default_factory=GenerationSettings)
     leader: LeaderSettings = Field(default_factory=LeaderSettings)
+    server: ServerSettings = Field(default_factory=ServerSettings)
 
     # ------------------------------------------------------------------
     #  Derived structural paths (never overridable — always relative to src/)

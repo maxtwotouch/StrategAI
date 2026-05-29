@@ -5,7 +5,8 @@ pipeline pattern: constrained enum vocabularies the client picks from,
 with rich field descriptions so clients know exactly what to send.
 """
 
-from pydantic import BaseModel, Field
+from enum import Enum
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
@@ -13,15 +14,14 @@ from typing import Optional
 #  Structure enums
 # ===========================================================================
 
-class StructureCategory:
+class StructureCategory(str, Enum):
     FORTIFICATION = "fortification"
     PRODUCTION    = "production"
     HOUSING       = "housing"
     SACRED        = "sacred"
-    ALL = {FORTIFICATION, PRODUCTION, HOUSING, SACRED}
 
 
-class StructureStyle:
+class StructureStyle(str, Enum):
     NORDIC_WOODEN      = "nordic_wooden"
     ANGLO_SAXON_STONE  = "anglo_saxon_stone"
     NORMAN_ROMANESQUE  = "norman_romanesque"
@@ -29,42 +29,35 @@ class StructureStyle:
     MEDITERRANEAN      = "mediterranean"
     SLAVIC_TIMBER      = "slavic_timber"
     MOORISH            = "moorish"
-    ALL = {
-        NORDIC_WOODEN, ANGLO_SAXON_STONE, NORMAN_ROMANESQUE,
-        GOTHIC, MEDITERRANEAN, SLAVIC_TIMBER, MOORISH,
-    }
 
 
-class StructureCondition:
+class StructureCondition(str, Enum):
     PRISTINE            = "pristine"
     WEATHERED           = "weathered"
     RUINED              = "ruined"
     UNDER_CONSTRUCTION  = "under_construction"
     FORTIFIED           = "fortified"
-    ALL = {PRISTINE, WEATHERED, RUINED, UNDER_CONSTRUCTION, FORTIFIED}
 
 
-class StructureScale:
+class StructureScale(str, Enum):
     SMALL  = "small"
     MEDIUM = "medium"
     LARGE  = "large"
-    ALL = {SMALL, MEDIUM, LARGE}
 
 
 # ===========================================================================
 #  Object enums
 # ===========================================================================
 
-class ObjectCategory:
+class ObjectCategory(str, Enum):
     VEGETATION   = "vegetation"
     GEOLOGICAL   = "geological"
     RURAL_PROPS  = "rural_props"
     URBAN_PROPS  = "urban_props"
     DEBRIS       = "debris"
-    ALL = {VEGETATION, GEOLOGICAL, RURAL_PROPS, URBAN_PROPS, DEBRIS}
 
 
-class Biome:
+class Biome(str, Enum):
     TEMPERATE_FOREST = "temperate_forest"
     TAIGA            = "taiga"
     DESERT           = "desert"
@@ -72,47 +65,39 @@ class Biome:
     MOUNTAIN         = "mountain"
     COASTAL          = "coastal"
     GRASSLAND        = "grassland"
-    ALL = {
-        TEMPERATE_FOREST, TAIGA, DESERT, SWAMP, MOUNTAIN,
-        COASTAL, GRASSLAND,
-    }
 
 
-class Season:
+class Season(str, Enum):
     SPRING = "spring"
     SUMMER = "summer"
     AUTUMN = "autumn"
     WINTER = "winter"
-    ALL = {SPRING, SUMMER, AUTUMN, WINTER}
 
 
 # ===========================================================================
 #  Terrain enums
 # ===========================================================================
 
-class TerrainCategory:
+class TerrainCategory(str, Enum):
     HILL       = "hill"
     SLOPE      = "slope"
     CLIFF      = "cliff"
     RIDGE      = "ridge"
     DEPRESSION = "depression"
-    ALL = {HILL, SLOPE, CLIFF, RIDGE, DEPRESSION}
 
 
-class TerrainScale:
+class TerrainScale(str, Enum):
     LOW    = "low"
     MEDIUM = "medium"
     HIGH   = "high"
-    ALL = {LOW, MEDIUM, HIGH}
 
 
-class TerrainMaterial:
+class TerrainMaterial(str, Enum):
     EARTHEN = "earthen"
     SANDY   = "sandy"
     ROCKY   = "rocky"
     SNOWY   = "snowy"
     MUDDY   = "muddy"
-    ALL = {EARTHEN, SANDY, ROCKY, SNOWY, MUDDY}
 
 
 # ===========================================================================
@@ -122,19 +107,19 @@ class TerrainMaterial:
 class StructureRequest(BaseModel):
     category: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(StructureCategory.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in StructureCategory))}",
     )
     style: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(StructureStyle.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in StructureStyle))}",
     )
     condition: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(StructureCondition.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in StructureCondition))}",
     )
     scale: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(StructureScale.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in StructureScale))}",
     )
     description: str = Field(
         ...,
@@ -149,19 +134,59 @@ class StructureRequest(BaseModel):
     )
     seed: Optional[int] = None
 
+    @field_validator("category")
+    @classmethod
+    def _check_category(cls, v: str) -> str:
+        valid = {e.value for e in StructureCategory}
+        if v not in valid:
+            raise ValueError(f"Unknown category '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("style")
+    @classmethod
+    def _check_style(cls, v: str) -> str:
+        valid = {e.value for e in StructureStyle}
+        if v not in valid:
+            raise ValueError(f"Unknown style '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("condition")
+    @classmethod
+    def _check_condition(cls, v: str) -> str:
+        valid = {e.value for e in StructureCondition}
+        if v not in valid:
+            raise ValueError(f"Unknown condition '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("scale")
+    @classmethod
+    def _check_scale(cls, v: str) -> str:
+        valid = {e.value for e in StructureScale}
+        if v not in valid:
+            raise ValueError(f"Unknown scale '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def _strip_description(cls, v: str) -> str:
+        stripped = v.strip()
+        if len(stripped) < 20:
+            raise ValueError("description must be at least 20 characters after stripping whitespace")
+        return stripped
+
 
 class ObjectRequest(BaseModel):
     category: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(ObjectCategory.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in ObjectCategory))}",
     )
     biome: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(Biome.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in Biome))}",
     )
     season: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(Season.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in Season))}",
     )
     description: str = Field(
         ...,
@@ -176,19 +201,51 @@ class ObjectRequest(BaseModel):
     )
     seed: Optional[int] = None
 
+    @field_validator("category")
+    @classmethod
+    def _check_category(cls, v: str) -> str:
+        valid = {e.value for e in ObjectCategory}
+        if v not in valid:
+            raise ValueError(f"Unknown category '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("biome")
+    @classmethod
+    def _check_biome(cls, v: str) -> str:
+        valid = {e.value for e in Biome}
+        if v not in valid:
+            raise ValueError(f"Unknown biome '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("season")
+    @classmethod
+    def _check_season(cls, v: str) -> str:
+        valid = {e.value for e in Season}
+        if v not in valid:
+            raise ValueError(f"Unknown season '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def _strip_description(cls, v: str) -> str:
+        stripped = v.strip()
+        if len(stripped) < 20:
+            raise ValueError("description must be at least 20 characters after stripping whitespace")
+        return stripped
+
 
 class TerrainRequest(BaseModel):
     category: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(TerrainCategory.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in TerrainCategory))}",
     )
     scale: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(TerrainScale.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in TerrainScale))}",
     )
     material: str = Field(
         ...,
-        description=f"One of: {', '.join(sorted(TerrainMaterial.ALL))}",
+        description=f"One of: {', '.join(sorted(e.value for e in TerrainMaterial))}",
     )
     description: str = Field(
         ...,
@@ -202,6 +259,38 @@ class TerrainRequest(BaseModel):
         ),
     )
     seed: Optional[int] = None
+
+    @field_validator("category")
+    @classmethod
+    def _check_category(cls, v: str) -> str:
+        valid = {e.value for e in TerrainCategory}
+        if v not in valid:
+            raise ValueError(f"Unknown category '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("scale")
+    @classmethod
+    def _check_scale(cls, v: str) -> str:
+        valid = {e.value for e in TerrainScale}
+        if v not in valid:
+            raise ValueError(f"Unknown scale '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("material")
+    @classmethod
+    def _check_material(cls, v: str) -> str:
+        valid = {e.value for e in TerrainMaterial}
+        if v not in valid:
+            raise ValueError(f"Unknown material '{v}'. Must be one of: {', '.join(sorted(valid))}")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def _strip_description(cls, v: str) -> str:
+        stripped = v.strip()
+        if len(stripped) < 20:
+            raise ValueError("description must be at least 20 characters after stripping whitespace")
+        return stripped
 
 
 # ===========================================================================

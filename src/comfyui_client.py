@@ -135,9 +135,10 @@ class ComfyUIClient:
         positive_prompt:
             Text prompt to inject into CLIPTextEncode nodes.
         seed:
-            Injected into ``SamplerCustomAdvanced.noise_seed``.  Random if None.
+            Injected into ``KSampler.seed`` or ``SamplerCustomAdvanced.noise_seed``.
+            Random if None.
         width / height:
-            Injected into ``EmptyFlux2LatentImage`` if present.
+            Injected into ``EmptyLatentImage`` or ``EmptyFlux2LatentImage`` if present.
         input_images:
             Mapping of node_id → PIL Image to upload before queueing.
         extra_overrides:
@@ -148,6 +149,8 @@ class ComfyUIClient:
             ``input/`` folder.
         """
         # 1. Load workflow
+        if not os.path.isfile(workflow_path):
+            raise FileNotFoundError(f"Workflow file not found: {workflow_path}")
         with open(workflow_path, "r") as fh:
             workflow = json.load(fh)
 
@@ -170,8 +173,22 @@ class ComfyUIClient:
             ref_image_filename=ref_image_filename,
         )
 
-        # 4. Queue
-        prompt_id = await self.queue_workflow(workflow)
+        # 4. Queue — uploaded images are cleaned up on failure
+        try:
+            prompt_id = await self.queue_workflow(workflow)
+        except Exception:
+            # Best-effort cleanup of uploaded images so ComfyUI's input/
+            # folder doesn't fill up with orphaned files.
+            for uploaded_name in uploaded.values():
+                try:
+                    await self.http.post(
+                        "/api/delete/image",
+                        json={"filename": uploaded_name},
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+            raise
         logger.info("ComfyUI prompt queued: %s", prompt_id)
 
         # 5. Wait for completion
@@ -189,6 +206,11 @@ class ComfyUIClient:
         for _node_id, node_output in outputs.items():
             images = node_output.get("images", [])
             for img_info in images:
+                if not isinstance(img_info, dict) or "filename" not in img_info:
+                    logger.warning(
+                        "Skipping unexpected output entry: %s", img_info
+                    )
+                    continue
                 data = await self.download_image(
                     filename=img_info["filename"],
                     subfolder=img_info.get("subfolder", ""),
@@ -253,13 +275,21 @@ class ComfyUIClient:
         body = resp.json()
         if "node_errors" in body:
             raise ValueError(f"Workflow validation errors: {body['node_errors']}")
+        if "prompt_id" not in body:
+            raise ValueError(
+                f"ComfyUI did not return a prompt_id. Response: {body}"
+            )
         return body["prompt_id"]
 
     async def wait_for_completion(self, prompt_id: str) -> bool:
         """Block until the prompt finishes (WebSocket preferred; falls back to polling)."""
         try:
             return await self._wait_via_ws(prompt_id)
-        except Exception as exc:
+        except (
+            websockets.exceptions.WebSocketException,
+            ConnectionError,
+            OSError,
+        ) as exc:
             logger.warning("WebSocket error, falling back to polling: %s", exc)
             return await self._wait_via_polling(prompt_id)
 
@@ -355,10 +385,18 @@ class ComfyUIClient:
                         )
                         return False
             except websockets.exceptions.ConnectionClosed as exc:
-                logger.warning("WebSocket closed: %s", exc)
-                return True  # assume completion on graceful close
+                logger.warning(
+                    "WebSocket closed prematurely (code=%s): %s — "
+                    "falling back to polling to verify completion",
+                    exc.code,
+                    exc,
+                )
+                # Do NOT assume completion — the WS may have closed before
+                # execution_complete was received.  Fall back to polling to
+                # verify the prompt actually finished.
 
-        # If the loop exited naturally, fall back to polling
+        # If the loop exited naturally OR WS closed prematurely,
+        # fall back to polling to verify completion.
         return await self._wait_via_polling(prompt_id)
 
     async def _wait_via_polling(self, prompt_id: str) -> bool:
@@ -394,14 +432,14 @@ def _patch_workflow(
 ) -> dict:
     """Walk every node and replace common input parameters.
 
-    Flux2 Klein node graph — no KSampler, no negative prompts.
+    Supports both SDXL/standard workflows (KSampler) and Flux2 Klein
+    workflows (SamplerCustomAdvanced).  Node identification is by
+    ``class_type``:
 
-    Node identification is by ``class_type``:
     - ``CLIPTextEncode`` → positive prompt
-    - ``SamplerCustomAdvanced`` → noise_seed
-    - ``EmptyFlux2LatentImage`` → width / height
-    - ``Flux2Scheduler`` → steps / denoise
-    - ``CFGGuider`` → cfg
+    - ``KSampler`` → seed (standard SDXL workflows)
+    - ``SamplerCustomAdvanced`` → noise_seed (Flux2 Klein workflows)
+    - ``EmptyLatentImage`` / ``EmptyFlux2LatentImage`` → width / height
     - ``LoadImage`` → uploaded image or reference filename
     """
     import random as _random
@@ -415,17 +453,29 @@ def _patch_workflow(
         ct = node.get("class_type", "")
         inputs = node.get("inputs", {})
 
-        # --- Positive prompt (Flux2 has no negative prompt node) ---
+        # --- Positive prompt ---
         if ct == "CLIPTextEncode":
             if positive_prompt is not None:
                 inputs["text"] = positive_prompt
 
-        # --- Seed (Flux2 uses SamplerCustomAdvanced + noise_seed) ---
+        # --- Seed: standard KSampler (SDXL workflows) ---
+        if ct == "KSampler":
+            if "seed" in inputs:
+                inputs["seed"] = seed
+
+        # --- Seed: Flux2 Klein (SamplerCustomAdvanced + noise_seed) ---
         if ct == "SamplerCustomAdvanced":
             if "noise_seed" in inputs:
                 inputs["noise_seed"] = seed
 
-        # --- Latent dimensions ---
+        # --- Latent dimensions — standard EmptyLatentImage ---
+        if ct == "EmptyLatentImage":
+            if width is not None:
+                inputs["width"] = width
+            if height is not None:
+                inputs["height"] = height
+
+        # --- Latent dimensions — Flux2 Klein ---
         if ct == "EmptyFlux2LatentImage":
             if width is not None:
                 inputs["width"] = width

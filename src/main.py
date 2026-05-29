@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -118,14 +120,38 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware — restrict origins in production via .env / env vars
+# CORS middleware — configure origins via config.yaml → server.cors_origins
+# or env var SERVER__CORS_ORIGINS (JSON array).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.server.cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=600,
 )
+
+# Request body size limit to prevent DOS
+from fastapi import Request as FastAPIRequest
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse as StarletteJSONResponse
+
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose Content-Length exceeds the configured maximum."""
+
+    async def dispatch(self, request: FastAPIRequest, call_next):
+        max_bytes = settings.server.max_request_body_mb * 1024 * 1024
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > max_bytes:
+            return StarletteJSONResponse(
+                {"detail": f"Request body exceeds {settings.server.max_request_body_mb} MB limit"},
+                status_code=413,
+            )
+        return await call_next(request)
+
+
+app.add_middleware(RequestSizeLimitMiddleware)
 
 
 @app.exception_handler(Exception)
@@ -183,7 +209,9 @@ async def get_catalog():
 async def health_check():
     """Report service status including ComfyUI connectivity."""
     lb = get_comfyui_loadbalancer()
-    comfyui_ok = (lb is not None) and await lb.health_check() if lb else False
+    comfyui_ok = False
+    if lb is not None:
+        comfyui_ok = await lb.health_check()
     return {
         "status": "ok",
         "comfyui_connected": comfyui_ok,
@@ -248,7 +276,7 @@ async def generate_leader(request: LeaderRequest):
 
     try:
         # --- Multi-leader action scene ---
-        if request.asset_type == "action" and getattr(request, "leader_ids", None):
+        if request.asset_type == "action" and request.leader_ids is not None:
             if len(request.leader_ids) < 1:
                 raise HTTPException(
                     status_code=400,
@@ -270,7 +298,7 @@ async def generate_leader(request: LeaderRequest):
         response: LeaderResponse = await leader_engine.generate(request)
         logger.info(
             "Leader %s generated: %s (%.1fs)",
-            response.leader_name,
+            getattr(response, "leader_name", "unknown"),
             response.asset_type,
             (response.generation_time_ms or 0) / 1000,
         )
@@ -279,6 +307,8 @@ async def generate_leader(request: LeaderRequest):
     except ValueError as e:
         logger.warning("Leader validation error: %s", e)
         raise HTTPException(400, detail=str(e))
+    except HTTPException:
+        raise  # re-raise HTTP exceptions unchanged
     except RuntimeError as e:
         logger.error("Leader runtime error: %s", e)
         raise HTTPException(503, detail=str(e))
@@ -388,10 +418,10 @@ async def list_structures():
 async def structure_catalog():
     """Return available enum values for structure generation."""
     return StructureCatalog(
-        categories=sorted(StructureCategory.ALL),
-        styles=sorted(StructureStyle.ALL),
-        conditions=sorted(StructureCondition.ALL),
-        scales=sorted(StructureScale.ALL),
+        categories=sorted(e.value for e in StructureCategory),
+        styles=sorted(e.value for e in StructureStyle),
+        conditions=sorted(e.value for e in StructureCondition),
+        scales=sorted(e.value for e in StructureScale),
     )
 
 
@@ -470,9 +500,9 @@ async def list_objects():
 async def object_catalog():
     """Return available enum values for object generation."""
     return ObjectCatalog(
-        categories=sorted(ObjectCategory.ALL),
-        biomes=sorted(Biome.ALL),
-        seasons=sorted(Season.ALL),
+        categories=sorted(e.value for e in ObjectCategory),
+        biomes=sorted(e.value for e in Biome),
+        seasons=sorted(e.value for e in Season),
     )
 
 
@@ -550,9 +580,9 @@ async def list_terrains():
 async def terrain_catalog():
     """Return available enum values for terrain generation."""
     return TerrainCatalog(
-        categories=sorted(TerrainCategory.ALL),
-        scales=sorted(TerrainScale.ALL),
-        materials=sorted(TerrainMaterial.ALL),
+        categories=sorted(e.value for e in TerrainCategory),
+        scales=sorted(e.value for e in TerrainScale),
+        materials=sorted(e.value for e in TerrainMaterial),
     )
 
 
@@ -637,7 +667,7 @@ async def list_units():
 async def unit_catalog():
     """Return available unit types."""
     return UnitCatalog(
-        unit_types=sorted(UnitType.ALL),
+        unit_types=sorted(e.value for e in UnitType),
     )
 
 

@@ -52,7 +52,7 @@ def build_unit_prompt(unit_type: str, description: str) -> str:
     Parameters
     ----------
     unit_type : str
-        One of ``UnitType.ALL`` — "archer", "scout", "settler", "warrior".
+        One of the ``UnitType`` enum values — "archer", "scout", "settler", "warrior".
     description : str
         Free-form specifics provided by the client (clothing colour, weapon
         details, posture, distinctive features, build, etc.).

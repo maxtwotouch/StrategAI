@@ -565,7 +565,7 @@ class TestLeaderEndpoints:
 
     @pytest.mark.asyncio
     async def test_action_without_category_400(self, async_client):
-        """Action without action_category → 400."""
+        """Action without action_category → 422 (Pydantic validation)."""
         lid = await self._create_splash(async_client, "Cleopatra VII",
             "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence.")
         resp = await async_client.post("/leader", json={
@@ -579,11 +579,11 @@ class TestLeaderEndpoints:
             "mood": "triumphant",
             "action_description": "Leading troops into battle.",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_action_without_description_400(self, async_client):
-        """Action without action_description → 400."""
+        """Action without action_description → 422 (Pydantic validation)."""
         lid = await self._create_splash(async_client, "Cleopatra VII",
             "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence.")
         resp = await async_client.post("/leader", json={
@@ -597,7 +597,7 @@ class TestLeaderEndpoints:
             "mood": "triumphant",
             "action_category": "military",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_full_leader_pipeline(self, async_client):

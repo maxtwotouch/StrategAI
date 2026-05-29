@@ -76,6 +76,7 @@ def _make_load_balancer(
     lb._health_check_interval = 30
     lb._max_retries = 3
     lb._rr_counter = __import__("itertools").count()
+    lb._select_lock = __import__("asyncio").Lock()
 
     lb._nodes = []
     for url, depth, healthy in zip(urls, queue_depths, healthy_flags):

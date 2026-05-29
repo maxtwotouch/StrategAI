@@ -15,7 +15,7 @@ medieval pixel-art styling.  Background tiles use a separate workflow
 Resolution (1024→128) and all sampling parameters are baked into the
 workflow JSON.  The engine only injects: positive_prompt, seed.
 """
-
+from __future__ import annotations
 import logging
 import random
 import time
@@ -146,7 +146,7 @@ class TileEngine:
         asset_id = generate_id(req.category)
 
         # 3. Seed
-        seed = req.seed or random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         # 4. Run ComfyUI
         start = time.time()
@@ -215,17 +215,18 @@ class StaticTileEngine:
         path = static_catalog.resolve_random("structure", req.category)
         if path:
             filename = _load_and_save(path)
+            static_seed = req.seed if req.seed is not None else 0
             _register_tile(
                 StructureRegistry.register,
                 asset_id=asset_id,
                 req=req,
                 image_id=filename,
-                seed=req.seed or 0,
+                seed=static_seed,
                 prompt_used=prompt,
                 generation_mode="static",
             )
             return _build_response(StructureResponse, req, asset_id, filename,
-                                   prompt, "static")
+                                   prompt, "static", seed=static_seed)
 
         # Fall through to placeholder
         return await _PlaceholderTileEngine().generate_structure(req)
@@ -237,17 +238,18 @@ class StaticTileEngine:
         path = static_catalog.resolve_random("nature_object")
         if path:
             filename = _load_and_save(path)
+            static_seed = req.seed if req.seed is not None else 0
             _register_tile(
                 ObjectRegistry.register,
                 asset_id=asset_id,
                 req=req,
                 image_id=filename,
-                seed=req.seed or 0,
+                seed=static_seed,
                 prompt_used=prompt,
                 generation_mode="static",
             )
             return _build_response(ObjectResponse, req, asset_id, filename,
-                                   prompt, "static")
+                                   prompt, "static", seed=static_seed)
 
         return await _PlaceholderTileEngine().generate_object(req)
 
@@ -305,7 +307,7 @@ class _PlaceholderTileEngine:
     ):
         prompt = build_prompt(req)
         asset_id = generate_id(req.category)
-        seed = req.seed or random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 
@@ -339,7 +341,8 @@ class _PlaceholderTileEngine:
 
         elapsed = int((time.time() - start) * 1000)
         return _build_response(response_cls, req, asset_id, filename,
-                               prompt, "placeholder", elapsed, f"{img.width}x{img.height}")
+                               prompt, "placeholder", elapsed, f"{img.width}x{img.height}",
+                               seed=seed)
 
 
 # ===========================================================================
@@ -368,12 +371,12 @@ def _register_tile(registry_register, asset_id: str, req, image_id: str,
 
 def _build_response(response_cls, req, asset_id: str, filename: str,
                     prompt: str, mode: str, elapsed: int | None = None,
-                    resolution: str | None = None):
+                    resolution: str | None = None, seed: int | None = None):
     """Construct a response object with request fields + server metadata."""
     kwargs: dict = {
         "url": f"/assets/{filename}",
         "asset_id": asset_id,
-        "seed": req.seed or 0,
+        "seed": seed if seed is not None else (req.seed if req.seed is not None else 0),
         "generation_mode": mode,
         "prompt_used": prompt,
     }
@@ -391,9 +394,20 @@ def _build_response(response_cls, req, asset_id: str, filename: str,
 
 
 def _load_and_save(src_path: str) -> str:
-    """Open a PNG from disk, save to AssetStore, return the UUID filename."""
+    """Open a PNG from disk, save to AssetStore, return the UUID filename.
+
+    Raises ``FileNotFoundError`` if the source path doesn't exist, and
+    ``ValueError`` if the file can't be opened as an image.
+    """
+    if not os.path.isfile(src_path):
+        raise FileNotFoundError(f"Static tile asset not found: {src_path}")
+    try:
+        img = Image.open(src_path).convert("RGBA")
+    except Exception as exc:
+        raise ValueError(
+            f"Failed to open image at {src_path}: {exc}"
+        ) from exc
     filename = f"{uuid.uuid4()}.png"
-    img = Image.open(src_path).convert("RGBA")
     store.save_image(filename, img)
     logger.info("Served static tile asset %s → %s", src_path, filename)
     return filename
