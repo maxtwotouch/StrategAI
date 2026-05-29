@@ -78,10 +78,11 @@ class UnitRegistry:
     def has_static(unit_type: str) -> bool:
         """Return True if a static sprite exists for this unit type.
 
-        This is checked by the static catalog, not the database, but we provide
-        a convenience hook for the engine to query.
+        NOTE: This is an optimistic stub.  The actual availability check
+        is performed by the engine via ``StaticCatalog.resolve_unit()``.
+        This method exists as a convenience query hook for future use.
         """
-        return True  # optimistic — the engine checks the catalog directly
+        return True
 
     # ------------------------------------------------------------------
     #  Delete

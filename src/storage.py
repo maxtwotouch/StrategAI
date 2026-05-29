@@ -1,5 +1,6 @@
 import os
 import io
+import threading
 from PIL import Image
 from src.config import settings, BASE_DIR
 import logging
@@ -7,14 +8,22 @@ from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_filename(filename: str) -> str:
+    """Strip directory components to prevent path traversal attacks."""
+    return os.path.basename(filename)
+
+
 class AssetStore:
     def __init__(self, max_cache_size=1000):
         self._memory_cache = OrderedDict()
         self.max_cache_size = max_cache_size
+        self._lock = threading.Lock()
         self._output_dir = os.path.join(BASE_DIR, settings.paths.output_dir)
 
     def save_image(self, filename: str, img: Image.Image):
         """Saves the image to both the in-memory cache and local disk."""
+        filename = _safe_filename(filename)
         # Save to disk
         path = os.path.join(self._output_dir, filename)
         img.save(path, format="PNG")
@@ -22,33 +31,37 @@ class AssetStore:
         # Save to memory
         buf = io.BytesIO()
         img.save(buf, format="PNG")
-        self._memory_cache[filename] = buf.getvalue()
-        self._memory_cache.move_to_end(filename)
-
-        # Enforce LRU cap
-        if len(self._memory_cache) > self.max_cache_size:
-            self._memory_cache.popitem(last=False)
-
-        logger.info(f"Saved {filename} to memory cache and disk.")
-
-    def get_image_bytes(self, filename: str) -> bytes | None:
-        """Retrieves image bytes, preferring memory cache then falling back to disk."""
-        if filename in self._memory_cache:
-            self._memory_cache.move_to_end(filename)
-            return self._memory_cache[filename]
-
-        path = os.path.join(self._output_dir, filename)
-        if os.path.exists(path):
-            with open(path, "rb") as f:
-                data = f.read()
-            self._memory_cache[filename] = data
+        with self._lock:
+            self._memory_cache[filename] = buf.getvalue()
             self._memory_cache.move_to_end(filename)
 
             # Enforce LRU cap
             if len(self._memory_cache) > self.max_cache_size:
                 self._memory_cache.popitem(last=False)
 
-            logger.info(f"Loaded {filename} from disk into memory cache.")
+        logger.info("Saved %s to memory cache and disk.", filename)
+
+    def get_image_bytes(self, filename: str) -> bytes | None:
+        """Retrieves image bytes, preferring memory cache then falling back to disk."""
+        filename = _safe_filename(filename)
+        with self._lock:
+            if filename in self._memory_cache:
+                self._memory_cache.move_to_end(filename)
+                return self._memory_cache[filename]
+
+        path = os.path.join(self._output_dir, filename)
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                data = f.read()
+            with self._lock:
+                self._memory_cache[filename] = data
+                self._memory_cache.move_to_end(filename)
+
+                # Enforce LRU cap
+                if len(self._memory_cache) > self.max_cache_size:
+                    self._memory_cache.popitem(last=False)
+
+            logger.info("Loaded %s from disk into memory cache.", filename)
             return data
 
         return None

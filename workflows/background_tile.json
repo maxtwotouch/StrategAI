@@ -1,5 +1,5 @@
 {
-  "_comment": "Workflow for top-down medieval pixel-art game assets (structures, objects, terrain, units).  The <tdp> LoRA trigger in prompt templates (config/prompt_templates.json → structure/object/terrain/unit) activates a LoRA that enforces top-down camera angle with medieval pixel-art styling.  Background tiles use a separate workflow (background_tile.json) without this LoRA.",
+  "_comment": "Workflow for seamless background ground tiles (water, grass, sand, stone, dirt).  Does NOT use the top-down pixel-art LoRA — background tiles are seamless repeating textures that fill the entire frame, not isolated top-down game assets.  The prompt template (config/prompt_templates.json → background_tile) omits the <tdp> LoRA trigger for this reason.",
   "1": {
     "inputs": {
       "ckpt_name": "sd_xl_turbo_1.0.safetensors"
@@ -58,11 +58,10 @@
   },
   "7": {
     "inputs": {
-      "filename_prefix": "tile_asset",
+      "filename_prefix": "bg_tile",
       "images": ["6", 0]
     },
     "class_type": "SaveImage",
     "_meta": {"title": "Save Image"}
   }
 }
-

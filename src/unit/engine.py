@@ -5,6 +5,11 @@ based on the per-family generation mode (comfyui, static, placeholder).
 
 Each unit generates a single south-facing (front view) sprite.
 
+Uses ``workflows/txt2img.json`` — the top-down tile asset workflow.  The
+``<tdp>`` LoRA trigger in the prompt template (``config/prompt_templates.json
+→ unit``) activates a LoRA that enforces top-down camera angle with medieval
+pixel-art styling.
+
 Resolution (1024→128) and all sampling parameters are baked into the
 workflow JSON.  The engine only injects: positive_prompt, seed.
 """
@@ -14,6 +19,7 @@ import random
 import time
 import uuid
 import os
+import threading
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -45,17 +51,20 @@ _UNIT_COLORS: dict[str, tuple[int, int, int, int]] = {
 }
 
 _FONT: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
+_FONT_LOCK = threading.Lock()
 
 
 def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     global _FONT
     if _FONT is None:
-        try:
-            _FONT = ImageFont.truetype(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16
-            )
-        except (OSError, IOError):
-            _FONT = ImageFont.load_default()
+        with _FONT_LOCK:
+            if _FONT is None:
+                try:
+                    _FONT = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16
+                    )
+                except (OSError, IOError):
+                    _FONT = ImageFont.load_default()
     return _FONT
 
 

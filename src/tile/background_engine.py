@@ -5,7 +5,10 @@ Background tiles are the base ground layer — seamless repeating textures
 structure/object/terrain tiles, background tiles fill the entire frame
 with no white background isolation.
 
-Uses the same ``txt2img.json`` workflow as other game assets (1024→128).
+Uses ``workflows/background_tile.json`` — a plain SDXL txt2img workflow
+without the top-down pixel-art LoRA.  The prompt template for background
+tiles (``config/prompt_templates.json → background_tile``) also omits the
+``<tdp>`` LoRA trigger phrase.
 """
 
 import logging
@@ -13,6 +16,7 @@ import random
 import time
 import uuid
 import os
+import threading
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -29,7 +33,7 @@ logger = logging.getLogger(__name__)
 #  Constants
 # ---------------------------------------------------------------------------
 
-# Must match the ComfyUI Image Resize node in workflows/txt2img.json
+# Must match the ComfyUI Image Resize node in workflows/background_tile.json
 GAME_ASSET_SIZE = 128
 
 # Valid background tile types
@@ -45,17 +49,20 @@ _PLACEHOLDER_COLORS: dict[str, tuple[int, int, int, int]] = {
 }
 
 _FONT: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
+_FONT_LOCK = threading.Lock()
 
 
 def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     global _FONT
     if _FONT is None:
-        try:
-            _FONT = ImageFont.truetype(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12
-            )
-        except (OSError, IOError):
-            _FONT = ImageFont.load_default()
+        with _FONT_LOCK:
+            if _FONT is None:
+                try:
+                    _FONT = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12
+                    )
+                except (OSError, IOError):
+                    _FONT = ImageFont.load_default()
     return _FONT
 
 
@@ -95,7 +102,7 @@ class BackgroundTileEngine:
         start = time.time()
 
         img = await self._client.generate(
-            os.path.join(settings.workflow_dir, "txt2img.json"),
+            os.path.join(settings.workflow_dir, "background_tile.json"),
             positive_prompt=prompt,
             seed=seed,
         )

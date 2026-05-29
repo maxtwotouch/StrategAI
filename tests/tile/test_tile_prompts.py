@@ -49,44 +49,47 @@ class TestBuildStructurePrompt:
     """Tests for build_structure_prompt."""
 
     def test_contains_all_enums(self):
-        """Output contains scale, category, style, condition, description."""
+        """Output contains scale, category, style, condition, description (prose values, not enum keys)."""
         req = _make_structure_req()
         prompt = build_structure_prompt(req)
-        assert "small" in prompt.lower() or "compact" in prompt
-        assert "fortification" in prompt.lower()
-        assert "nordic" in prompt.lower()
-        assert "pristine" in prompt.lower()
+        assert "compact" in prompt.lower()
+        assert "defensive" in prompt.lower()  # fortification prose
+        assert "norse" in prompt.lower()      # nordic_wooden prose
+        assert "freshly built" in prompt.lower()  # pristine prose
 
     def test_uses_template(self):
-        """Prompt is wrapped by the structure template."""
+        """Prompt is wrapped by the structure template (prefix and suffix present)."""
         req = _make_structure_req()
         prompt = build_structure_prompt(req)
         template = load_template("structure")
-        assert template.replace("{PROMPT_HERE}", "") in prompt or prompt in template.replace("{PROMPT_HERE}", "test")
+        parts = template.split("{PROMPT_HERE}")
+        assert len(parts) == 2, "Template must have exactly one {PROMPT_HERE} placeholder"
+        assert parts[0].strip() in prompt
+        assert parts[1].strip() in prompt
 
 
 class TestBuildObjectPrompt:
     """Tests for build_object_prompt."""
 
     def test_contains_all_enums(self):
-        """Output contains category, biome, season, description."""
+        """Output contains category, biome, season, description (prose values, not enum keys)."""
         req = _make_object_req()
         prompt = build_object_prompt(req)
-        assert "vegetation" in prompt.lower()
-        assert "temperate" in prompt.lower()
-        assert "summer" in prompt.lower()
+        assert "natural living plant" in prompt.lower()  # vegetation prose
+        assert "deciduous" in prompt.lower()              # temperate_forest prose
+        assert "mature foliage" in prompt.lower()         # summer prose
 
 
 class TestBuildTerrainPrompt:
     """Tests for build_terrain_prompt."""
 
     def test_contains_all_enums(self):
-        """Output contains scale, category, material, description."""
+        """Output contains scale, category, material, description (prose values, not enum keys)."""
         req = _make_terrain_req()
         prompt = build_terrain_prompt(req)
-        assert "hill" in prompt.lower()
-        assert "medium" in prompt.lower()
-        assert "earthen" in prompt.lower()
+        assert "hill" in prompt.lower()                  # hill IS in the terrain prose
+        assert "moderate" in prompt.lower()              # medium scale prose
+        assert "grass-topped" in prompt.lower()          # earthen material prose
 
 
 class TestEnumMaps:

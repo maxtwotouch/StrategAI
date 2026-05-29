@@ -197,10 +197,11 @@ ACTION_CATEGORY = {
 }
 
 # ---------------------------------------------------------------------------
-# Style tails  (appended to every prompt — never exposed to client)
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 # Prompt builders
+# ---------------------------------------------------------------------------
+# Style directives live exclusively in config/prompt_templates.json —
+# the Python layer only assembles enum-injected prose between the
+# template prefix and suffix.  No hardcoded tail strings.
 # ---------------------------------------------------------------------------
 
 def build_splash_prompt(req: LeaderRequest) -> str:
@@ -215,10 +216,10 @@ def build_splash_prompt(req: LeaderRequest) -> str:
 
 
 def build_profile_prompt(req: LeaderRequest) -> str:
+    # Composition directives (face filling the frame, headpiece visible) live
+    # in the leader_profile template suffix — see config/prompt_templates.json.
     inner = ", ".join([
         req.leader_description.strip(),
-        "face filling the frame",
-        "headpiece and collar visible at the edges of the frame",
         MOOD[req.mood],
     ])
     return _assemble("leader_profile", inner)
@@ -246,11 +247,14 @@ def build_multi_action_prompt(
     Composes all leader descriptions into a single prompt describing
     their interaction within the action scene.
     """
+    # The template prefix (config/prompt_templates.json → leader_action)
+    # already contributes "epic cinematic scene depicting" — Python only
+    # assembles WHO is in the scene, not HOW it is framed.
     if len(leader_descriptions) == 1:
-        char_part = f"epic cinematic scene depicting {leader_descriptions[0].strip()}"
+        char_part = leader_descriptions[0].strip()
     elif len(leader_descriptions) == 2:
         char_part = (
-            f"epic cinematic scene depicting two leaders interacting: "
+            f"two leaders interacting: "
             f"{leader_names[0]}, {leader_descriptions[0].strip()}, "
             f"and {leader_names[1]}, {leader_descriptions[1].strip()}"
         )
@@ -259,7 +263,7 @@ def build_multi_action_prompt(
             f"{name}, {desc.strip()}"
             for name, desc in zip(leader_names, leader_descriptions)
         )
-        char_part = f"epic cinematic scene depicting multiple leaders: {named}"
+        char_part = f"multiple leaders: {named}"
 
     inner = ", ".join([
         char_part,

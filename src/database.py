@@ -112,6 +112,12 @@ class UnitRecord(Base):
     generation_mode = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
+# ---------------------------------------------------------------------------
+# DEV WARNING: Base.metadata.create_all() is a development convenience that
+# creates tables only if they don't exist.  It does NOT handle schema
+# changes (ALTER TABLE, column drops, renames).  For production, replace
+# with a proper migration tool such as Alembic.
+# ---------------------------------------------------------------------------
 Base.metadata.create_all(bind=engine)
 
 

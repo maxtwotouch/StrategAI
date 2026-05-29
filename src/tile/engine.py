@@ -6,6 +6,12 @@ based on the per-family generation mode (comfyui, static, placeholder).
 Unlike the leader pipeline, tiles are single-shot txt2img — no multi-stage
 dependencies, no reference images, no seed anchoring.
 
+Uses ``workflows/txt2img.json`` which is intended for top-down game assets
+(structures, objects, terrain, units).  The ``<tdp>`` LoRA trigger in the
+prompt templates activates a LoRA that enforces top-down camera angle with
+medieval pixel-art styling.  Background tiles use a separate workflow
+(``background_tile.json``) without this LoRA.
+
 Resolution (1024→128) and all sampling parameters are baked into the
 workflow JSON.  The engine only injects: positive_prompt, seed.
 """
@@ -15,6 +21,7 @@ import random
 import time
 import uuid
 import os
+import threading
 from typing import Union
 
 from PIL import Image, ImageDraw, ImageFont
@@ -57,17 +64,20 @@ _PLACEHOLDER_COLORS = {
 }
 
 _FONT: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
+_FONT_LOCK = threading.Lock()
 
 
 def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     global _FONT
     if _FONT is None:
-        try:
-            _FONT = ImageFont.truetype(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14
-            )
-        except (OSError, IOError):
-            _FONT = ImageFont.load_default()
+        with _FONT_LOCK:
+            if _FONT is None:
+                try:
+                    _FONT = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14
+                    )
+                except (OSError, IOError):
+                    _FONT = ImageFont.load_default()
     return _FONT
 
 

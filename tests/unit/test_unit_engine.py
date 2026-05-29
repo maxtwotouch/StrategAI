@@ -37,14 +37,14 @@ class TestUnitEngine:
         assert resp.unit_id.startswith("unit_archer_")
         assert resp.seed is not None
         assert resp.prompt_used is not None
-        assert resp.resolution == "512x512"
+        assert resp.resolution == "128x128"
         assert resp.generation_time_ms is not None
 
     @pytest.mark.asyncio
     async def test_generates_single_image(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """client.generate called once (single sprite)."""
         monkeypatch.setattr("src.unit.engine.store", test_store)
-        mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
+        mock_comfyui_client.generate.return_value = Image.new("RGBA", (128, 128), (0, 255, 0, 255))
 
         engine = UnitEngine(mock_comfyui_client)
         req = _make_unit_req()
@@ -125,7 +125,7 @@ class TestPlaceholderUnitEngine:
         assert resp.generation_mode == "placeholder"
         assert resp.unit_type == "archer"
         assert resp.url.startswith("/assets/")
-        assert resp.resolution == "512x512"
+        assert resp.resolution == "128x128"
 
     @pytest.mark.asyncio
     async def test_persists_unit_record(self, test_store, test_db, monkeypatch):

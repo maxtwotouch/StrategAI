@@ -49,7 +49,7 @@ class TestTileEngine:
     async def test_generate_structure(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Returns StructureResponse with correct fields."""
         monkeypatch.setattr("src.tile.engine.store", test_store)
-        mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
+        mock_comfyui_client.generate.return_value = Image.new("RGBA", (128, 128), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
         req = _make_structure_req()
@@ -63,13 +63,13 @@ class TestTileEngine:
         assert resp.asset_id.startswith("struct_")
         assert resp.seed is not None
         assert resp.prompt_used is not None
-        assert resp.resolution == "512x512"
+        assert resp.resolution == "128x128"
         assert resp.generation_time_ms is not None
 
     @pytest.mark.asyncio
     async def test_generate_object(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         monkeypatch.setattr("src.tile.engine.store", test_store)
-        mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
+        mock_comfyui_client.generate.return_value = Image.new("RGBA", (128, 128), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
         req = _make_object_req()
@@ -179,7 +179,7 @@ class TestPlaceholderTileEngine:
         assert resp.asset_type == "structure"
         assert resp.generation_mode == "placeholder"
         assert resp.url.startswith("/assets/")
-        assert resp.resolution == "512x512"
+        assert resp.resolution == "128x128"
 
     @pytest.mark.asyncio
     async def test_generate_object(self, test_store, test_db, monkeypatch):

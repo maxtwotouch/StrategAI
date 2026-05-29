@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -31,15 +32,18 @@ _PROMPT_TEMPLATES_PATH = (
 # ---------------------------------------------------------------------------
 
 _templates: dict[str, dict[str, str]] | None = None
+_templates_lock = threading.Lock()
 
 
 def _load() -> dict[str, dict[str, str]]:
-    """Load and cache the template JSON (called once, lazily)."""
+    """Load and cache the template JSON (called once, lazily, thread-safe)."""
     global _templates
     if _templates is None:
-        with open(_PROMPT_TEMPLATES_PATH, "r") as fh:
-            data: dict[str, Any] = json.load(fh)
-        _templates = data["templates"]
+        with _templates_lock:
+            if _templates is None:
+                with open(_PROMPT_TEMPLATES_PATH, "r") as fh:
+                    data: dict[str, Any] = json.load(fh)
+                _templates = data["templates"]
     return _templates
 
 

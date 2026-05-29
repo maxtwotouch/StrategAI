@@ -13,6 +13,17 @@ from .models import (
 )
 
 
+def load_template(family: str) -> str:
+    """Return the full template text with {PROMPT_HERE} placeholder for testing.
+
+    For production use, prefer :func:`_assemble` which handles prefix/suffix
+    separation automatically.
+    """
+    from src.prompt_templates import get_template
+    tmpl = get_template(family)
+    return f"{tmpl['prefix']}{{PROMPT_HERE}}{tmpl['suffix']}"
+
+
 # ===========================================================================
 #  Structure injection maps
 # ===========================================================================

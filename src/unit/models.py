@@ -6,7 +6,7 @@ picks from, with rich field descriptions so clients know exactly what to send.
 Each unit generates a single south-facing (front view) sprite at 512×512.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
@@ -42,6 +42,15 @@ class UnitRequest(BaseModel):
         ),
     )
     seed: Optional[int] = None
+
+    @field_validator("unit_type")
+    @classmethod
+    def validate_unit_type(cls, v: str) -> str:
+        if v not in UnitType.ALL:
+            raise ValueError(
+                f"Unknown unit_type '{v}'. Must be one of: {', '.join(sorted(UnitType.ALL))}"
+            )
+        return v
 
 
 # ===========================================================================

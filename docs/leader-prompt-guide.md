@@ -16,9 +16,16 @@ HOW IT WORKS
 ───────────────────────────────────────────────────────────────────
 
 You pick enum values for archetype, culture, time_of_day, mood, and
-(for action scenes) action_category. The server maps each enum to
+(for action scenes) action_category.  The server maps each enum to
 rich, hand-crafted prose and assembles a complete prompt behind the
-scenes. You never write raw prompts.
+scenes.  You never write raw prompts.
+
+All style directives — cinematic quality tags, composition framing,
+shot-type guidance (close-up portrait, wide composition, dynamic
+action), and format constraints — live exclusively in the server's
+``config/prompt_templates.json``.  The Python layer only assembles
+enum prose + your free-form description between the template prefix
+and suffix.  No prompt prose is hardcoded in Python.
 
 You also provide free-form `leader_description` and (for action)
 `action_description` fields for specifics the enums can't capture.

@@ -5,7 +5,8 @@
 ═══════════════════════════════════════════════════════════════════
 
 A single pipeline for top-down medieval character sprites.
-Each unit generates one south-facing (front view) sprite at 512×512.
+Each unit generates one south-facing (front view) sprite at 128×128
+(downscaled from 1024×1024 generation).
 
   POST /unit   → single character sprite
 
@@ -15,12 +16,14 @@ HOW IT WORKS
 ───────────────────────────────────────────────────────────────────
 
 You pick a ``unit_type`` enum value and provide a free-form
-``description``. The server maps the unit type to rich, hand-crafted
-prose describing the character archetype, appends pixel-art style
-directives (transparent background, crisp pixel edges, centered
-sprite), and sends the assembled prompt to ComfyUI via the same
-``txt2img.json`` workflow used by structure, object, and terrain
-pipelines. You never write raw prompts.
+``description``.  The server maps the unit type to rich, hand-crafted
+prose describing the character archetype, then wraps it in a template
+from ``config/prompt_templates.json`` — the template provides ALL
+style directives: the ``<tdp>`` top-down LoRA trigger, south-facing
+front-view framing, transparent background, pixel-art crispness, and
+centered sprite format.  The assembled prompt is sent to ComfyUI via
+``workflows/txt2img.json`` (shared with structure/object/terrain).
+You never write raw prompts.
 
 All sprites are south-facing (front view) — the canonical direction
 for top-down game characters facing the camera.
@@ -175,12 +178,12 @@ A successful POST /unit returns:
     "generation_mode": "comfyui",
     "status": "completed",
     "prompt_used": "pixel art top-down 2d game character sprite, ...",
-    "resolution": "512x512",
+    "resolution": "128x128",
     "generation_time_ms": 7120
   }
 
 The ``url`` field is the canonical sprite URL — a single south-facing
-(front view) 512×512 PNG with transparent background.
+(front view) 128×128 PNG with transparent background.
 
 
 ═══════════════════════════════════════════════════════════════════
@@ -261,12 +264,12 @@ A single PNG per unit type — simple flat naming.
   Layer 4:  Units (characters)        ← POST /unit
   Layer 3:  Structures & Objects      ← POST /structure, POST /object
   Layer 2:  Terrain features          ← POST /terrain
-  Layer 1:  Background tiles          ← POST /generate
+  Layer 1:  Background tiles          ← generated via tile pipeline (bg mode)
 
 Units sit on top of everything — they're the characters that
 move across the map. Generate bottom-up: background tile first,
 then terrain, then structures/objects, then units on top.
 
-All unit sprites are south-facing (front view) at 512×512 with
+All unit sprites are south-facing (front view) at 128×128 with
 transparent backgrounds, ready for placement on the game map.
 

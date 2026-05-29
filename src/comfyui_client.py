@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import time
 import uuid
 from typing import Any
@@ -400,7 +401,8 @@ def _patch_workflow(
             meta = node.get("_meta", {})
             title = meta.get("title", "").lower()
             if "reference" in title:
-                inputs["image"] = ref_image_filename
+                # Sanitize to prevent path traversal
+                inputs["image"] = os.path.basename(ref_image_filename)
 
         # --- Arbitrary overrides ---
         if extra_overrides and node_id in extra_overrides:

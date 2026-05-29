@@ -1,101 +1,144 @@
 # Image Diffusion Service: Production Architecture
 
 ## 1. System Overview
-The Medieval Pixel Art Image Service is a decoupled, highly scalable web service that provides on-demand generative AI assets, acting as the dynamic engine behind the game's terrain, structures, and storytelling.
-
-The web server is a lightweight orchestrator — it never loads model weights. All image generation is delegated to an external **ComfyUI** server via its HTTP + WebSocket API. Static/pre-made assets are served from a folder structure with zero configuration. A **placeholder** mode provides always-available procedural fallbacks for testing and development.
+The Medieval Pixel Art Image Service is a decoupled web service that provides
+on-demand generative AI assets for a top-down medieval game.  The web server is
+a lightweight orchestrator — it never loads model weights.  All image generation
+is delegated to an external **ComfyUI** server via its HTTP + WebSocket API.
+Static/pre-made assets are served from a folder structure with zero configuration.
+A **placeholder** mode provides always-available procedural fallbacks.
 
 ## 2. Core Operational Flow
-1. **Request Intake**: `FastAPI` validates incoming payloads (`GenerationRequest`, `SplashRequest`, `LeaderRequest`) using strict Pydantic schemas.
-2. **Mode Resolution**: The factory (`get_generator`) delegates based on `asset_family` and the configured generation mode (`comfyui`, `static`, `placeholder`, or `random`).
+1. **Request Intake**: `FastAPI` validates incoming payloads (`LeaderRequest`,
+   `StructureRequest`, `ObjectRequest`, `TerrainRequest`, `UnitRequest`) using
+   strict Pydantic schemas.
+2. **Mode Resolution**: Each pipeline engine checks `config.yaml` →
+   `generation.modes.{family}` (or `generation.default_mode`) and routes to the
+   appropriate generator: `comfyui`, `static`, or `placeholder`.
 3. **Asset Processing**:
-   - **ComfyUI**: Loads a workflow JSON template, patches in the prompt and seed, uploads any input images (for inpainting or img2img), submits to ComfyUI, polls via WebSocket, downloads the result.
-   - **Static**: Serves pre-made PNGs from `static_tiles/` directory. Falls back to procedural placeholder if no static PNG is available.
-   - **Placeholder**: Always returns a procedural coloured rectangle with text label — zero external dependencies, always available.
-   - **Random**: Coin-flip per request between `comfyui` and `static`.
-   - **Copy-on-Write (CoW)**: For inpainting, the system loads the `base_image_id`, iteratively creates masks for each bounding box, and runs sequential inpainting passes through ComfyUI.
-4. **Caching & Delivery**: The final asset is stored in an in-memory LRU cache for fast serving, persisted to disk, and indexed in SQLite. The asset URL is returned to the client.
+   - **ComfyUI**: Loads a workflow JSON template, patches in the prompt and seed,
+     uploads any input images (for img2img), submits to ComfyUI, polls via
+     WebSocket, downloads the result.
+   - **Static**: Serves pre-made PNGs from `static_tiles/`. Falls back to
+     procedural placeholder if no static PNG is available.
+   - **Placeholder**: Always returns a procedural coloured rectangle with text
+     label — zero external dependencies.
+4. **Caching & Delivery**: The final asset is stored in an in-memory LRU cache
+   (thread-safe), persisted to disk, and indexed in SQLite. The asset URL is
+   returned to the client.
 
-## 3. Component Architecture
+## 3. Prompt Architecture: Templates > Python
 
-### A. API Layer (`main.py` & `models.py`)
-- **FastAPI**: Handles high-concurrency requests with CORS middleware. Endpoints: `POST /generate`, `POST /splash`, `POST /leader`, `GET /leader`, `GET /leader/{id}`, `DELETE /leader/{id}`, `POST /structure`, `POST /object`, `POST /terrain`, `POST /unit`, `GET /unit`, `GET /unit/{unit_id}`, `DELETE /unit/{unit_id}`, `GET /health`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`.
-- **Pydantic**: Guarantees typed, structural contracts for `asset_family`, `tile_type`, `structure_subtype`, CoW references, and leader pipeline parameters.
-- **Fully async**: Generation runs directly on the asyncio event loop via `httpx` + `websockets`. No thread-pool required.
+The service follows a strict separation of concerns for prompt assembly:
 
-### B. Storage Layer (`storage.py`)
-- **AssetStore**: In-memory LRU cache (OrderedDict, default 1000 entries) for zero-latency serving. Transparent disk fallback for cache misses.
+| Layer | Where | What |
+|-------|-------|------|
+| **Workflow JSON** | `workflows/*.json` | Model, resolution, sampler, scheduler, steps, CFG, denoise, LoRA nodes, output prefix — everything ComfyUI needs that does NOT vary per request |
+| **Prompt templates** | `config/prompt_templates.json` | Prefix + suffix for each asset family. Contains ALL style directives, camera framing, quality tags, LoRA triggers (`<tdp>`), and format constraints. The Python layer never hardcodes prompt prose. |
+| **Enum injection maps** | `src/{leader,tile,unit}/prompts.py` | Hand-crafted prose per enum value (archetype, culture, biome, mood, etc.). Structured data mappings — key → rich description. |
+| **Assembly logic** | `src/{leader,tile,unit}/prompts.py` | Glue that joins enum prose + user description into the `inner` string, then wraps with template prefix/suffix. No style words. |
 
-### C. Compute Layer (`generators.py` & `comfyui_client.py`)
-- **ComfyUIClient**: Async HTTP + WebSocket client. Handles workflow submission, image upload, progress polling, result download, prompt cancellation, and health checks.
-- **ComfyUIGenerator**: Wraps ComfyUIClient for the standard asset pipeline. Handles txt2img, story, splash, and sequential CoW inpainting.
-- **StaticTileGenerator**: Serves pre-made PNGs from `static_tiles/`. Falls back to procedural placeholders for families without static assets.
-- **_PlaceholderGenerator**: Procedural coloured rectangle with text label — always-available fallback for testing and development.
+**Key principle**: The template JSON is the single source of truth for HOW
+something is depicted. The Python layer only contributes WHAT is depicted.
 
-### D. Static Catalog (`static_catalog.py`)
-- Scans `static_tiles/` at startup and builds an in-memory lookup by family and subtype.
-- Powers `GET /catalog` discovery endpoint and static asset resolution.
+The `<tdp>` LoRA trigger appears in the structure, object, terrain, and unit
+templates.  It activates a LoRA that enforces **top-down camera angle** with
+medieval pixel-art styling.  Background tiles (seamless ground textures) and
+leader portraits use separate templates/workflows without this LoRA.
 
-### E. Feature Engineering (`inpainting.py`)
-- Calculates precise A/B bounds binary masks with optional Gaussian blur.
-- Manages an internal vocabulary mapping (`get_inpaint_prompt`) to decouple game logic ("water") from prompt engineering ("sparkling blue pixel art river water texture, seamless, top-down 2d game").
+## 4. Component Architecture
 
-### F. Leader Pipeline (`src/leader/`)
-- **Three-stage generation**: splash (txt2img, establishes canonical visual identity) → profile (img2img, close-crop portrait using splash as reference, denoise=0.30) → action.
-- **Single-leader action**: img2img using the leader's reference image (denoise=0.60), preserving character identity while placing them in a new scene.
-- **Multi-leader action**: txt2img with a composite prompt that weaves together all leaders' physical descriptions and names via `build_multi_action_prompt()` (in `src/leader/prompts.py`). No reference image is used because ComfyUI can only accept one reference image for img2img, but a multi-leader scene needs to depict multiple distinct faces. Triggered by providing `leader_ids` (list) in the request body alongside `asset_type: "action"`.
-- **Structured prompt injection**: clients select from enum values (archetype, culture, time_of_day, mood, action_category). The server maps these to rich, hand-crafted prose via `src/leader/prompts.py`.
-- **Seed anchoring**: splash seed is stored in `LeaderRecord` (via `src/leader/registry.py`) and re-used for profile/action to maximize img2img consistency.
-- **Reference image**: splash art is copied to `leader_references/ref_{leader_id}.png` and re-uploaded to ComfyUI before each profile and single-leader action generation.
-- **SQLite-backed**: `LeaderRecord` table (in `src/leader/models.py`) tracks all leaders alongside `AssetRecord`.
+### A. API Layer (`src/main.py` & per-pipeline `models.py`)
+- **FastAPI**: Async HTTP server with CORS middleware. Current endpoints:
+  `POST /leader`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`,
+  `POST /structure`, `GET /structure/{id}`, `DELETE /structure/{id}`,
+  `POST /object`, `GET /object/{id}`, `DELETE /object/{id}`,
+  `POST /terrain`, `GET /terrain/{id}`, `DELETE /terrain/{id}`,
+  `POST /unit`, `GET /unit/{unit_id}`, `DELETE /unit/{unit_id}`,
+  `GET /health`, `GET /catalog`, `GET /assets/{filename}`,
+  plus `/structure/catalog`, `/object/catalog`, `/terrain/catalog`, `/unit/catalog`.
+- **Pydantic**: Typed request/response schemas with enum validation.
+- **Fully async**: Generation runs on the asyncio event loop via `httpx` + `websockets`.
 
-### G. Tile Pipeline (`src/tile/`)
-- **Three subtypes**: structures (`structure_subtype`), objects (`object_subtype`), terrain (`terrain_subtype`).
-- **Single-tile generation**: each request generates one 512×512 tile.
-- **Enum-driven prompt assembly**: `src/tile/prompts.py` maps subtype enums to rich pixel-art prose, combined with the client's free-form `description`.
-- **Static fallback**: `StaticTileEngine` resolves sprites from `static_tiles/`, falling back to procedural placeholders for subtypes without static PNGs.
-- **SQLite-backed**: `StructureRecord`, `ObjectRecord`, `TerrainRecord` tables store generated tile metadata.
+### B. Storage Layer (`src/storage.py`)
+- **AssetStore**: Thread-safe in-memory LRU cache (OrderedDict + Lock, default
+  1000 entries).  Transparent disk fallback for cache misses.  Path traversal
+  protection via `os.path.basename()`.
 
-### H. Unit Pipeline (`src/unit/`)
-- **Single-sprite generation**: each unit type (archer, scout, settler, warrior) generates one south-facing (front view) sprite at 512×512.
-- **Enum-driven prompt assembly**: `src/unit/prompts.py` maps `unit_type` to rich pixel-art prose, combined with the client's free-form `description`. South-facing direction is hardcoded into the prompt.
-- **Static fallback**: `StaticUnitEngine` resolves sprites from `static_tiles/unit/{type}.png`, falling back to procedural placeholders if no static PNG exists.
-- **SQLite-backed**: `UnitRecord` table stores a single `image_id` per unit.
+### C. ComfyUI Client (`src/comfyui_client.py`)
+- **ComfyUIClient**: Async HTTP + WebSocket client handling the full lifecycle:
+  image upload, workflow submission, progress polling, result download, and
+  health checks.  Workflow patching targets Flux2 Klein node types
+  (SamplerCustomAdvanced, EmptyFlux2LatentImage — no negative prompts).
 
-### H. Persistence (`database.py`)
-- **SQLite** via SQLAlchemy. No external database dependency.
-- **AssetRecord**: tracks every generated asset: id, family, tile_type, structure_subtype, inpainting data, generation mode.
-- **LeaderRecord**: tracks leader identity: canonical splash image, seed, prompt, profile/action image IDs, reference filename.
+### D. Static Catalog (`src/static_catalog.py`)
+- Scans `static_tiles/` at startup and builds an in-memory lookup by family
+  and subtype.  Powers `GET /catalog` and static asset resolution.
 
-## 4. Workflow JSON Templates
+### E. Leader Pipeline (`src/leader/`)
+- **Three-stage generation**: splash (txt2img, canonical visual identity) →
+  profile (img2img, close-crop portrait, denoise=0.30) → action (img2img,
+  denoise=0.60).
+- **Multi-leader action**: txt2img composite prompt weaving together multiple
+  leaders' descriptions. Triggered by `leader_ids` list.
+- **Structured prompt injection**: Clients select enum values; server maps to
+  rich prose via `src/leader/prompts.py`.
+- **Seed anchoring**: Splash seed stored in `LeaderRecord` and re-used for
+  profile/action to maximize img2img consistency.
+- **SQLite-backed**: `LeaderRecord` table in `src/database.py`.
 
-Seven ComfyUI workflows stored in `workflows/`, exported in API format:
+### F. Tile Pipeline (`src/tile/`)
+- **Three families**: structures, objects, terrain. Each request generates one
+  128×128 game tile (downscaled from 1024×1024 generation).
+- **Enum-driven prompt assembly**: `src/tile/prompts.py` with prose injection maps.
+- **Background tiles**: Separate engine (`src/tile/background_engine.py`) and
+  workflow (`background_tile.json`) for seamless ground textures — no LoRA,
+  no white background isolation.
+- **Static fallback**: `StaticTileEngine` resolves from `static_tiles/`.
+- **SQLite-backed**: `StructureRecord`, `ObjectRecord`, `TerrainRecord`.
 
-| Workflow | Purpose | Key injection points |
+### G. Unit Pipeline (`src/unit/`)
+- **Single-sprite generation**: Each unit type (archer, scout, settler, warrior)
+  produces one 128×128 south-facing sprite.
+- **Enum-driven prompt assembly**: `src/unit/prompts.py` with injection map.
+  South-facing direction and front-view framing live in the template.
+- **Static fallback**: `StaticUnitEngine` resolves from `static_tiles/`.
+- **SQLite-backed**: `UnitRecord`.
+
+### H. Persistence (`src/database.py`)
+- **SQLite** via SQLAlchemy. `Base.metadata.create_all()` at startup (dev
+  convenience — replace with Alembic for production migrations).
+- **AssetRecord**: Tracks every generated asset: id, family, generation mode.
+- **LeaderRecord**: Canonical splash image, seed, prompt, profile/action image
+  IDs, reference filename.
+
+## 5. Workflow JSON Templates
+
+Live in `workflows/`.  Resolution, steps, CFG, sampler, scheduler, denoise,
+LoRA nodes, and output prefix are all baked into the JSONs — Python only
+injects prompt text and seed.
+
+| Workflow | Used by | Notes |
 |---|---|---|
-| `txt2img.json` | Structures, objects, terrain, unit sprites | Positive/negative prompt, seed |
-| `inpaint.json` | Background tiles with CoW inpainting | Base image, mask image, fill prompt, seed |
-| `story.json` | 16:9 cinematic concept art | Positive prompt, seed |
-| `splash.json` | Leader portrait (legacy /splash endpoint) | Positive prompt (built from style/outfit/weapon fields), seed |
-| `leader/leader_splash.json` | Leader splash (txt2img, 1920×1088) | Positive prompt, negative prompt, seed |
-| `leader/leader_profile.json` | Leader profile (img2img, 1024×1024, denoise=0.30) | Positive prompt, negative prompt, seed, reference image filename |
-| `leader/leader_action.json` | Leader action (1920×1088, denoise=0.60). Single-leader: img2img with reference image. Multi-leader: txt2img with composite prompt. | Positive prompt, negative prompt, seed, reference image filename (single-leader only) |
+| `txt2img.json` | Structures, objects, terrain, units | Top-down tile assets. `<tdp>` LoRA trigger in prompt template. |
+| `background_tile.json` | Background ground tiles (water, grass, sand, stone, dirt) | Seamless textures — NO `<tdp>` LoRA. |
+| `leader/leader_splash.json` | Leader splash (txt2img, 1920×1088) | Establishes canonical visual identity. |
+| `leader/leader_profile.json` | Leader profile (img2img, denoise=0.30) | Uses splash as reference image. |
+| `leader/leader_action.json` | Leader action (img2img, denoise=0.60 for single; txt2img for multi) | Uses splash as reference (single-leader only). |
 
-Resolution, steps, CFG, sampler, scheduler, denoise, model paths, LoRA strength, and output filename prefix are baked into the workflow JSONs and do not vary per request.
+## 6. Generation Modes (Per-Family)
 
-## 5. Generation Modes (Per-Family)
+| Mode | Behaviour |
+|---|---|
+| `comfyui` | Always calls ComfyUI. 503 if unreachable. |
+| `static` | Serves from `static_tiles/`. Falls back to placeholder. |
+| `placeholder` | Procedural coloured placeholder — zero dependencies. |
 
-| Mode | Behaviour | When to use |
-|---|---|---|
-| `comfyui` | Always calls ComfyUI. 503 if unreachable. | Full AI generation |
-| `static` | Serves from `static_tiles/`. Falls back to placeholder. | Offline dev, deterministic assets |
-| `placeholder` | Always returns procedural coloured placeholder. | Testing, CI, zero-dependency demos |
-| `random` | Coin-flip per request (`GENERATION__RANDOM_PROBABILITY`). | A/B testing, gradual rollout |
+Controlled via `config.yaml` (version-controlled) with `.env` overrides using
+`__` delimiter for nested keys — ops-level control with zero code changes.
 
-Controlled via `config.yaml` (version-controlled) with `.env` overrides using `__` delimiter — ops-level control with zero code changes.
+## 7. Path to Scaled Execution (Future)
 
-## 6. Path to Scaled Execution (Future)
-
-- **Task Queues**: Implement **Celery + Redis** for non-blocking generation at scale.
-- **Object Storage**: Swap in-memory/disk cache with **AWS S3 / Cloudflare R2** for multi-node deployments.
+- **Task Queues**: Celery + Redis for non-blocking generation at scale.
+- **Object Storage**: S3 / Cloudflare R2 for multi-node asset sharing.
 - **GPU Cloud**: Separate web server hosting from GPU inference nodes.

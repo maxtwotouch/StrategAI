@@ -4,7 +4,6 @@ import pytest
 from src.leader.models import LeaderRequest
 from src.leader.prompts import (
     build_splash_prompt, build_profile_prompt, build_action_prompt, build_prompt,
-    SPLASH_TAIL, PROFILE_TAIL, ACTION_TAIL,
     ARCHETYPE, CULTURE, TIME_OF_DAY, MOOD, ACTION_CATEGORY,
 )
 
@@ -32,20 +31,20 @@ class TestBuildSplashPrompt:
     """Tests for build_splash_prompt."""
 
     def test_contains_all_enums(self):
-        """Output contains archetype prose, culture prose, time_of_day prose, mood prose, SPLASH_TAIL."""
+        """Output contains archetype prose, culture prose, time_of_day prose, mood prose, style tail (from template suffix)."""
         req = _make_leader_req("splash")
         prompt = build_splash_prompt(req)
         assert "standing proudly" in prompt  # archetype prose
         assert "sandstone temple" in prompt  # culture prose
         assert "golden sunlight" in prompt  # time_of_day prose
         assert "hard-won victory" in prompt  # mood prose
-        assert SPLASH_TAIL in prompt
+        assert "professional cinematic quality" in prompt  # tail prose (template suffix)
 
     def test_ends_with_tail(self):
-        """Final comma-separated segment matches SPLASH_TAIL."""
+        """Prompt ends with the style tail from the template suffix."""
         req = _make_leader_req("splash")
         prompt = build_splash_prompt(req)
-        assert prompt.endswith(SPLASH_TAIL)
+        assert prompt.endswith("ultra-detailed")
 
     def test_leader_description_included(self):
         """The leader_description field appears verbatim."""
@@ -58,13 +57,13 @@ class TestBuildProfilePrompt:
     """Tests for build_profile_prompt."""
 
     def test_contains_close_up(self):
-        """Contains 'close-up portrait', 'face filling the frame', mood, PROFILE_TAIL."""
+        """Contains 'close-up portrait', 'face filling the frame', mood, style tail (template suffix)."""
         req = _make_leader_req("profile")
         prompt = build_profile_prompt(req)
         assert "close-up portrait" in prompt
         assert "face filling the frame" in prompt
         assert "hard-won victory" in prompt  # mood
-        assert PROFILE_TAIL in prompt
+        assert "professional cinematic quality" in prompt  # tail prose (template suffix)
 
     def test_leader_description_included(self):
         req = _make_leader_req("profile")
@@ -76,7 +75,7 @@ class TestBuildActionPrompt:
     """Tests for build_action_prompt."""
 
     def test_contains_all_parts(self):
-        """Contains action_description, action_category prose, culture, time_of_day, mood, ACTION_TAIL."""
+        """Contains action_description, action_category prose, culture, time_of_day, mood, style tail (template suffix)."""
         req = _make_leader_req("action")
         prompt = build_action_prompt(req)
         assert "Leading troops into battle" in prompt
@@ -84,7 +83,7 @@ class TestBuildActionPrompt:
         assert "sandstone temple" in prompt  # culture
         assert "golden sunlight" in prompt  # time_of_day
         assert "hard-won victory" in prompt  # mood
-        assert ACTION_TAIL in prompt
+        assert "professional cinematic quality" in prompt  # tail prose (template suffix)
 
 
 class TestBuildPromptDispatcher:
@@ -93,17 +92,17 @@ class TestBuildPromptDispatcher:
     def test_routes_to_splash(self):
         req = _make_leader_req("splash")
         prompt = build_prompt(req)
-        assert SPLASH_TAIL in prompt
+        assert "ultra-detailed" in prompt  # splash tail in template suffix
 
     def test_routes_to_profile(self):
         req = _make_leader_req("profile")
         prompt = build_prompt(req)
-        assert PROFILE_TAIL in prompt
+        assert "close-up portrait" in prompt  # profile tail in template suffix
 
     def test_routes_to_action(self):
         req = _make_leader_req("action")
         prompt = build_prompt(req)
-        assert ACTION_TAIL in prompt
+        assert "dynamic action" in prompt  # action tail in template suffix
 
 
 class TestEnumMaps:

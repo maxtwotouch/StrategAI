@@ -122,11 +122,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for production cross-origin access
+# CORS middleware — restrict origins in production via .env / env vars
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -136,7 +136,7 @@ app.add_middleware(
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled exception on %s %s: %s", request.method, request.url, exc)
     return JSONResponse(
-        content={"detail": f"Internal server error: {str(exc)}"},
+        content={"detail": "Internal server error"},
         status_code=500,
     )
 

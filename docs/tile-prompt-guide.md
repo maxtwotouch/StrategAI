@@ -680,35 +680,12 @@ Only tile types that have at least one static PNG (or are
 supported by comfyui generation) appear in this list.
 
 
-INPAINTING (CoW)
-
-Background tiles support copy-on-write inpainting — paint paths,
-roads, and other features directly into the tile texture:
-
-  {
-    "asset_family": "background_tile",
-    "tile_type": "grass",
-    "base_image_id": "abc123.png",
-    "inpaints": [
-      {
-        "point_a": { "x": 0, "y": 256 },
-        "point_b": { "x": 512, "y": 256 },
-        "fill_type": "gravel_road"
-      }
-    ]
-  }
-
-This is orthogonal to the terrain pipeline. A grass tile with an
-inpainted dirt path can still have a hill terrain sprite placed
-on top of it.
-
-
 LAYERING MODEL (for game engine integration)
 
   Layer 4:  Units (characters)        ← POST /unit
   Layer 3:  Structures & Objects      ← POST /structure, POST /object
   Layer 2:  Terrain features          ← POST /terrain
-  Layer 1:  Background tiles          ← POST /generate
+  Layer 1:  Background tiles          ← generated via tile pipeline (bg mode)
 
 Generate bottom-up: background tile first, then terrain features
 for elevation, then structures and objects, then units on top.

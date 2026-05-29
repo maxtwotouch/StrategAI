@@ -2,19 +2,16 @@
 
 import os
 import pytest
-from src.config import Settings, ComfyUISettings, PathSettings, GenerationSettings, SplashSettings, LeaderSettings
+from src.config import Settings, ComfyUISettings, PathSettings, GenerationSettings, LeaderSettings
 
 
 class TestConfigDefaults:
     """Test default values and derived properties."""
 
     def test_default_modes_all_present(self):
-        """All 10 families have entries in generation.modes defaults."""
+        """All 5 families have entries in generation.modes defaults."""
         s = Settings()
-        expected_families = {
-            "background_tile", "structure", "object", "terrain",
-            "nature_object", "character_sprite", "story", "splash", "leader", "unit",
-        }
+        expected_families = {"structure", "object", "terrain", "leader", "unit"}
         assert set(s.generation.modes.keys()) == expected_families
 
     def test_get_mode_known_family(self):
@@ -57,19 +54,11 @@ class TestConfigDefaults:
         """Generation settings have expected defaults."""
         g = GenerationSettings()
         assert g.default_mode == "comfyui"
-        assert g.random_probability == 0.5
 
-    def test_splash_defaults(self):
-        """Splash settings have expected defaults."""
-        s = SplashSettings()
-        assert s.width == 256
-        assert s.height == 256
-
-    def test_leader_negative_prompt_not_empty(self):
-        """Leader negative prompt is a non-empty string."""
+    def test_leader_settings_empty(self):
+        """Leader settings placeholder exists (Flux2 Klein uses no negative prompts)."""
         l = LeaderSettings()
-        assert len(l.negative_prompt) > 0
-        assert "blurry" in l.negative_prompt
+        assert l is not None
 
 
 class TestConfigOverrides:
