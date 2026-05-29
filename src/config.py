@@ -1,5 +1,7 @@
 import os
 from enum import Enum
+
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
@@ -11,6 +13,13 @@ from pydantic_settings import (
 # Resolve paths relative to the project root (one level up from src/)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Load .env into os.environ so that pydantic-settings' env_settings source
+# can pick up overrides (the built-in dotenv_settings source does not merge
+# dict fields like generation.modes correctly).
+_dotenv_path = os.path.join(BASE_DIR, ".env")
+if os.path.isfile(_dotenv_path):
+    load_dotenv(_dotenv_path)
 
 # ---------------------------------------------------------------------------
 #  Nested configuration models (mirrors config.yaml structure)
