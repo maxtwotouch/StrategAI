@@ -10,6 +10,8 @@ from __future__ import annotations
 import uuid
 import logging
 
+from sqlalchemy.orm import Session
+
 from src.database import SessionLocal, UnitRecord
 
 logger = logging.getLogger(__name__)
@@ -40,9 +42,15 @@ class UnitRegistry:
         seed: int,
         prompt_used: str,
         generation_mode: str,
+        session: Session | None = None,
     ) -> None:
-        """Persist a new unit record."""
-        with SessionLocal() as db:
+        """Persist a new unit record.
+
+        If *session* is provided the caller owns the transaction.
+        """
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             record = UnitRecord(
                 unit_id=unit_id,
                 unit_type=unit_type,
@@ -53,8 +61,12 @@ class UnitRegistry:
                 generation_mode=generation_mode,
             )
             db.add(record)
-            db.commit()
+            if _close:
+                db.commit()
             logger.info("Unit registered: %s (%s)", unit_id, unit_type)
+        finally:
+            if _close:
+                db.close()
 
     # ------------------------------------------------------------------
     #  Read
@@ -80,11 +92,11 @@ class UnitRegistry:
     def has_static(unit_type: str) -> bool:
         """Return True if a static sprite exists for this unit type.
 
-        NOTE: This is an optimistic stub.  The actual availability check
-        is performed by the engine via ``StaticCatalog.resolve_unit()``.
-        This method exists as a convenience query hook for future use.
+        Delegates to ``StaticCatalog.has_unit_type()`` which scans
+        ``static_tiles/unit/`` for matching PNG files.
         """
-        return True
+        from src.static_catalog import catalog as _catalog
+        return _catalog.has_unit_type(unit_type)
 
     # ------------------------------------------------------------------
     #  Delete

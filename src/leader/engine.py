@@ -83,29 +83,36 @@ class LeaderEngine:
         filename = f"{leader_id}_splash.png"
         store.save_image(filename, img)
 
-        # 7. Persist AssetRecord
-        with SessionLocal() as db:
+        # 7. Persist AssetRecord + LeaderRecord in one transaction
+        db = SessionLocal()
+        try:
             db.add(AssetRecord(
                 id=filename,
                 asset_family="leader_splash",
                 character_name=req.leader_name,
                 generation_mode="comfyui",
             ))
+            # LeaderRegistry.register copies splash→reference dir (file I/O)
+            # before writing to DB — the file copy is not transactional.
+            LeaderRegistry.register(
+                leader_id=leader_id,
+                leader_name=req.leader_name,
+                leader_description=req.leader_description,
+                archetype=req.archetype,
+                culture=req.culture,
+                time_of_day=req.time_of_day,
+                mood=req.mood,
+                splash_image_filename=filename,
+                splash_seed=seed,
+                splash_prompt=prompt,
+                session=db,
+            )
             db.commit()
-
-        # 8. Register leader (copies splash → reference dir)
-        LeaderRegistry.register(
-            leader_id=leader_id,
-            leader_name=req.leader_name,
-            leader_description=req.leader_description,
-            archetype=req.archetype,
-            culture=req.culture,
-            time_of_day=req.time_of_day,
-            mood=req.mood,
-            splash_image_filename=filename,
-            splash_seed=seed,
-            splash_prompt=prompt,
-        )
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -169,8 +176,9 @@ class LeaderEngine:
         filename = f"{req.leader_id}_profile.png"
         store.save_image(filename, img)
 
-        # 8. Persist AssetRecord
-        with SessionLocal() as db:
+        # 8. Persist AssetRecord + update LeaderRecord in one transaction
+        db = SessionLocal()
+        try:
             db.add(AssetRecord(
                 id=filename,
                 asset_family="leader_profile",
@@ -178,10 +186,13 @@ class LeaderEngine:
                 character_name=req.leader_name,
                 generation_mode="comfyui",
             ))
+            LeaderRegistry.record_profile(req.leader_id, filename, session=db)
             db.commit()
-
-        # 9. Update registry
-        LeaderRegistry.record_profile(req.leader_id, filename)
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -250,8 +261,9 @@ class LeaderEngine:
         filename = f"{req.leader_id}_action_{uuid.uuid4().hex[:6]}.png"
         store.save_image(filename, img)
 
-        # 8. Persist AssetRecord
-        with SessionLocal() as db:
+        # 8. Persist AssetRecord + update LeaderRecord in one transaction
+        db = SessionLocal()
+        try:
             db.add(AssetRecord(
                 id=filename,
                 asset_family="leader_action",
@@ -259,10 +271,13 @@ class LeaderEngine:
                 character_name=req.leader_name,
                 generation_mode="comfyui",
             ))
+            LeaderRegistry.record_action(req.leader_id, filename, session=db)
             db.commit()
-
-        # 9. Update registry
-        LeaderRegistry.record_action(req.leader_id, filename)
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -309,10 +324,11 @@ class LeaderEngine:
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_action.json")
 
         # Run
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            seed=req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1),
+            seed=seed,
         )
 
         # Save

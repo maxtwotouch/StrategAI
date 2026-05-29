@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from src.config import settings, BASE_DIR
@@ -49,23 +50,27 @@ class LeaderRegistry:
         splash_image_filename: str,
         splash_seed: int,
         splash_prompt: str,
+        session: Session | None = None,
     ) -> str:
         """Register a new leader after splash generation.
 
         Copies the splash image to the reference directory as ref_{leader_id}.png
         and inserts a LeaderRecord.
 
+        If *session* is provided the caller owns the transaction.
         Returns the reference filename.
         """
         ref_name = f"ref_{leader_id}.png"
 
-        # Copy splash → reference directory
+        # Copy splash → reference directory (not transactional — file I/O)
         src = Path(os.path.join(BASE_DIR, settings.paths.output_dir)) / splash_image_filename
         dst = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / ref_name
         shutil.copy2(src, dst)
         logger.info("Copied splash → reference image: %s", ref_name)
 
-        with SessionLocal() as db:
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             record = LeaderRecord(
                 leader_id=leader_id,
                 leader_name=leader_name,
@@ -82,8 +87,12 @@ class LeaderRegistry:
                 action_image_ids=None,
             )
             db.add(record)
-            db.commit()
+            if _close:
+                db.commit()
             logger.info("Leader registered: %s (%s)", leader_name, leader_id)
+        finally:
+            if _close:
+                db.close()
 
         return ref_name
 
@@ -126,21 +135,37 @@ class LeaderRegistry:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def record_profile(leader_id: str, image_filename: str) -> None:
+    def record_profile(
+        leader_id: str,
+        image_filename: str,
+        session: Session | None = None,
+    ) -> None:
         """Record a profile image for an existing leader."""
-        with SessionLocal() as db:
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             leader = db.query(LeaderRecord).filter(
                 LeaderRecord.leader_id == leader_id
             ).first()
             if leader:
                 leader.profile_image_id = image_filename
-                db.commit()
+                if _close:
+                    db.commit()
                 logger.info("Profile recorded for leader: %s", leader_id)
+        finally:
+            if _close:
+                db.close()
 
     @staticmethod
-    def record_action(leader_id: str, image_filename: str) -> None:
+    def record_action(
+        leader_id: str,
+        image_filename: str,
+        session: Session | None = None,
+    ) -> None:
         """Append an action image to the leader's action_image_ids list."""
-        with SessionLocal() as db:
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             leader = db.query(LeaderRecord).filter(
                 LeaderRecord.leader_id == leader_id
             ).first()
@@ -149,8 +174,12 @@ class LeaderRegistry:
                 ids.append(image_filename)
                 leader.action_image_ids = ids
                 flag_modified(leader, "action_image_ids")
-                db.commit()
+                if _close:
+                    db.commit()
                 logger.info("Action recorded for leader: %s", leader_id)
+        finally:
+            if _close:
+                db.close()
 
     # ------------------------------------------------------------------
     # Delete

@@ -21,10 +21,9 @@ import random
 import time
 import uuid
 import os
-import threading
 from typing import Union
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
@@ -63,22 +62,7 @@ _PLACEHOLDER_COLORS = {
     "terrain": (100, 100, 80, 255),
 }
 
-_FONT: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
-_FONT_LOCK = threading.Lock()
-
-
-def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    global _FONT
-    if _FONT is None:
-        with _FONT_LOCK:
-            if _FONT is None:
-                try:
-                    _FONT = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14
-                    )
-                except (OSError, IOError):
-                    _FONT = ImageFont.load_default()
-    return _FONT
+from src.font_utils import get_font as _get_font
 
 
 # ===========================================================================
@@ -160,25 +144,30 @@ class TileEngine:
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
 
-        # 6. Persist AssetRecord
-        with SessionLocal() as db:
+        # 6. Persist AssetRecord + specialized registry record in one transaction
+        db = SessionLocal()
+        try:
             db.add(AssetRecord(
                 id=filename,
                 asset_family=family,
                 generation_mode="comfyui",
             ))
+            _register_tile(
+                registry_register,
+                asset_id=asset_id,
+                req=req,
+                image_id=filename,
+                seed=seed,
+                prompt_used=prompt,
+                generation_mode="comfyui",
+                session=db,
+            )
             db.commit()
-
-        # 7. Register in tile-specific table
-        _register_tile(
-            registry_register,
-            asset_id=asset_id,
-            req=req,
-            image_id=filename,
-            seed=seed,
-            prompt_used=prompt,
-            generation_mode="comfyui",
-        )
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -215,7 +204,7 @@ class StaticTileEngine:
         path = static_catalog.resolve_random("structure", req.category)
         if path:
             filename = _load_and_save(path)
-            static_seed = req.seed if req.seed is not None else 0
+            static_seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
             _register_tile(
                 StructureRegistry.register,
                 asset_id=asset_id,
@@ -238,7 +227,7 @@ class StaticTileEngine:
         path = static_catalog.resolve_random("nature_object")
         if path:
             filename = _load_and_save(path)
-            static_seed = req.seed if req.seed is not None else 0
+            static_seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
             _register_tile(
                 ObjectRegistry.register,
                 asset_id=asset_id,
@@ -314,7 +303,7 @@ class _PlaceholderTileEngine:
         color = _PLACEHOLDER_COLORS.get(family, (128, 128, 128, 255))
         img = Image.new("RGBA", (GAME_ASSET_SIZE, GAME_ASSET_SIZE), color)
         draw = ImageDraw.Draw(img)
-        font = _get_font()
+        font = _get_font(14)
 
         # Border
         draw.rectangle([4, 4, GAME_ASSET_SIZE - 5, GAME_ASSET_SIZE - 5],
@@ -350,7 +339,8 @@ class _PlaceholderTileEngine:
 # ===========================================================================
 
 def _register_tile(registry_register, asset_id: str, req, image_id: str,
-                   seed: int, prompt_used: str, generation_mode: str) -> None:
+                   seed: int, prompt_used: str, generation_mode: str,
+                   session=None) -> None:
     """Call the appropriate Registry.register() with the right kwargs."""
     # Extract relevant fields from the request based on what register() expects
     kwargs: dict = {
@@ -358,6 +348,7 @@ def _register_tile(registry_register, asset_id: str, req, image_id: str,
         "seed": seed,
         "prompt_used": prompt_used,
         "generation_mode": generation_mode,
+        "session": session,
     }
     for field_name in type(req).model_fields:
         if field_name == "seed":

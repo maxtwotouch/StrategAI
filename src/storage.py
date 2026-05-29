@@ -15,9 +15,9 @@ def _safe_filename(filename: str) -> str:
 
 
 class AssetStore:
-    def __init__(self, max_cache_size=1000):
+    def __init__(self, max_cache_size: int | None = None):
         self._memory_cache = OrderedDict()
-        self.max_cache_size = max_cache_size
+        self.max_cache_size = max_cache_size if max_cache_size is not None else settings.server.cache_max_entries
         self._lock = threading.Lock()
         self._output_dir = os.path.join(BASE_DIR, settings.paths.output_dir)
 

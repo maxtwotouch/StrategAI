@@ -31,9 +31,9 @@ class ComfyUISettings(BaseModel):
     """
     base_url: str = "http://127.0.0.1:8188"
     nodes: list[str] = Field(default_factory=list)
-    timeout: int = 300
-    health_check_interval: int = 30
-    max_retries: int = 3
+    timeout: int = Field(default=300, gt=0, description="Per-request timeout in seconds")
+    health_check_interval: int = Field(default=30, gt=0, description="Seconds between re-pinging unhealthy nodes")
+    max_retries: int = Field(default=3, ge=0, description="Max nodes to try per generation before failing")
 
     def get_urls(self) -> list[str]:
         """Return the list of ComfyUI server URLs to connect to.
@@ -51,6 +51,11 @@ class PathSettings(BaseModel):
     splash_dir: str = "splash_assets"
     static_tiles_dir: str = "static_tiles"
     leader_reference_dir: str = "leader_references"
+    font_path: str = Field(
+        default="",
+        description="Optional absolute path to a .ttf or .ttc font for placeholder labels. "
+                    "Leave empty to auto-detect from common system locations.",
+    )
 
 
 class GenerationSettings(BaseModel):
@@ -82,11 +87,19 @@ class ServerSettings(BaseModel):
     )
     max_request_body_mb: int = Field(
         default=10,
+        gt=0,
         description="Maximum request body size in megabytes.",
     )
     assets_url_prefix: str = Field(
         default="/assets",
         description="URL prefix for serving generated assets.",
+    )
+    cache_max_entries: int = Field(
+        default=1000,
+        gt=0,
+        description="Maximum number of images held in the in-memory LRU cache. "
+                    "Reduce if RAM is constrained (e.g. 100).  Set higher for "
+                    "faster repeated reads at the cost of memory.",
     )
 
 

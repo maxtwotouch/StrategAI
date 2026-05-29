@@ -9,6 +9,8 @@ import re
 import uuid
 from typing import Optional
 
+from sqlalchemy.orm import Session
+
 from src.database import SessionLocal, StructureRecord, ObjectRecord, TerrainRecord
 
 logger = logging.getLogger(__name__)
@@ -55,8 +57,16 @@ class StructureRegistry:
         seed: int,
         prompt_used: str,
         generation_mode: str = "comfyui",
+        session: Session | None = None,
     ) -> None:
-        with SessionLocal() as db:
+        """Persist a new structure record.
+
+        If *session* is provided the caller owns the transaction (commit/rollback).
+        Otherwise a temporary session is created and committed immediately.
+        """
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             db.add(StructureRecord(
                 structure_id=structure_id,
                 category=category,
@@ -69,8 +79,12 @@ class StructureRegistry:
                 prompt_used=prompt_used,
                 generation_mode=generation_mode,
             ))
-            db.commit()
+            if _close:
+                db.commit()
             logger.info("Structure registered: %s (%s)", structure_id, category)
+        finally:
+            if _close:
+                db.close()
 
     @staticmethod
     def get(structure_id: str) -> Optional[StructureRecord]:
@@ -118,8 +132,11 @@ class ObjectRegistry:
         seed: int,
         prompt_used: str,
         generation_mode: str = "comfyui",
+        session: Session | None = None,
     ) -> None:
-        with SessionLocal() as db:
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             db.add(ObjectRecord(
                 object_id=object_id,
                 category=category,
@@ -131,8 +148,12 @@ class ObjectRegistry:
                 prompt_used=prompt_used,
                 generation_mode=generation_mode,
             ))
-            db.commit()
+            if _close:
+                db.commit()
             logger.info("Object registered: %s (%s)", object_id, category)
+        finally:
+            if _close:
+                db.close()
 
     @staticmethod
     def get(object_id: str) -> Optional[ObjectRecord]:
@@ -180,8 +201,11 @@ class TerrainRegistry:
         seed: int,
         prompt_used: str,
         generation_mode: str = "comfyui",
+        session: Session | None = None,
     ) -> None:
-        with SessionLocal() as db:
+        _close = session is None
+        db = session or SessionLocal()
+        try:
             db.add(TerrainRecord(
                 terrain_id=terrain_id,
                 category=category,
@@ -193,8 +217,12 @@ class TerrainRegistry:
                 prompt_used=prompt_used,
                 generation_mode=generation_mode,
             ))
-            db.commit()
+            if _close:
+                db.commit()
             logger.info("Terrain registered: %s (%s)", terrain_id, category)
+        finally:
+            if _close:
+                db.close()
 
     @staticmethod
     def get(terrain_id: str) -> Optional[TerrainRecord]:

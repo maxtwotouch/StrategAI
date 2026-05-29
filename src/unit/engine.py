@@ -21,9 +21,8 @@ import random
 import time
 import uuid
 import os
-import threading
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
@@ -52,22 +51,7 @@ _UNIT_COLORS: dict[str, tuple[int, int, int, int]] = {
     UnitType.WARRIOR: (180, 50, 50, 255),     # reddish
 }
 
-_FONT: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
-_FONT_LOCK = threading.Lock()
-
-
-def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    global _FONT
-    if _FONT is None:
-        with _FONT_LOCK:
-            if _FONT is None:
-                try:
-                    _FONT = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16
-                    )
-                except (OSError, IOError):
-                    _FONT = ImageFont.load_default()
-    return _FONT
+from src.font_utils import get_font as _get_font
 
 
 # ===========================================================================
@@ -96,23 +80,30 @@ class UnitEngine:
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
+        # Persist AssetRecord + UnitRecord in one transaction
+        db = SessionLocal()
+        try:
             db.add(AssetRecord(
                 id=filename,
                 asset_family="unit",
                 generation_mode="comfyui",
             ))
+            UnitRegistry.register(
+                unit_id=unit_id,
+                unit_type=req.unit_type,
+                description=req.description,
+                image_id=filename,
+                seed=seed,
+                prompt_used=prompt,
+                generation_mode="comfyui",
+                session=db,
+            )
             db.commit()
-
-        UnitRegistry.register(
-            unit_id=unit_id,
-            unit_type=req.unit_type,
-            description=req.description,
-            image_id=filename,
-            seed=seed,
-            prompt_used=prompt,
-            generation_mode="comfyui",
-        )
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -139,7 +130,7 @@ class StaticUnitEngine:
         """Resolve a unit sprite from static_tiles/unit/, falling back to placeholder."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else 0
+        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
 
         start = time.time()
 
@@ -199,7 +190,7 @@ class _PlaceholderUnitEngine:
         start = time.time()
 
         color = _UNIT_COLORS.get(req.unit_type, (128, 128, 128, 255))
-        font = _get_font()
+        font = _get_font(16)
 
         img = Image.new("RGBA", (GAME_ASSET_SIZE, GAME_ASSET_SIZE), color)
         draw = ImageDraw.Draw(img)

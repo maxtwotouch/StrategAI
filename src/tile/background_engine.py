@@ -18,9 +18,8 @@ import random
 import time
 import uuid
 import os
-import threading
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
@@ -50,22 +49,7 @@ _PLACEHOLDER_COLORS: dict[str, tuple[int, int, int, int]] = {
     "dirt":  (140, 100, 60, 255),
 }
 
-_FONT: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
-_FONT_LOCK = threading.Lock()
-
-
-def _get_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    global _FONT
-    if _FONT is None:
-        with _FONT_LOCK:
-            if _FONT is None:
-                try:
-                    _FONT = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12
-                    )
-                except (OSError, IOError):
-                    _FONT = ImageFont.load_default()
-    return _FONT
+from src.font_utils import get_font as _get_font
 
 
 # ===========================================================================
@@ -162,7 +146,7 @@ class _PlaceholderBackgroundTileEngine:
 
     async def generate(self, tile_type: str, seed: int | None = None) -> str:
         color = _PLACEHOLDER_COLORS.get(tile_type, (128, 128, 128, 255))
-        font = _get_font()
+        font = _get_font(12)
 
         img = Image.new("RGBA", (GAME_ASSET_SIZE, GAME_ASSET_SIZE), color)
         draw = ImageDraw.Draw(img)

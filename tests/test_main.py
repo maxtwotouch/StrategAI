@@ -23,8 +23,10 @@ class TestHealth:
         data = resp.json()
         assert data["status"] == "ok"
         assert "modes" in data
-        assert "leaders_registered" in data
-        assert "units_registered" in data
+        assert "registered" in data
+        assert "leaders" in data["registered"]
+        assert "units" in data["registered"]
+        assert "structures" in data["registered"]
 
     @pytest.mark.asyncio
     async def test_health_comfyui_disconnected(self, async_client):

@@ -39,14 +39,27 @@ paths:
 
 # ---- Generation modes (per asset family) ------------------------------
 # Valid per-family: "comfyui" | "static" | "placeholder"
+#
+# Families:
+#   structure, object, terrain    — game tile assets (txt2img)
+#   background_tile               — seamless ground textures (background_tile.json)
+#   unit                          — character sprites (txt2img)
+#   leader                        — splash/profile/action pipeline (leader/*.json)
+#   character_sprite, story, splash — reserved for future use
 generation:
   modes:
     structure: "comfyui"
     object: "comfyui"
     terrain: "comfyui"
-    leader: "comfyui"
+    background_tile: "comfyui"
+    character_sprite: "comfyui"
     unit: "comfyui"
+    leader: "comfyui"
+    story: "comfyui"
+    splash: "comfyui"
   default_mode: "comfyui"
 
 # ---- Leader pipeline --------------------------------------------------
+# Reserved for future leader-specific overrides (e.g. per-archetype LoRA
+# strengths, pipeline stage retry counts, prompt weighting).
 leader: {}

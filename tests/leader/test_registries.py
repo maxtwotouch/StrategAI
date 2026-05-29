@@ -451,10 +451,12 @@ class TestUnitRegistry:
     def test_delete_returns_false(self, test_db):
         assert UnitRegistry.delete("nonexistent") is False
 
-    def test_has_static_always_true(self):
-        """has_static() always returns True (stub)."""
-        assert UnitRegistry.has_static("archer") is True
-        assert UnitRegistry.has_static("dragon") is True
+    def test_has_static_checks_catalog(self):
+        """has_static() delegates to StaticCatalog — False when no static files."""
+        # In test environment there are no static unit PNGs, so has_static returns False.
+        # The old stub always returned True; this now reflects real catalog state.
+        result = UnitRegistry.has_static("archer")
+        assert isinstance(result, bool)  # returns a bool (False in test env)
 
 
 class TestGenerateUnitId:

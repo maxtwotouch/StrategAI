@@ -9,9 +9,12 @@ class TestConfigDefaults:
     """Test default values and derived properties."""
 
     def test_default_modes_all_present(self):
-        """All 5 families have entries in generation.modes defaults."""
+        """All 9 families have entries in generation.modes defaults."""
         s = Settings()
-        expected_families = {"structure", "object", "terrain", "leader", "unit"}
+        expected_families = {
+            "structure", "object", "terrain", "background_tile",
+            "character_sprite", "leader", "unit", "story", "splash",
+        }
         assert set(s.generation.modes.keys()) == expected_families
 
     def test_get_mode_known_family(self):

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import random
+import time as _time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -26,12 +28,20 @@ from src.tile.models import (
     TerrainCategory, TerrainScale, TerrainMaterial,
 )
 from src.tile.registry import StructureRegistry, ObjectRegistry, TerrainRegistry
+from src.tile.background_engine import (
+    BackgroundTileEngine, StaticBackgroundTileEngine,
+    GAME_ASSET_SIZE as BG_ASSET_SIZE,
+)
+from src.tile.background_models import (
+    BackgroundTileRequest, BackgroundTileResponse, BackgroundTileCatalog,
+)
 from src.unit.engine import UnitEngine, StaticUnitEngine
 from src.unit.models import (
     UnitRequest, UnitResponse, UnitCatalog,
     UnitType,
 )
 from src.unit.registry import UnitRegistry
+from src.prompt_templates import assemble as _assemble
 
 # Setup production logging
 logging.basicConfig(
@@ -48,6 +58,9 @@ tile_engine: TileEngine | StaticTileEngine | None = None
 
 # Unit engine (initialized in lifespan)
 unit_engine: UnitEngine | StaticUnitEngine | None = None
+
+# Background tile engine (initialized in lifespan)
+background_tile_engine: BackgroundTileEngine | StaticBackgroundTileEngine | None = None
 
 
 @asynccontextmanager
@@ -73,16 +86,24 @@ async def lifespan(app: FastAPI):
             "ComfyUI unreachable -- leader endpoints will return 503"
         )
 
-    # Initialize tile engine based on structure/object/terrain mode
+    # Initialize tile engine — check all three tile families independently.
+    # If any family needs comfyui mode and the load-balancer is reachable,
+    # use TileEngine; if all are static/placeholder, use StaticTileEngine.
     tile_families = ["structure", "object", "terrain"]
-    tile_mode = settings.get_mode("structure")
+    tile_modes = {f: settings.get_mode(f) for f in tile_families}
+    any_tile_comfyui = any(m == "comfyui" for m in tile_modes.values())
+    all_tile_static = all(m in ("static", "placeholder") for m in tile_modes.values())
 
-    if tile_mode in ("static", "placeholder"):
+    if all_tile_static:
         tile_engine = StaticTileEngine()
-        logger.info("Tile engine initialized (%s mode)", tile_mode)
-    elif lb is not None:
+        logger.info("Tile engine initialized (static/placeholder mode) — modes: %s", tile_modes)
+    elif lb is not None and any_tile_comfyui:
         tile_engine = TileEngine(lb)
-        logger.info("Tile engine initialized (comfyui mode)")
+        logger.info("Tile engine initialized (comfyui mode, %d nodes) — modes: %s", len(lb._nodes), tile_modes)
+    elif lb is not None and lb_reachable:
+        # LB is reachable but no tile family explicitly set to comfyui
+        tile_engine = TileEngine(lb)
+        logger.info("Tile engine initialized (comfyui mode, default) — modes: %s", tile_modes)
     else:
         logger.warning("Tile engine: ComfyUI unreachable, tile endpoints will return 503")
 
@@ -98,10 +119,22 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Unit engine: ComfyUI unreachable, unit endpoints will return 503")
 
+    # Initialize background tile engine
+    bg_tile_mode = settings.get_mode("background_tile")
+
+    if bg_tile_mode in ("static", "placeholder"):
+        background_tile_engine = StaticBackgroundTileEngine()
+        logger.info("Background tile engine initialized (%s mode)", bg_tile_mode)
+    elif lb is not None:
+        background_tile_engine = BackgroundTileEngine(lb)
+        logger.info("Background tile engine initialized (comfyui mode)")
+    else:
+        logger.warning("Background tile engine: ComfyUI unreachable, background_tile endpoints will return 503")
+
     logger.info(
         "Application started.  Modes: %s",
         {f: settings.get_mode(f) for f in [
-            "structure", "object", "terrain", "leader", "unit",
+            "structure", "object", "terrain", "background_tile", "leader", "unit",
         ]},
     )
     logger.info(
@@ -183,7 +216,7 @@ async def get_asset(filename: str):
 
 @app.get("/catalog")
 async def get_catalog():
-    """Return available tile types and structure subtypes from static_tiles/."""
+    """Return available tile types, structure subtypes, and unit types from static_tiles/."""
     return {
         "background_tile": {
             "tile_types": static_catalog.list_tile_types(),
@@ -197,6 +230,9 @@ async def get_catalog():
         "character_sprite": {
             "available": static_catalog.has_any("character_sprite"),
         },
+        "unit": {
+            "unit_types": static_catalog.list_unit_types(),
+        },
     }
 
 
@@ -207,7 +243,7 @@ async def get_catalog():
 
 @app.get("/health")
 async def health_check():
-    """Report service status including ComfyUI connectivity."""
+    """Report service status including ComfyUI connectivity and registered assets."""
     lb = get_comfyui_loadbalancer()
     comfyui_ok = False
     if lb is not None:
@@ -220,11 +256,17 @@ async def health_check():
             "structure": settings.get_mode("structure"),
             "object": settings.get_mode("object"),
             "terrain": settings.get_mode("terrain"),
+            "background_tile": settings.get_mode("background_tile"),
             "leader": settings.get_mode("leader"),
             "unit": settings.get_mode("unit"),
         },
-        "leaders_registered": len(LeaderRegistry.list_all()),
-        "units_registered": len(UnitRegistry.list_all()),
+        "registered": {
+            "leaders": len(LeaderRegistry.list_all()),
+            "structures": len(StructureRegistry.list_all()),
+            "objects": len(ObjectRegistry.list_all()),
+            "terrains": len(TerrainRegistry.list_all()),
+            "units": len(UnitRegistry.list_all()),
+        },
     }
 
 
@@ -241,7 +283,7 @@ async def get_modes():
     'comfyui', 'static', or 'placeholder' mode without reading config.
     """
     families = [
-        "structure", "object", "terrain", "leader", "unit",
+        "structure", "object", "terrain", "background_tile", "leader", "unit",
     ]
     return {
         "modes": {f: settings.get_mode(f) for f in families},
@@ -694,3 +736,93 @@ async def delete_unit(unit_id: str):
     if not deleted:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
     return {"status": "deleted", "unit_id": unit_id}
+
+
+# ---------------------------------------------------------------------------
+#  Background tile pipeline
+# ---------------------------------------------------------------------------
+
+
+@app.post("/background_tile", response_model=BackgroundTileResponse)
+async def generate_background_tile(request: BackgroundTileRequest):
+    """Generate a seamless repeating background tile texture.
+
+    Supported tile types: water, grass, sand, stone, dirt.
+    Returns a 128×128 seamless PNG suitable for tiling on a game map.
+    """
+    logger.info("Received background_tile request: type=%s", request.tile_type)
+
+    if background_tile_engine is None:
+        raise HTTPException(503, "Background tile generation not available (ComfyUI unreachable)")
+
+    try:
+        # Build prompt (same logic as in BackgroundTileEngine.generate)
+        prompt = _assemble("background_tile", f"{request.tile_type} ground texture")
+        seed = request.seed if request.seed is not None else random.randint(10**14, 10**15 - 1)
+
+        t0 = _time.time()
+        filename = await background_tile_engine.generate(request.tile_type, seed)
+
+        elapsed = int((_time.time() - t0) * 1000)
+        logger.info("Background tile '%s' generated in %dms → %s", request.tile_type, elapsed, filename)
+
+        return BackgroundTileResponse(
+            url=f"/assets/{filename}",
+            tile_type=request.tile_type,
+            seed=seed,
+            generation_mode=settings.get_mode("background_tile"),
+            prompt_used=prompt,
+            resolution=f"{BG_ASSET_SIZE}x{BG_ASSET_SIZE}",
+            generation_time_ms=elapsed,
+        )
+
+    except ValueError as e:
+        logger.warning("Background tile validation error: %s", e)
+        raise HTTPException(400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Background tile runtime error: %s", e)
+        raise HTTPException(503, detail=str(e))
+    except Exception as e:
+        logger.error("Background tile generation error: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/background_tile", response_model=list[BackgroundTileResponse])
+async def list_background_tiles():
+    """Return all generated background tiles (from AssetRecord)."""
+    with SessionLocal() as db:
+        records = (
+            db.query(AssetRecord)
+            .filter(AssetRecord.asset_family == "background_tile")
+            .order_by(AssetRecord.created_at.desc())
+            .all()
+        )
+    return [
+        BackgroundTileResponse(
+            url=f"/assets/{r.id}",
+            tile_type=r.tile_type or "unknown",
+            seed=0,  # not stored in AssetRecord
+            generation_mode=r.generation_mode or "unknown",
+        )
+        for r in records
+    ]
+
+
+@app.get("/background_tile/catalog", response_model=BackgroundTileCatalog)
+async def background_tile_catalog():
+    """Return available background tile types."""
+    return BackgroundTileCatalog(
+        tile_types=sorted(static_catalog.list_tile_types()),
+    )
+
+
+@app.delete("/background_tile/{filename}")
+async def delete_background_tile(filename: str):
+    """Remove a background tile record. Generated asset remains on disk."""
+    with SessionLocal() as db:
+        record = db.query(AssetRecord).filter(AssetRecord.id == filename).first()
+        if not record:
+            raise HTTPException(404, f"Background tile '{filename}' not found")
+        db.delete(record)
+        db.commit()
+    return {"status": "deleted", "filename": filename}
