@@ -364,10 +364,20 @@ def _build_response(response_cls, req, asset_id: str, filename: str,
                     prompt: str, mode: str, elapsed: int | None = None,
                     resolution: str | None = None, seed: int | None = None):
     """Construct a response object with request fields + server metadata."""
+    # Seed is always generated before reaching this point; use req.seed as
+    # a safety fallback only if the caller passes None (which should not happen).
+    actual_seed = seed if seed is not None else req.seed
+    if actual_seed is None:
+        actual_seed = 0
+        logger.warning(
+            "_build_response: seed was None for asset %s — falling back to 0. "
+            "This indicates a bug in the calling code.",
+            asset_id,
+        )
     kwargs: dict = {
         "url": f"/assets/{filename}",
         "asset_id": asset_id,
-        "seed": seed if seed is not None else (req.seed if req.seed is not None else 0),
+        "seed": actual_seed,
         "generation_mode": mode,
         "prompt_used": prompt,
     }

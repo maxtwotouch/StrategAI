@@ -13,6 +13,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from src.database import SessionLocal, UnitRecord
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,16 @@ class UnitRegistry:
             record = db.query(UnitRecord).filter(UnitRecord.unit_id == unit_id).first()
             if record is None:
                 return False
+            image_id = record.image_id
             db.delete(record)
             db.commit()
+            # Best-effort cleanup of the image file on disk
+            try:
+                store.delete(image_id)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to delete image file %s for unit %s: %s",
+                    image_id, unit_id, exc,
+                )
             logger.info("Unit deleted: %s", unit_id)
             return True

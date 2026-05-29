@@ -124,7 +124,8 @@ class LeaderRequest(BaseModel):
     leader_ids: Optional[list[str]] = Field(
         default=None,
         description="Required for multi-leader action scenes. List of leader_ids to include in the scene. "
-                    "When provided, leader_id is ignored for action generation.",
+                    "When provided, leader_id is ignored for action generation. "
+                    "Must contain at least one entry; empty list is rejected.",
     )
     seed: Optional[int] = Field(
         default=None,

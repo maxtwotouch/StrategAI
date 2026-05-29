@@ -119,10 +119,8 @@ test_object_record_constraints
 Same
 test_terrain_record_constraints
 Same
-test_unit_record_fallback_columns_equal
-image_id_n == image_id_s allowed (fallback scenario)
-test_unit_record_all_directions_required
-All 4 image_id_* columns NOT NULL
+test_unit_record_constraints
+image_id NOT NULL — insert without it raises
 test_get_db_context_manager
 get_db() yields a session and closes it
 2.4 Storage — AssetStore (tests/test_storage.py)
@@ -309,8 +307,6 @@ test_unit_delete_returns_false
 Unknown ID → False
 test_generate_unit_id_format
 Starts with unit_, contains type, 6-char hex suffix
-test_unit_register_fallback_scenario
-image_id_n == image_id_s (allowed — fallback reuse)
 2.8 Inpainting (tests/test_inpainting.py)
 Test
 What It Verifies

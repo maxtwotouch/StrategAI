@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from src.database import SessionLocal, StructureRecord, ObjectRecord, TerrainRecord
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +108,17 @@ class StructureRegistry:
                 StructureRecord.structure_id == structure_id
             ).first()
             if record:
+                image_id = record.image_id
                 db.delete(record)
                 db.commit()
+                # Best-effort cleanup of the image file on disk
+                try:
+                    store.delete(image_id)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to delete image file %s for structure %s: %s",
+                        image_id, structure_id, exc,
+                    )
                 logger.info("Structure deleted: %s", structure_id)
                 return True
         return False
@@ -176,8 +186,16 @@ class ObjectRegistry:
                 ObjectRecord.object_id == object_id
             ).first()
             if record:
+                image_id = record.image_id
                 db.delete(record)
                 db.commit()
+                try:
+                    store.delete(image_id)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to delete image file %s for object %s: %s",
+                        image_id, object_id, exc,
+                    )
                 logger.info("Object deleted: %s", object_id)
                 return True
         return False
@@ -245,8 +263,16 @@ class TerrainRegistry:
                 TerrainRecord.terrain_id == terrain_id
             ).first()
             if record:
+                image_id = record.image_id
                 db.delete(record)
                 db.commit()
+                try:
+                    store.delete(image_id)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to delete image file %s for terrain %s: %s",
+                        image_id, terrain_id, exc,
+                    )
                 logger.info("Terrain deleted: %s", terrain_id)
                 return True
         return False

@@ -26,7 +26,11 @@ class AssetStore:
         filename = _safe_filename(filename)
         # Save to disk
         path = os.path.join(self._output_dir, filename)
-        img.save(path, format="PNG")
+        try:
+            img.save(path, format="PNG")
+        except OSError as exc:
+            logger.error("Failed to write image to disk at %s: %s", path, exc)
+            raise RuntimeError(f"Failed to persist asset to disk: {exc}") from exc
 
         # Save to memory
         buf = io.BytesIO()

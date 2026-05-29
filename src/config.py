@@ -114,8 +114,8 @@ class Settings(BaseSettings):
     Load order (later sources win):
       1. Pydantic defaults (above)
       2. ``config.yaml`` — version-controlled, primary source of truth
-      3. ``.env`` file — deployment-specific overrides
-      4. Environment variables (highest priority)
+      3. Environment variables
+      4. ``.env`` file — deployment-specific overrides (highest priority)
 
     Use ``__`` as the nesting delimiter in ``.env`` / env vars.
     Example: ``COMFYUI__BASE_URL=http://10.0.0.5:8188``
@@ -171,8 +171,8 @@ class Settings(BaseSettings):
         return (
             init_settings,
             env_settings,
-            dotenv_settings,
             YamlConfigSettingsSource(settings_cls),
+            dotenv_settings,
             file_secret_settings,
         )
 

@@ -53,6 +53,16 @@ class UnitRequest(BaseModel):
             )
         return v
 
+    @field_validator("description")
+    @classmethod
+    def _strip_description(cls, v: str) -> str:
+        stripped = v.strip()
+        if len(stripped) < 20:
+            raise ValueError(
+                "description must be at least 20 characters after stripping whitespace"
+            )
+        return stripped
+
 
 # ===========================================================================
 #  Response
@@ -63,6 +73,7 @@ class UnitResponse(BaseModel):
     asset_type: str = "unit"
     unit_id: str                                      # "unit_archer_a1b2c3"
     unit_type: str
+    description: str = ""                             # the description that was submitted
     seed: int
     generation_mode: str                              # "comfyui" | "static" | "placeholder"
     status: str = "completed"

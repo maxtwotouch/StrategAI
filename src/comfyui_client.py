@@ -154,6 +154,9 @@ class ComfyUIClient:
         with open(workflow_path, "r") as fh:
             workflow = json.load(fh)
 
+        # 1.5 Validate workflow structure before queueing — fail fast
+        _validate_workflow(workflow, workflow_path)
+
         # 2. Upload input images (usually for inpainting)
         uploaded: dict[str, str] = {}
         if input_images:
@@ -295,7 +298,7 @@ class ComfyUIClient:
 
     async def get_result(self, prompt_id: str) -> dict:
         """``GET /history/{prompt_id}`` → parsed output dict."""
-        resp = await self.http.get(f"/history/{prompt_id}", timeout=10)
+        resp = await self.http.get(f"/history/{prompt_id}", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -338,7 +341,7 @@ class ComfyUIClient:
         or ``None`` if the node is unreachable.
         """
         try:
-            resp = await self.http.get("/queue", timeout=5)
+            resp = await self.http.get("/queue", timeout=min(self.timeout, 15))
             resp.raise_for_status()
             body = resp.json()
             running = body.get("queue_running", [])
@@ -409,10 +412,46 @@ class ComfyUIClient:
                 history = await self.get_result(prompt_id)
                 if prompt_id in history:
                     return True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Polling attempt for prompt %s failed (%.1fs remaining): %s",
+                    prompt_id,
+                    deadline - time.monotonic(),
+                    exc,
+                )
             await asyncio.sleep(2)
         return False
+
+
+# ------------------------------------------------------------------
+#  Workflow validation
+# ------------------------------------------------------------------
+
+
+def _validate_workflow(workflow: dict, workflow_path: str) -> None:
+    """Validate workflow structure before queueing to fail fast.
+
+    Checks that:
+    - At least one ``SaveImage`` node exists (so we have output to download)
+    - ``CLIPTextEncode`` nodes have a ``text`` input (so prompt injection works)
+    """
+    has_save_image = False
+    for node_id, node in workflow.items():
+        ct = node.get("class_type", "")
+        if ct == "SaveImage":
+            has_save_image = True
+        if ct == "CLIPTextEncode":
+            inputs = node.get("inputs", {})
+            if "text" not in inputs:
+                raise ValueError(
+                    f"CLIPTextEncode node '{node_id}' in {workflow_path} "
+                    f"is missing 'text' input — prompt injection will fail"
+                )
+    if not has_save_image:
+        raise ValueError(
+            f"Workflow {workflow_path} has no SaveImage node — "
+            f"no output images will be produced"
+        )
 
 
 # ------------------------------------------------------------------
@@ -490,7 +529,7 @@ def _patch_workflow(
         if ct == "LoadImage" and ref_image_filename is not None:
             meta = node.get("_meta", {})
             title = meta.get("title", "").lower()
-            if "reference" in title:
+            if title == "load reference image" or title == "reference image":
                 # Sanitize to prevent path traversal
                 inputs["image"] = os.path.basename(ref_image_filename)
 

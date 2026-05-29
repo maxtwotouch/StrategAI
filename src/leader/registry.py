@@ -62,7 +62,9 @@ class LeaderRegistry:
         """
         ref_name = f"ref_{leader_id}.png"
 
-        # Copy splash → reference directory (not transactional — file I/O)
+        # Copy splash → reference directory.
+        # If the DB insert fails, clean up the copied file so we don't
+        # leave an orphaned reference image.
         src = Path(os.path.join(BASE_DIR, settings.paths.output_dir)) / splash_image_filename
         dst = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / ref_name
         shutil.copy2(src, dst)
@@ -90,6 +92,14 @@ class LeaderRegistry:
             if _close:
                 db.commit()
             logger.info("Leader registered: %s (%s)", leader_name, leader_id)
+        except Exception:
+            if _close:
+                db.rollback()
+            # Clean up the reference file we already copied
+            if dst.exists():
+                dst.unlink()
+                logger.warning("Cleaned up orphaned reference file after DB failure: %s", ref_name)
+            raise
         finally:
             if _close:
                 db.close()

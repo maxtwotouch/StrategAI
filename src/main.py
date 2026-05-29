@@ -66,7 +66,7 @@ background_tile_engine: BackgroundTileEngine | StaticBackgroundTileEngine | None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
-    global leader_engine, tile_engine, unit_engine
+    global leader_engine, tile_engine, unit_engine, background_tile_engine
 
     # Single load-balancer shared across all engines.
     # For single-node configs this is equivalent to a plain ComfyUIClient.
@@ -176,11 +176,18 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: FastAPIRequest, call_next):
         max_bytes = settings.server.max_request_body_mb * 1024 * 1024
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > max_bytes:
-            return StarletteJSONResponse(
-                {"detail": f"Request body exceeds {settings.server.max_request_body_mb} MB limit"},
-                status_code=413,
-            )
+        # Only enforce Content-Length on methods that typically carry a body
+        if request.method in ("POST", "PUT", "PATCH"):
+            if content_length is None:
+                return StarletteJSONResponse(
+                    {"detail": "Content-Length header is required"},
+                    status_code=411,
+                )
+            if int(content_length) > max_bytes:
+                return StarletteJSONResponse(
+                    {"detail": f"Request body exceeds {settings.server.max_request_body_mb} MB limit"},
+                    status_code=413,
+                )
         return await call_next(request)
 
 
@@ -189,7 +196,7 @@ app.add_middleware(RequestSizeLimitMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled exception on %s %s: %s", request.method, request.url, exc)
+    logger.error("Unhandled exception on %s %s: %s", request.method, request.url, exc, exc_info=True)
     return JSONResponse(
         content={"detail": "Internal server error"},
         status_code=500,
@@ -697,6 +704,7 @@ async def list_units():
             url=f"/assets/{r.image_id}",
             unit_id=r.unit_id,
             unit_type=r.unit_type,
+            description=r.description or "",
             seed=r.seed,
             generation_mode=r.generation_mode or "unknown",
             prompt_used=r.prompt_used,
@@ -723,6 +731,7 @@ async def get_unit(unit_id: str):
         url=f"/assets/{record.image_id}",
         unit_id=record.unit_id,
         unit_type=record.unit_type,
+        description=record.description or "",
         seed=record.seed,
         generation_mode=record.generation_mode or "unknown",
         prompt_used=record.prompt_used,
