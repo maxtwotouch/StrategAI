@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import logging
-import random
-import time as _time
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.config import settings
-from src.database import SessionLocal, AssetRecord
+from src.config import settings, DeploymentMode
+from src.database import SessionLocal, AssetRecord, verify_db_connectivity
 from src.comfyui_client import close_comfyui_client, get_comfyui_loadbalancer
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
 from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
@@ -42,6 +41,7 @@ from src.unit.models import (
 )
 from src.unit.registry import UnitRegistry
 from src.prompt_templates import assemble as _assemble
+from src.prompt_templates import validate_all_templates
 
 # Setup production logging
 logging.basicConfig(
@@ -68,7 +68,40 @@ async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
     global leader_engine, tile_engine, unit_engine, background_tile_engine
 
-    # Single load-balancer shared across all engines.
+    # --- Production safety checks ---
+    if settings.mode == DeploymentMode.PRODUCTION:
+        if settings.server.cors_origins == ["*"] or settings.server.cors_origins == ["http://localhost:3000"]:
+            logger.critical(
+                "PRODUCTION mode but CORS origins are too permissive: %s. "
+                "Set SERVER__CORS_ORIGINS to your actual domain(s).",
+                settings.server.cors_origins,
+            )
+        if "sqlite" in str(settings.model_config.get("DATABASE_URL", "")).lower():
+            logger.warning(
+                "PRODUCTION mode with SQLite — consider migrating to PostgreSQL "
+                "for concurrent request safety."
+            )
+
+    # --- Startup validation ---
+    # Validate prompt templates
+    template_errors = validate_all_templates()
+    if template_errors:
+        logger.critical(
+            "Prompt template validation FAILED — %d error(s). "
+            "The service will start but generation may fail.",
+            len(template_errors),
+        )
+        for err in template_errors:
+            logger.critical("  • %s", err)
+
+    # Verify database connectivity
+    db_ok = verify_db_connectivity()
+    if not db_ok:
+        logger.critical(
+            "Database connectivity check FAILED — asset persistence will not work."
+        )
+
+    # --- Engine initialization ---
     # For single-node configs this is equivalent to a plain ComfyUIClient.
     lb = get_comfyui_loadbalancer()
     lb_reachable = await lb.health_check() if lb else False

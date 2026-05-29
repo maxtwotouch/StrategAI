@@ -14,10 +14,10 @@ FastAPI endpoints -- no thread-pool required.
 """
 from __future__ import annotations
 import logging
-import random
+import os
+import secrets
 import time
 import uuid
-import os
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -31,6 +31,22 @@ from .registry import LeaderRegistry, generate_leader_id
 from src.storage import store
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+#  Helpers
+# ---------------------------------------------------------------------------
+
+
+def _try_remove_asset(filename: str) -> None:
+    """Best-effort cleanup of an orphaned image file after a DB failure."""
+    try:
+        path = os.path.join(BASE_DIR, settings.paths.output_dir, os.path.basename(filename))
+        if os.path.isfile(path):
+            os.unlink(path)
+            logger.warning("Cleaned up orphaned asset: %s", filename)
+    except Exception as exc:
+        logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
 
 
 class LeaderEngine:
@@ -65,8 +81,8 @@ class LeaderEngine:
         # 2. Generate leader_id
         leader_id = generate_leader_id(req.leader_name)
 
-        # 3. Seed
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        # 3. Seed — use cryptographically secure random unless caller provides one
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         # 4. Workflow path
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_splash.json")
@@ -84,35 +100,33 @@ class LeaderEngine:
         store.save_image(filename, img)
 
         # 7. Persist AssetRecord + LeaderRecord in one transaction
-        db = SessionLocal()
+        #    Uses context manager for auto-rollback on exception.
         try:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_splash",
-                character_name=req.leader_name,
-                generation_mode="comfyui",
-            ))
-            # LeaderRegistry.register copies splash→reference dir (file I/O)
-            # before writing to DB — the file copy is not transactional.
-            LeaderRegistry.register(
-                leader_id=leader_id,
-                leader_name=req.leader_name,
-                leader_description=req.leader_description,
-                archetype=req.archetype,
-                culture=req.culture,
-                time_of_day=req.time_of_day,
-                mood=req.mood,
-                splash_image_filename=filename,
-                splash_seed=seed,
-                splash_prompt=prompt,
-                session=db,
-            )
-            db.commit()
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_splash",
+                    character_name=req.leader_name,
+                    generation_mode="comfyui",
+                ))
+                LeaderRegistry.register(
+                    leader_id=leader_id,
+                    leader_name=req.leader_name,
+                    leader_description=req.leader_description,
+                    archetype=req.archetype,
+                    culture=req.culture,
+                    time_of_day=req.time_of_day,
+                    mood=req.mood,
+                    splash_image_filename=filename,
+                    splash_seed=seed,
+                    splash_prompt=prompt,
+                    session=db,
+                )
+                db.commit()
         except Exception:
-            db.rollback()
+            # Clean up orphaned image file if DB persist fails
+            _try_remove_asset(filename)
             raise
-        finally:
-            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -145,8 +159,14 @@ class LeaderEngine:
         # 2. Seed: use canonical unless overridden
         seed = req.seed if req.seed is not None else leader.splash_seed
 
-        # 3. Upload reference image
-        ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / leader.reference_filename
+        # 3. Upload reference image — with path traversal protection
+        ref_base = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)).resolve()
+        ref_filename = os.path.basename(leader.reference_filename)
+        ref_path = (ref_base / ref_filename).resolve()
+        if not str(ref_path).startswith(str(ref_base)):
+            raise RuntimeError(
+                f"Reference image path escapes directory: {leader.reference_filename}"
+            )
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
         try:
@@ -177,22 +197,20 @@ class LeaderEngine:
         store.save_image(filename, img)
 
         # 8. Persist AssetRecord + update LeaderRecord in one transaction
-        db = SessionLocal()
         try:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_profile",
-                base_image_id=leader.splash_image_id,
-                character_name=req.leader_name,
-                generation_mode="comfyui",
-            ))
-            LeaderRegistry.record_profile(req.leader_id, filename, session=db)
-            db.commit()
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_profile",
+                    base_image_id=leader.splash_image_id,
+                    character_name=req.leader_name,
+                    generation_mode="comfyui",
+                ))
+                LeaderRegistry.record_profile(req.leader_id, filename, session=db)
+                db.commit()
         except Exception:
-            db.rollback()
+            _try_remove_asset(filename)
             raise
-        finally:
-            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -230,8 +248,14 @@ class LeaderEngine:
         # 2. Seed
         seed = req.seed if req.seed is not None else leader.splash_seed
 
-        # 3. Upload reference image
-        ref_path = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)) / leader.reference_filename
+        # 3. Upload reference image — with path traversal protection
+        ref_base = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)).resolve()
+        ref_filename = os.path.basename(leader.reference_filename)
+        ref_path = (ref_base / ref_filename).resolve()
+        if not str(ref_path).startswith(str(ref_base)):
+            raise RuntimeError(
+                f"Reference image path escapes directory: {leader.reference_filename}"
+            )
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
         try:
@@ -262,22 +286,20 @@ class LeaderEngine:
         store.save_image(filename, img)
 
         # 8. Persist AssetRecord + update LeaderRecord in one transaction
-        db = SessionLocal()
         try:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_action",
-                base_image_id=leader.splash_image_id,
-                character_name=req.leader_name,
-                generation_mode="comfyui",
-            ))
-            LeaderRegistry.record_action(req.leader_id, filename, session=db)
-            db.commit()
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_action",
+                    base_image_id=leader.splash_image_id,
+                    character_name=req.leader_name,
+                    generation_mode="comfyui",
+                ))
+                LeaderRegistry.record_action(req.leader_id, filename, session=db)
+                db.commit()
         except Exception:
-            db.rollback()
+            _try_remove_asset(filename)
             raise
-        finally:
-            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -324,7 +346,7 @@ class LeaderEngine:
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_action.json")
 
         # Run
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
@@ -458,7 +480,7 @@ class StaticLeaderEngine:
     async def _generate_splash(self, req: LeaderRequest) -> LeaderResponse:
         prompt = build_prompt(req)
         leader_id = generate_leader_id(req.leader_name)
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         start = time.time()
 

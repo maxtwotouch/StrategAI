@@ -10,13 +10,15 @@ await directly from async FastAPI endpoints; no thread-pool needed.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
 import os
+import secrets
 import time
 import uuid
-from typing import Any
+from typing import Any, Iterable
 
 import httpx
 import websockets
@@ -86,6 +88,7 @@ class ComfyUIClient:
         self.base_url = (base_url or settings.comfyui.base_url).rstrip("/")
         self.timeout = timeout or settings.comfyui.timeout
         self._http: httpx.AsyncClient | None = None
+        self._http_lock: asyncio.Lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     #  Lifecycle
@@ -93,18 +96,41 @@ class ComfyUIClient:
 
     async def close(self) -> None:
         """Release the underlying HTTP client."""
-        if self._http is not None:
-            await self._http.aclose()
-            self._http = None
+        async with self._http_lock:
+            if self._http is not None:
+                await self._http.aclose()
+                self._http = None
 
     @property
     def http(self) -> httpx.AsyncClient:
-        """Lazily-initialised ``httpx.AsyncClient`` (not thread-safe)."""
+        """Lazily-initialised ``httpx.AsyncClient``.
+
+        .. warning::
+           This property is **not** async-safe — it cannot use ``await``.
+           Callers that need guaranteed single initialization should use
+           :meth:`get_http` instead in async contexts.
+        """
         if self._http is None:
             self._http = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=httpx.Timeout(self.timeout, connect=15.0),
             )
+        return self._http
+
+    async def get_http(self) -> httpx.AsyncClient:
+        """Async-safe lazy initializer for the underlying HTTP client.
+
+        Prefer this over the ``http`` property in production code to avoid
+        double-initialisation races when two coroutines first access the
+        client concurrently.
+        """
+        if self._http is None:
+            async with self._http_lock:
+                if self._http is None:
+                    self._http = httpx.AsyncClient(
+                        base_url=self.base_url,
+                        timeout=httpx.Timeout(self.timeout, connect=15.0),
+                    )
         return self._http
 
     # ------------------------------------------------------------------
@@ -157,6 +183,8 @@ class ComfyUIClient:
         # 1.5 Validate workflow structure before queueing — fail fast
         _validate_workflow(workflow, workflow_path)
 
+        _start_time = time.monotonic()
+
         # 2. Upload input images (usually for inpainting)
         uploaded: dict[str, str] = {}
         if input_images:
@@ -182,21 +210,14 @@ class ComfyUIClient:
         except Exception:
             # Best-effort cleanup of uploaded images so ComfyUI's input/
             # folder doesn't fill up with orphaned files.
-            for uploaded_name in uploaded.values():
-                try:
-                    await self.http.post(
-                        "/api/delete/image",
-                        json={"filename": uploaded_name},
-                        timeout=10,
-                    )
-                except Exception:
-                    pass
+            await _cleanup_uploaded_images(self, uploaded.values())
             raise
         logger.info("ComfyUI prompt queued: %s", prompt_id)
 
-        # 5. Wait for completion
+        # 5. Wait for completion — clean up uploaded images on failure
         ok = await self.wait_for_completion(prompt_id)
         if not ok:
+            await _cleanup_uploaded_images(self, uploaded.values())
             raise RuntimeError(
                 f"ComfyUI prompt {prompt_id} did not complete successfully"
             )
@@ -205,7 +226,7 @@ class ComfyUIClient:
         result = await self.get_result(prompt_id)
         outputs = result.get(prompt_id, {}).get("outputs", {})
 
-        # 7. Download the first image we find
+        # 7. Download the first image we find (with retry and validation)
         for _node_id, node_output in outputs.items():
             images = node_output.get("images", [])
             for img_info in images:
@@ -214,12 +235,20 @@ class ComfyUIClient:
                         "Skipping unexpected output entry: %s", img_info
                     )
                     continue
-                data = await self.download_image(
+                data = await _download_with_retry(
+                    self,
                     filename=img_info["filename"],
                     subfolder=img_info.get("subfolder", ""),
                     folder_type=img_info.get("type", "output"),
                 )
-                return Image.open(io.BytesIO(data)).convert("RGBA")
+                img = Image.open(io.BytesIO(data)).convert("RGBA")
+                _validate_downloaded_image(img, img_info["filename"])
+                elapsed = time.monotonic() - _start_time
+                logger.info(
+                    "Generation completed: prompt_id=%s filename=%s elapsed=%.1fs size=%dx%d",
+                    prompt_id, img_info["filename"], elapsed, img.width, img.height,
+                )
+                return img
 
         raise RuntimeError("Workflow completed but produced no output images")
 
@@ -277,7 +306,10 @@ class ComfyUIClient:
         resp.raise_for_status()
         body = resp.json()
         if "node_errors" in body:
-            raise ValueError(f"Workflow validation errors: {body['node_errors']}")
+            errors = body["node_errors"]
+            raise ValueError(
+                f"Workflow validation errors: {json.dumps(errors)}"
+            )
         if "prompt_id" not in body:
             raise ValueError(
                 f"ComfyUI did not return a prompt_id. Response: {body}"
@@ -424,6 +456,72 @@ class ComfyUIClient:
 
 
 # ------------------------------------------------------------------
+#  Internal helpers
+# ------------------------------------------------------------------
+
+
+async def _cleanup_uploaded_images(
+    client: ComfyUIClient, filenames: "Iterable[str]"
+) -> None:
+    """Best-effort deletion of uploaded images from ComfyUI's input/ folder."""
+    for fname in filenames:
+        try:
+            await client.http.post(
+                "/api/delete/image",
+                json={"filename": fname},
+                timeout=10,
+            )
+        except Exception:
+            pass
+
+
+async def _download_with_retry(
+    client: ComfyUIClient,
+    filename: str,
+    subfolder: str = "",
+    folder_type: str = "output",
+    max_attempts: int = 3,
+) -> bytes:
+    """Download an image with exponential backoff on transient failures."""
+    last_exc: Exception | None = None
+    for attempt in range(max_attempts):
+        try:
+            return await client.download_image(
+                filename=filename,
+                subfolder=subfolder,
+                folder_type=folder_type,
+            )
+        except Exception as exc:
+            last_exc = exc
+            if attempt < max_attempts - 1:
+                delay = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning(
+                    "Download attempt %d/%d for %s failed: %s — retrying in %.1fs",
+                    attempt + 1, max_attempts, filename, exc, delay,
+                )
+                await asyncio.sleep(delay)
+    raise RuntimeError(
+        f"Failed to download {filename} after {max_attempts} attempts"
+    ) from last_exc
+
+
+def _validate_downloaded_image(img: Image.Image, filename: str) -> None:
+    """Reject images that are clearly invalid (0-pixel, excessive size)."""
+    if img.width <= 0 or img.height <= 0:
+        raise ValueError(
+            f"Downloaded image {filename} has invalid dimensions: "
+            f"{img.width}x{img.height}"
+        )
+    # Reject unreasonably large images (> 16K on any axis)
+    max_dim = 16384
+    if img.width > max_dim or img.height > max_dim:
+        raise ValueError(
+            f"Downloaded image {filename} exceeds maximum dimension "
+            f"{max_dim}: {img.width}x{img.height}"
+        )
+
+
+# ------------------------------------------------------------------
 #  Workflow validation
 # ------------------------------------------------------------------
 
@@ -481,10 +579,8 @@ def _patch_workflow(
     - ``EmptyLatentImage`` / ``EmptyFlux2LatentImage`` → width / height
     - ``LoadImage`` → uploaded image or reference filename
     """
-    import random as _random
-
     if seed is None:
-        seed = _random.randint(0, 2**32 - 1)
+        seed = secrets.randbits(32)  # cryptographically secure, 0..2^32-1
 
     uploaded = uploaded_filenames or {}
 

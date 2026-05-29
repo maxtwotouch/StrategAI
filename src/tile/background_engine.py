@@ -14,10 +14,10 @@ tiles (``config/prompt_templates.json → background_tile``) also omits the
 from __future__ import annotations
 
 import logging
-import random
+import os
+import secrets
 import time
 import uuid
-import os
 
 from PIL import Image, ImageDraw
 
@@ -83,7 +83,7 @@ class BackgroundTileEngine:
             )
 
         prompt = _assemble("background_tile", f"{tile_type} ground texture")
-        seed = seed if seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = seed if seed is not None else secrets.randbits(31)
 
         start = time.time()
 

@@ -1,5 +1,6 @@
 import os
 import io
+import tempfile
 import threading
 from PIL import Image
 from src.config import settings, BASE_DIR
@@ -14,6 +15,28 @@ def _safe_filename(filename: str) -> str:
     return os.path.basename(filename)
 
 
+def _atomic_write(path: str, data: bytes) -> None:
+    """Write data to *path* atomically via a temp-file + rename.
+
+    This prevents corrupted files if the process crashes mid-write, and
+    avoids partial reads by concurrent consumers.
+    """
+    dirname = os.path.dirname(path)
+    fd, tmp_path = tempfile.mkstemp(dir=dirname, suffix=".png")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.chmod(tmp_path, 0o644)
+        os.rename(tmp_path, path)
+    except Exception:
+        # Best-effort cleanup of the temp file on failure
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
 class AssetStore:
     def __init__(self, max_cache_size: int | None = None):
         self._memory_cache = OrderedDict()
@@ -22,21 +45,29 @@ class AssetStore:
         self._output_dir = os.path.join(BASE_DIR, settings.paths.output_dir)
 
     def save_image(self, filename: str, img: Image.Image):
-        """Saves the image to both the in-memory cache and local disk."""
+        """Saves the image to both the in-memory cache and local disk.
+
+        Uses atomic writes (temp file + rename) to avoid corrupted files
+        on crash.  Sets explicit permissions (0o644).
+        """
         filename = _safe_filename(filename)
-        # Save to disk
         path = os.path.join(self._output_dir, filename)
+
+        # Serialize once
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        data = buf.getvalue()
+
+        # Atomic disk write
         try:
-            img.save(path, format="PNG")
+            _atomic_write(path, data)
         except OSError as exc:
             logger.error("Failed to write image to disk at %s: %s", path, exc)
             raise RuntimeError(f"Failed to persist asset to disk: {exc}") from exc
 
-        # Save to memory
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        # Memory cache
         with self._lock:
-            self._memory_cache[filename] = buf.getvalue()
+            self._memory_cache[filename] = data
             self._memory_cache.move_to_end(filename)
 
             # Enforce LRU cap

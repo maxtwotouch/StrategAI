@@ -17,10 +17,10 @@ workflow JSON.  The engine only injects: positive_prompt, seed.
 from __future__ import annotations
 
 import logging
-import random
+import os
+import secrets
 import time
 import uuid
-import os
 
 from PIL import Image, ImageDraw
 
@@ -34,6 +34,25 @@ from src.static_catalog import catalog as static_catalog
 from src.storage import store
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+#  Helpers
+# ---------------------------------------------------------------------------
+
+
+def _try_remove_asset(filename: str) -> None:
+    """Best-effort cleanup of an orphaned image file after a DB failure."""
+    try:
+        path = os.path.join(settings.paths.output_dir, os.path.basename(filename))
+        full = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path
+        ) if not os.path.isabs(path) else path
+        if os.path.isfile(full):
+            os.unlink(full)
+            logger.warning("Cleaned up orphaned asset: %s", filename)
+    except Exception as exc:
+        logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
+
 
 # ---------------------------------------------------------------------------
 #  Constants
@@ -68,7 +87,7 @@ class UnitEngine:
         """Generate a single south-facing sprite for a unit type."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         start = time.time()
 
@@ -81,29 +100,27 @@ class UnitEngine:
         store.save_image(filename, img)
 
         # Persist AssetRecord + UnitRecord in one transaction
-        db = SessionLocal()
         try:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="unit",
-                generation_mode="comfyui",
-            ))
-            UnitRegistry.register(
-                unit_id=unit_id,
-                unit_type=req.unit_type,
-                description=req.description,
-                image_id=filename,
-                seed=seed,
-                prompt_used=prompt,
-                generation_mode="comfyui",
-                session=db,
-            )
-            db.commit()
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="unit",
+                    generation_mode="comfyui",
+                ))
+                UnitRegistry.register(
+                    unit_id=unit_id,
+                    unit_type=req.unit_type,
+                    description=req.description,
+                    image_id=filename,
+                    seed=seed,
+                    prompt_used=prompt,
+                    generation_mode="comfyui",
+                    session=db,
+                )
+                db.commit()
         except Exception:
-            db.rollback()
+            _try_remove_asset(filename)
             raise
-        finally:
-            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -131,7 +148,7 @@ class StaticUnitEngine:
         """Resolve a unit sprite from static_tiles/unit/, falling back to placeholder."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         start = time.time()
 
@@ -187,7 +204,7 @@ class _PlaceholderUnitEngine:
     async def generate(self, req: UnitRequest) -> UnitResponse:
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         start = time.time()
 

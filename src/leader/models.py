@@ -199,6 +199,17 @@ class LeaderRequest(BaseModel):
             )
         return v
 
+    @field_validator("leader_ids")
+    @classmethod
+    def _check_leader_ids(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        """Reject empty leader_ids list — must be None or have at least one entry."""
+        if v is not None and len(v) == 0:
+            raise ValueError(
+                "leader_ids must contain at least one leader_id if provided. "
+                "Use None (omit the field) if you are not doing a multi-leader action."
+            )
+        return v
+
     @field_validator("leader_name")
     @classmethod
     def _strip_leader_name(cls, v: str) -> str:

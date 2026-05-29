@@ -17,10 +17,10 @@ workflow JSON.  The engine only injects: positive_prompt, seed.
 """
 from __future__ import annotations
 import logging
-import random
+import os
+import secrets
 import time
 import uuid
-import os
 from typing import Union
 
 from PIL import Image, ImageDraw
@@ -46,6 +46,25 @@ from src.static_catalog import catalog as static_catalog
 from src.storage import store
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+#  Helpers
+# ---------------------------------------------------------------------------
+
+
+def _try_remove_asset(filename: str) -> None:
+    """Best-effort cleanup of an orphaned image file after a DB failure."""
+    try:
+        path = os.path.join(settings.paths.output_dir, os.path.basename(filename))
+        full = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path
+        ) if not os.path.isabs(path) else path
+        if os.path.isfile(full):
+            os.unlink(full)
+            logger.warning("Cleaned up orphaned asset: %s", filename)
+    except Exception as exc:
+        logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
+
 
 # ---------------------------------------------------------------------------
 #  Constants
@@ -130,7 +149,7 @@ class TileEngine:
         asset_id = generate_id(req.category)
 
         # 3. Seed
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         # 4. Run ComfyUI
         start = time.time()
@@ -145,29 +164,27 @@ class TileEngine:
         store.save_image(filename, img)
 
         # 6. Persist AssetRecord + specialized registry record in one transaction
-        db = SessionLocal()
         try:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family=family,
-                generation_mode="comfyui",
-            ))
-            _register_tile(
-                registry_register,
-                asset_id=asset_id,
-                req=req,
-                image_id=filename,
-                seed=seed,
-                prompt_used=prompt,
-                generation_mode="comfyui",
-                session=db,
-            )
-            db.commit()
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family=family,
+                    generation_mode="comfyui",
+                ))
+                _register_tile(
+                    registry_register,
+                    asset_id=asset_id,
+                    req=req,
+                    image_id=filename,
+                    seed=seed,
+                    prompt_used=prompt,
+                    generation_mode="comfyui",
+                    session=db,
+                )
+                db.commit()
         except Exception:
-            db.rollback()
+            _try_remove_asset(filename)
             raise
-        finally:
-            db.close()
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -204,7 +221,7 @@ class StaticTileEngine:
         path = static_catalog.resolve_random("structure", req.category)
         if path:
             filename = _load_and_save(path)
-            static_seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+            static_seed = req.seed if req.seed is not None else secrets.randbits(31)
             _register_tile(
                 StructureRegistry.register,
                 asset_id=asset_id,
@@ -227,7 +244,7 @@ class StaticTileEngine:
         path = static_catalog.resolve_random("nature_object")
         if path:
             filename = _load_and_save(path)
-            static_seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+            static_seed = req.seed if req.seed is not None else secrets.randbits(31)
             _register_tile(
                 ObjectRegistry.register,
                 asset_id=asset_id,
@@ -296,7 +313,7 @@ class _PlaceholderTileEngine:
     ):
         prompt = build_prompt(req)
         asset_id = generate_id(req.category)
-        seed = req.seed if req.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = req.seed if req.seed is not None else secrets.randbits(31)
 
         start = time.time()
 

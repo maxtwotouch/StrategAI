@@ -93,3 +93,60 @@ def assemble(family: str, inner: str) -> str:
 def list_families() -> list[str]:
     """Return all available template family keys."""
     return sorted(_load().keys())
+
+
+# ---------------------------------------------------------------------------
+#  Startup validation
+# ---------------------------------------------------------------------------
+
+_REQUIRED_TEMPLATE_KEYS = {"prefix", "suffix"}
+
+
+def validate_all_templates() -> list[str]:
+    """Validate every loaded template at startup.
+
+    Checks that:
+    - Every template has ``prefix`` and ``suffix`` keys.
+    - Both ``prefix`` and ``suffix`` are non-empty strings
+      (degenerate templates would produce broken prompts).
+
+    Returns a list of error messages (empty = all good).  The application
+    should refuse to start if any errors are returned.
+    """
+    errors: list[str] = []
+    try:
+        templates = _load()
+    except FileNotFoundError as exc:
+        return [f"Prompt templates file not found: {_PROMPT_TEMPLATES_PATH} — {exc}"]
+    except json.JSONDecodeError as exc:
+        return [f"Prompt templates file is not valid JSON: {_PROMPT_TEMPLATES_PATH} — {exc}"]
+    except KeyError as exc:
+        return [
+            f"Prompt templates file is missing required 'templates' key: "
+            f"{_PROMPT_TEMPLATES_PATH} — {exc}"
+        ]
+
+    for family, tmpl in templates.items():
+        # Check required keys
+        missing_keys = _REQUIRED_TEMPLATE_KEYS - set(tmpl.keys())
+        if missing_keys:
+            errors.append(
+                f"Template '{family}' is missing required keys: {missing_keys}"
+            )
+            continue
+
+        # Check that prefix and suffix are non-empty
+        for key in _REQUIRED_TEMPLATE_KEYS:
+            val = tmpl.get(key, "")
+            if not isinstance(val, str) or not val.strip():
+                errors.append(
+                    f"Template '{family}' has empty or non-string '{key}' — "
+                    f"prompt assembly would produce incomplete output"
+                )
+
+    if errors:
+        logger = __import__("logging").getLogger(__name__)
+        for err in errors:
+            logger.error("Template validation error: %s", err)
+
+    return errors

@@ -1,4 +1,5 @@
 import os
+from enum import Enum
 from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
@@ -82,13 +83,16 @@ class LeaderSettings(BaseModel):
 class ServerSettings(BaseModel):
     """HTTP server configuration."""
     cors_origins: list[str] = Field(
-        default_factory=lambda: ["*"],
-        description="CORS allowed origins. Set to specific domains in production.",
+        default_factory=lambda: ["http://localhost:3000"],
+        description="CORS allowed origins.  The default allows local development. "
+                    "Set to specific domains in production.  Using ['*'] is a "
+                    "security risk — the server will emit a warning at startup.",
     )
     max_request_body_mb: int = Field(
         default=10,
         gt=0,
-        description="Maximum request body size in megabytes.",
+        le=100,
+        description="Maximum request body size in megabytes (1–100).",
     )
     assets_url_prefix: str = Field(
         default="/assets",
@@ -97,10 +101,25 @@ class ServerSettings(BaseModel):
     cache_max_entries: int = Field(
         default=1000,
         gt=0,
+        le=100_000,
         description="Maximum number of images held in the in-memory LRU cache. "
                     "Reduce if RAM is constrained (e.g. 100).  Set higher for "
                     "faster repeated reads at the cost of memory.",
     )
+    cache_max_mb: int = Field(
+        default=500,
+        gt=0,
+        le=16384,
+        description="Approximate maximum memory (MB) for the in-memory image cache. "
+                    "Eviction is still entry-count-based, but this provides a "
+                    "guideline for sizing.  Reduce if RAM is constrained.",
+    )
+
+
+class DeploymentMode(str, Enum):
+    """Deployment environment — controls which safety checks are enforced."""
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +150,12 @@ class Settings(BaseSettings):
 
     host: str = "0.0.0.0"
     port: int = 8000
+    mode: DeploymentMode = Field(
+        default=DeploymentMode.DEVELOPMENT,
+        description="Deployment environment. 'production' enables stricter "
+                    "safety checks (CORS must be explicit, database must be "
+                    "PostgreSQL, etc.).",
+    )
     comfyui: ComfyUISettings = Field(default_factory=ComfyUISettings)
     paths: PathSettings = Field(default_factory=PathSettings)
     generation: GenerationSettings = Field(default_factory=GenerationSettings)

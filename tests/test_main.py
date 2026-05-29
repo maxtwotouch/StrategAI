@@ -528,8 +528,8 @@ class TestLeaderEndpoints:
         assert data["generation_mode"] == "static"
 
     @pytest.mark.asyncio
-    async def test_multi_action_empty_leader_ids_400(self, async_client):
-        """Empty leader_ids list → 400."""
+    async def test_multi_action_empty_leader_ids_422(self, async_client):
+        """Empty leader_ids list → 422 (Pydantic validation error)."""
         resp = await async_client.post("/leader", json={
             "asset_type": "action",
             "leader_name": "Test",
@@ -542,7 +542,7 @@ class TestLeaderEndpoints:
             "action_category": "diplomatic",
             "action_description": "Signing a treaty.",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_multi_action_nonexistent_leader_400(self, async_client):
