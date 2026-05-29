@@ -17,9 +17,32 @@ SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class ComfyUISettings(BaseModel):
-    """Connection settings for the external ComfyUI inference server."""
+    """Connection settings for the external ComfyUI inference server(s).
+
+    Single-node (backward-compatible):
+        ``base_url`` is used directly, ``nodes`` is empty.
+
+    Multi-node (load-balanced):
+        ``nodes`` is a list of ComfyUI server URLs.  The load-balancer
+        picks the node with the shortest queue (pending + running) and
+        transparently retries on a different node on failure.
+
+    All nodes are assumed homogeneous — same models, LoRAs, storage.
+    """
     base_url: str = "http://127.0.0.1:8188"
+    nodes: list[str] = Field(default_factory=list)
     timeout: int = 300
+    health_check_interval: int = 30
+    max_retries: int = 3
+
+    def get_urls(self) -> list[str]:
+        """Return the list of ComfyUI server URLs to connect to.
+
+        If ``nodes`` is non-empty it is used directly; otherwise
+        ``base_url`` is wrapped in a single-element list for backward
+        compatibility.
+        """
+        return self.nodes if self.nodes else [self.base_url]
 
 
 class PathSettings(BaseModel):

@@ -9,6 +9,8 @@ __pycache__/
 venv/
 env/
 
+.devcontainer
+
 # IDE
 .idea/
 .vscode/

@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _comfyui_client: ComfyUIClient | None = None
+_comfyui_lb: "ComfyUILoadBalancer | None" = None
 
 
 def get_comfyui_client() -> ComfyUIClient | None:
@@ -43,11 +44,30 @@ def get_comfyui_client() -> ComfyUIClient | None:
     return _comfyui_client
 
 
+def get_comfyui_loadbalancer() -> "ComfyUILoadBalancer | None":
+    """Return the shared :class:`ComfyUILoadBalancer` singleton.
+
+    If ``comfyui.nodes`` is configured with multiple URLs the load-balancer
+    distributes work across all of them.  For single-node deployments this
+    is equivalent to a plain ``ComfyUIClient`` (pool size = 1).
+    """
+    global _comfyui_lb
+    if _comfyui_lb is None:
+        from src.comfyui_loadbalancer import ComfyUILoadBalancer
+
+        _comfyui_lb = ComfyUILoadBalancer()
+    return _comfyui_lb
+
+
 async def close_comfyui_client() -> None:
     """Shut down the shared ComfyUI client (called during app shutdown)."""
-    global _comfyui_client
+    global _comfyui_client, _comfyui_lb
+    if _comfyui_lb is not None:
+        await _comfyui_lb.close()
+        _comfyui_lb = None
     if _comfyui_client is not None:
         await _comfyui_client.close()
+        _comfyui_client = None
         _comfyui_client = None
 
 
@@ -280,6 +300,26 @@ class ComfyUIClient:
             return resp.status_code == 200
         except Exception:
             return False
+
+    async def get_queue_info(self) -> dict | None:
+        """``GET /queue`` → queue depth and status.
+
+        Returns a dict with ``running``, ``pending``, and ``depth`` keys,
+        or ``None`` if the node is unreachable.
+        """
+        try:
+            resp = await self.http.get("/queue", timeout=5)
+            resp.raise_for_status()
+            body = resp.json()
+            running = body.get("queue_running", [])
+            pending = body.get("queue_pending", [])
+            return {
+                "running": len(running),
+                "pending": len(pending),
+                "depth": len(running) + len(pending),
+            }
+        except Exception:
+            return None
 
     # ------------------------------------------------------------------
     #  Private: waiting strategies

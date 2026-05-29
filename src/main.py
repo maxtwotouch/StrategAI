@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from src.config import settings
 from src.database import SessionLocal, AssetRecord
-from src.comfyui_client import close_comfyui_client, get_comfyui_client
+from src.comfyui_client import close_comfyui_client, get_comfyui_loadbalancer
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
 from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
 from src.leader.registry import LeaderRegistry
@@ -53,23 +53,23 @@ async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hooks."""
     global leader_engine, tile_engine, unit_engine
 
+    # Single load-balancer shared across all engines.
+    # For single-node configs this is equivalent to a plain ComfyUIClient.
+    lb = get_comfyui_loadbalancer()
+    lb_reachable = await lb.health_check() if lb else False
+
     leader_mode = settings.get_mode("leader")
 
     if leader_mode in ("static", "placeholder"):
         leader_engine = StaticLeaderEngine()
         logger.info("Leader engine initialized (%s mode)", leader_mode)
+    elif lb is not None and lb_reachable:
+        leader_engine = LeaderEngine(lb)
+        logger.info("Leader engine initialized (comfyui mode, %d nodes)", len(lb._nodes))
     else:
-        client = get_comfyui_client()
-        if client is not None:
-            reachable = await client.health_check()
-            if reachable:
-                leader_engine = LeaderEngine(client)
-                logger.info("Leader engine initialized (comfyui mode)")
-            else:
-                logger.warning(
-                    "ComfyUI server unreachable at %s -- leader endpoints will return 503",
-                    client.base_url,
-                )
+        logger.warning(
+            "ComfyUI unreachable -- leader endpoints will return 503"
+        )
 
     # Initialize tile engine based on structure/object/terrain mode
     tile_families = ["structure", "object", "terrain"]
@@ -78,13 +78,11 @@ async def lifespan(app: FastAPI):
     if tile_mode in ("static", "placeholder"):
         tile_engine = StaticTileEngine()
         logger.info("Tile engine initialized (%s mode)", tile_mode)
+    elif lb is not None:
+        tile_engine = TileEngine(lb)
+        logger.info("Tile engine initialized (comfyui mode)")
     else:
-        client = get_comfyui_client()
-        if client is not None:
-            tile_engine = TileEngine(client)
-            logger.info("Tile engine initialized (comfyui mode)")
-        else:
-            logger.warning("Tile engine: ComfyUI unreachable, tile endpoints will return 503")
+        logger.warning("Tile engine: ComfyUI unreachable, tile endpoints will return 503")
 
     # Initialize unit engine
     unit_mode = settings.get_mode("unit")
@@ -92,13 +90,11 @@ async def lifespan(app: FastAPI):
     if unit_mode in ("static", "placeholder"):
         unit_engine = StaticUnitEngine()
         logger.info("Unit engine initialized (%s mode)", unit_mode)
+    elif lb is not None:
+        unit_engine = UnitEngine(lb)
+        logger.info("Unit engine initialized (comfyui mode)")
     else:
-        client = get_comfyui_client()
-        if client is not None:
-            unit_engine = UnitEngine(client)
-            logger.info("Unit engine initialized (comfyui mode)")
-        else:
-            logger.warning("Unit engine: ComfyUI unreachable, unit endpoints will return 503")
+        logger.warning("Unit engine: ComfyUI unreachable, unit endpoints will return 503")
 
     logger.info(
         "Application started.  Modes: %s",
@@ -186,11 +182,12 @@ async def get_catalog():
 @app.get("/health")
 async def health_check():
     """Report service status including ComfyUI connectivity."""
-    client = get_comfyui_client()
-    comfyui_ok = (client is not None) and await client.health_check() if client else False
+    lb = get_comfyui_loadbalancer()
+    comfyui_ok = (lb is not None) and await lb.health_check() if lb else False
     return {
         "status": "ok",
         "comfyui_connected": comfyui_ok,
+        "comfyui_nodes": len(lb._nodes) if lb else 0,
         "modes": {
             "structure": settings.get_mode("structure"),
             "object": settings.get_mode("object"),

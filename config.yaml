@@ -10,9 +10,25 @@ host: "0.0.0.0"
 port: 8000
 
 # ---- ComfyUI connection -----------------------------------------------
+# Single-node (backward-compatible):
+#   comfyui:
+#     base_url: "http://127.0.0.1:8188"
+#     timeout: 300
+#
+# Multi-node (load-balanced across identical servers):
+#   comfyui:
+#     nodes:
+#       - "http://192.168.1.10:8188"
+#       - "http://192.168.1.11:8188"
+#       - "http://192.168.1.12:8188"
+#     timeout: 300
+#     health_check_interval: 30   # seconds between re-pinging unhealthy nodes
+#     max_retries: 3              # max nodes to try per generation before failing
 comfyui:
   base_url: "http://127.0.0.1:8188"
   timeout: 300
+  health_check_interval: 30
+  max_retries: 3
 
 # ---- Paths (all relative to project root) -----------------------------
 paths:
