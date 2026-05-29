@@ -5,13 +5,17 @@ txt2img generation of top-down game sprites.  The prompt is designed to work
 with the same txt2img.json workflow used by structure/object/terrain.
 
 All sprites are south-facing (front view) — the canonical game-facing direction.
+
+Prompt templates (prefix + suffix) live in ``config/prompt_templates.json``.
+This module only contributes the enum injection map and assembly logic.
 """
 
+from src.prompt_templates import assemble as _assemble
 from .models import UnitType
 
 
 # ===========================================================================
-#  Unit type prompts — describes the character archetype
+#  Unit type injection map — describes the character archetype
 # ===========================================================================
 
 _UNIT_PROMPTS: dict[str, str] = {
@@ -41,6 +45,10 @@ _UNIT_PROMPTS: dict[str, str] = {
 def build_unit_prompt(unit_type: str, description: str) -> str:
     """Build a rich txt2img prompt from unit type and free-form description.
 
+    The template (prefix: <tdp> trigger + style direction, suffix: format
+    constraints) is loaded from ``config/prompt_templates.json``.  This
+    function only contributes the unit archetype prose and user description.
+
     Parameters
     ----------
     unit_type : str
@@ -52,18 +60,11 @@ def build_unit_prompt(unit_type: str, description: str) -> str:
     Returns
     -------
     str
-        A comma-separated prompt string ready for txt2img injection.
+        A complete prompt string ready for txt2img injection.
     """
     unit_desc = _UNIT_PROMPTS.get(unit_type, "medieval character sprite")
 
-    parts = [
-        "pixel art top-down 2d game character sprite",
-        unit_desc,
-        "facing camera, front view, full frontal, character looks at viewer",
-        description,
-        "isolated on transparent background",
-        "crisp pixel edges, no anti-aliasing",
-        "centered single sprite, game asset",
-    ]
+    # Inner prose: archetype description + user-provided specifics
+    inner = f"{unit_desc}, {description}"
 
-    return ", ".join(p for p in parts if p)
+    return _assemble("unit", inner)

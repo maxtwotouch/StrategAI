@@ -27,6 +27,28 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+#  Singleton client (lazily created, shared across all engines)
+# ---------------------------------------------------------------------------
+
+_comfyui_client: ComfyUIClient | None = None
+
+
+def get_comfyui_client() -> ComfyUIClient | None:
+    """Return the shared ComfyUIClient singleton, creating it if needed."""
+    global _comfyui_client
+    if _comfyui_client is None:
+        _comfyui_client = ComfyUIClient()
+    return _comfyui_client
+
+
+async def close_comfyui_client() -> None:
+    """Shut down the shared ComfyUI client (called during app shutdown)."""
+    global _comfyui_client
+    if _comfyui_client is not None:
+        await _comfyui_client.close()
+        _comfyui_client = None
+
 
 class ComfyUIClient:
     """Thin async HTTP + WebSocket client for a single ComfyUI server.
@@ -73,7 +95,6 @@ class ComfyUIClient:
         workflow_path: str,
         *,
         positive_prompt: str | None = None,
-        negative_prompt: str | None = None,
         seed: int | None = None,
         width: int | None = None,
         height: int | None = None,
@@ -83,16 +104,19 @@ class ComfyUIClient:
     ) -> Image.Image:
         """Load a workflow JSON, patch it, run it, return the first output image.
 
+        Flux2 Klein does not use negative prompts — only positive_prompt is
+        injected into ``CLIPTextEncode`` nodes.
+
         Parameters
         ----------
         workflow_path:
             Absolute path to the workflow JSON template.
-        positive_prompt / negative_prompt:
-            Text prompts to inject into the workflow.
+        positive_prompt:
+            Text prompt to inject into CLIPTextEncode nodes.
         seed:
-            KSampler seed.  Random if None.
+            Injected into ``SamplerCustomAdvanced.noise_seed``.  Random if None.
         width / height:
-            Latent image dimensions.
+            Injected into ``EmptyFlux2LatentImage`` if present.
         input_images:
             Mapping of node_id → PIL Image to upload before queueing.
         extra_overrides:
@@ -117,7 +141,6 @@ class ComfyUIClient:
         workflow = _patch_workflow(
             workflow,
             positive_prompt=positive_prompt,
-            negative_prompt=negative_prompt,
             seed=seed,
             width=width,
             height=height,
@@ -317,14 +340,10 @@ class ComfyUIClient:
 #  Workflow patching helpers
 # ------------------------------------------------------------------
 
-_COMMON_NEGATIVE = "blurry, low res, realistic, 3d render, photorealistic"
-
-
 def _patch_workflow(
     workflow: dict,
     *,
     positive_prompt: str | None = None,
-    negative_prompt: str | None = None,
     seed: int | None = None,
     width: int | None = None,
     height: int | None = None,
@@ -334,8 +353,15 @@ def _patch_workflow(
 ) -> dict:
     """Walk every node and replace common input parameters.
 
-    Node identification is by ``class_type`` (e.g. ``CLIPTextEncode``,
-    ``KSampler``, ``EmptyLatentImage``, ``LoadImage``).
+    Flux2 Klein node graph — no KSampler, no negative prompts.
+
+    Node identification is by ``class_type``:
+    - ``CLIPTextEncode`` → positive prompt
+    - ``SamplerCustomAdvanced`` → noise_seed
+    - ``EmptyFlux2LatentImage`` → width / height
+    - ``Flux2Scheduler`` → steps / denoise
+    - ``CFGGuider`` → cfg
+    - ``LoadImage`` → uploaded image or reference filename
     """
     import random as _random
 
@@ -348,23 +374,18 @@ def _patch_workflow(
         ct = node.get("class_type", "")
         inputs = node.get("inputs", {})
 
-        # --- Prompt nodes ---
+        # --- Positive prompt (Flux2 has no negative prompt node) ---
         if ct == "CLIPTextEncode":
-            meta = node.get("_meta", {})
-            title = meta.get("title", "").lower()
-            if "positive" in title or "pos" in title:
-                if positive_prompt is not None:
-                    inputs["text"] = positive_prompt
-            elif "negative" in title or "neg" in title:
-                inputs["text"] = negative_prompt or _COMMON_NEGATIVE
+            if positive_prompt is not None:
+                inputs["text"] = positive_prompt
 
-        # --- KSampler ---
-        if ct == "KSampler":
-            if "seed" in inputs:
-                inputs["seed"] = seed
+        # --- Seed (Flux2 uses SamplerCustomAdvanced + noise_seed) ---
+        if ct == "SamplerCustomAdvanced":
+            if "noise_seed" in inputs:
+                inputs["noise_seed"] = seed
 
-        # --- EmptyLatentImage ---
-        if ct == "EmptyLatentImage":
+        # --- Latent dimensions ---
+        if ct == "EmptyFlux2LatentImage":
             if width is not None:
                 inputs["width"] = width
             if height is not None:

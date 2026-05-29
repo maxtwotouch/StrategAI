@@ -6,7 +6,7 @@ and persists everything through LeaderRegistry + AssetStore + AssetRecord.
 
 Resolution, denoise, steps, cfg, sampler, scheduler, model paths, LoRA
 strength, and SaveImage prefix are all baked into the workflow JSONs.
-The engine only injects: positive_prompt, seed, negative_prompt, and
+The engine only injects: positive_prompt, seed, and
 (for profile/action) the reference image + LoadImage filename.
 
 All generation methods are **async** and can be awaited directly from
@@ -76,7 +76,6 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader.negative_prompt,
             seed=seed,
         )
 
@@ -152,12 +151,11 @@ class LeaderEngine:
         # 5. Workflow path
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_profile.json")
 
-        # 6. Run — inject prompt, seed, negative prompt, and reference image filename
+        # 6. Run — inject prompt, seed, and reference image filename
         start = time.time()
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader.negative_prompt,
             seed=seed,
             ref_image_filename=leader.reference_filename,
         )
@@ -234,7 +232,6 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader.negative_prompt,
             seed=seed,
             ref_image_filename=leader.reference_filename,
         )
@@ -305,7 +302,6 @@ class LeaderEngine:
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
-            negative_prompt=settings.leader.negative_prompt,
             seed=req.seed or random.randint(10**14, 10**15 - 1),
         )
 

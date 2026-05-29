@@ -22,32 +22,15 @@ paths:
   leader_reference_dir: "leader_references"
 
 # ---- Generation modes (per asset family) ------------------------------
-# Valid per-family: "comfyui" | "static" | "placeholder" | "random"
+# Valid per-family: "comfyui" | "static" | "placeholder"
 generation:
   modes:
-    background_tile: "comfyui"
     structure: "comfyui"
     object: "comfyui"
     terrain: "comfyui"
-    nature_object: "comfyui"
-    character_sprite: "comfyui"
-    story: "comfyui"
-    splash: "comfyui"
     leader: "comfyui"
     unit: "comfyui"
   default_mode: "comfyui"
-  random_probability: 0.5
-
-# ---- Splash art defaults ----------------------------------------------
-splash:
-  width: 256
-  height: 256
 
 # ---- Leader pipeline --------------------------------------------------
-leader:
-  negative_prompt: >
-    blurry, low quality, distorted, ugly, deformed face, bad hands,
-    missing fingers, text, watermark, signature, logo, cartoon, 3D render,
-    photograph, selfie, modern clothing, jeans, t-shirt, plastic,
-    oversaturated colors, bad anatomy, extra limbs, cloned face, disfigured,
-    jpeg artifacts
+leader: {}

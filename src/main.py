@@ -7,11 +7,10 @@ from fastapi.responses import JSONResponse
 
 from src.config import settings
 from src.database import SessionLocal, AssetRecord
-from src.generators import close_comfyui_client, get_generator, _get_comfyui_client
+from src.comfyui_client import close_comfyui_client, get_comfyui_client
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
 from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
 from src.leader.registry import LeaderRegistry
-from src.models import GenerationRequest, GenerationResponse, SplashRequest, SplashResponse
 from src.static_catalog import catalog as static_catalog
 from src.storage import store
 from src.tile.engine import TileEngine, StaticTileEngine
@@ -60,7 +59,7 @@ async def lifespan(app: FastAPI):
         leader_engine = StaticLeaderEngine()
         logger.info("Leader engine initialized (%s mode)", leader_mode)
     else:
-        client = _get_comfyui_client()
+        client = get_comfyui_client()
         if client is not None:
             reachable = await client.health_check()
             if reachable:
@@ -73,15 +72,14 @@ async def lifespan(app: FastAPI):
                 )
 
     # Initialize tile engine based on structure/object/terrain mode
-    # (all three share the same client; mode determines instance type)
     tile_families = ["structure", "object", "terrain"]
-    tile_mode = settings.get_mode("structure")  # representative — all three share config
+    tile_mode = settings.get_mode("structure")
 
     if tile_mode in ("static", "placeholder"):
         tile_engine = StaticTileEngine()
         logger.info("Tile engine initialized (%s mode)", tile_mode)
     else:
-        client = _get_comfyui_client()
+        client = get_comfyui_client()
         if client is not None:
             tile_engine = TileEngine(client)
             logger.info("Tile engine initialized (comfyui mode)")
@@ -95,7 +93,7 @@ async def lifespan(app: FastAPI):
         unit_engine = StaticUnitEngine()
         logger.info("Unit engine initialized (%s mode)", unit_mode)
     else:
-        client = _get_comfyui_client()
+        client = get_comfyui_client()
         if client is not None:
             unit_engine = UnitEngine(client)
             logger.info("Unit engine initialized (comfyui mode)")
@@ -105,8 +103,7 @@ async def lifespan(app: FastAPI):
     logger.info(
         "Application started.  Modes: %s",
         {f: settings.get_mode(f) for f in [
-            "structure", "nature_object", "background_tile",
-            "character_sprite", "story", "splash", "leader", "unit",
+            "structure", "object", "terrain", "leader", "unit",
         ]},
     )
     logger.info(
@@ -158,93 +155,6 @@ async def get_asset(filename: str):
 
 
 # ---------------------------------------------------------------------------
-#  Generate
-# ---------------------------------------------------------------------------
-
-
-@app.post("/generate", response_model=GenerationResponse)
-async def generate_image(request: GenerationRequest):
-    logger.info("Received generation request for family: %s", request.asset_family)
-    try:
-        # Resolve generation mode (for logging + DB)
-        mode = settings.get_mode(request.asset_family)
-
-        # Run generation directly (async -- no thread-pool needed)
-        generator = get_generator(request.asset_family, request)
-        filename: str = await generator.generate(request)
-
-        # Persist to database
-        with SessionLocal() as db:
-            record = AssetRecord(
-                id=filename,
-                asset_family=request.asset_family,
-                base_image_id=request.base_image_id,
-                inpaints=[patch.model_dump() for patch in request.inpaints] if request.inpaints else [],
-                tile_type=request.tile_type,
-                structure_subtype=request.structure_subtype,
-                generation_mode=mode,
-            )
-            db.add(record)
-            db.commit()
-
-        url = f"/assets/{filename}"
-        logger.info("Successfully generated asset at %s (mode=%s)", url, mode)
-        return GenerationResponse(
-            url=url,
-            asset_family=request.asset_family,
-            tile_type=request.tile_type,
-            generation_mode=mode,
-        )
-    except ValueError as e:
-        logger.warning("Validation error: %s", e)
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        logger.error("Runtime error generating asset: %s", e)
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        logger.error("Error generating asset: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ---------------------------------------------------------------------------
-#  Splash
-# ---------------------------------------------------------------------------
-
-
-@app.post("/splash", response_model=SplashResponse)
-async def generate_splash(request: SplashRequest):
-    """Generate a splash art (leader profile portrait)."""
-    logger.info("Received splash request for character: %s", request.character_name)
-    try:
-        mode = settings.get_mode("splash")
-        generator = get_generator("splash", request)
-        filename: str = await generator.generate(request)
-
-        # Persist to database
-        with SessionLocal() as db:
-            record = AssetRecord(
-                id=filename,
-                asset_family="splash",
-                base_image_id=None,
-                inpaints=[],
-                character_name=request.character_name,
-                generation_mode=mode,
-            )
-            db.add(record)
-            db.commit()
-
-        url = f"/assets/{filename}"
-        logger.info("Successfully generated splash art at %s (mode=%s)", url, mode)
-        return SplashResponse(
-            url=url,
-            character_name=request.character_name,
-        )
-    except Exception as e:
-        logger.error("Error generating splash art: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ---------------------------------------------------------------------------
 #  Catalog
 # ---------------------------------------------------------------------------
 
@@ -276,20 +186,15 @@ async def get_catalog():
 @app.get("/health")
 async def health_check():
     """Report service status including ComfyUI connectivity."""
-    client = _get_comfyui_client()
+    client = get_comfyui_client()
     comfyui_ok = (client is not None) and await client.health_check() if client else False
     return {
         "status": "ok",
         "comfyui_connected": comfyui_ok,
         "modes": {
-            "background_tile": settings.get_mode("background_tile"),
             "structure": settings.get_mode("structure"),
             "object": settings.get_mode("object"),
             "terrain": settings.get_mode("terrain"),
-            "nature_object": settings.get_mode("nature_object"),
-            "character_sprite": settings.get_mode("character_sprite"),
-            "story": settings.get_mode("story"),
-            "splash": settings.get_mode("splash"),
             "leader": settings.get_mode("leader"),
             "unit": settings.get_mode("unit"),
         },
@@ -311,12 +216,11 @@ async def get_modes():
     'comfyui', 'static', or 'placeholder' mode without reading config.
     """
     families = [
-        "background_tile", "structure", "object", "terrain",
-        "nature_object", "character_sprite", "story", "splash", "leader", "unit",
+        "structure", "object", "terrain", "leader", "unit",
     ]
     return {
         "modes": {f: settings.get_mode(f) for f in families},
-        "valid_modes": ["comfyui", "static", "placeholder", "random"],
+        "valid_modes": ["comfyui", "static", "placeholder"],
     }
 
 

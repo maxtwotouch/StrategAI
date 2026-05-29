@@ -3,9 +3,12 @@
 The client never writes raw prompts. The server builds them from structured
 enums (archetype, culture, time_of_day, mood, action_category) plus the
 leader_description and action_description prose fields.
+
+Prompt templates (prefix + suffix) live in ``config/prompt_templates.json``.
+This module only contributes the enum injection maps and assembly logic.
 """
 
-from src.config import settings
+from src.prompt_templates import assemble as _assemble
 from .models import LeaderRequest
 
 # ---------------------------------------------------------------------------
@@ -196,63 +199,41 @@ ACTION_CATEGORY = {
 # ---------------------------------------------------------------------------
 # Style tails  (appended to every prompt — never exposed to client)
 # ---------------------------------------------------------------------------
-
-SPLASH_TAIL = (
-    "civilization leader splash screen art, rich painterly oil style, "
-    "masterpiece composition, dramatic lighting, by Craig Mullins and "
-    "Greg Rutkowski, 8K, highly detailed, 16:9 cinematic aspect ratio"
-)
-
-PROFILE_TAIL = (
-    "civilization leader profile picture, sharp focus on eyes, Rembrandt "
-    "lighting, portrait lens 85mm f/1.4, very shallow depth of field, bokeh "
-    "background, highly detailed skin texture and pores, 8K, square format"
-)
-
-ACTION_TAIL = (
-    "civilization game event art, rich painterly oil style, dramatic composition, "
-    "consistent character design, highly detailed, 8K, 16:9 cinematic aspect ratio"
-)
-
-
 # ---------------------------------------------------------------------------
 # Prompt builders
 # ---------------------------------------------------------------------------
 
 def build_splash_prompt(req: LeaderRequest) -> str:
-    parts = [
-        f"epic cinematic wide composition of {req.leader_description.strip()},",
+    inner = ", ".join([
+        req.leader_description.strip(),
         ARCHETYPE[req.archetype],
         f"in {CULTURE[req.culture]}",
         TIME_OF_DAY[req.time_of_day],
         MOOD[req.mood],
-        SPLASH_TAIL,
-    ]
-    return ", ".join(parts)
+    ])
+    return _assemble("leader_splash", inner)
 
 
 def build_profile_prompt(req: LeaderRequest) -> str:
-    parts = [
-        f"professional close-up portrait of {req.leader_description.strip()},",
+    inner = ", ".join([
+        req.leader_description.strip(),
         "face filling the frame",
         "headpiece and collar visible at the edges of the frame",
         MOOD[req.mood],
-        PROFILE_TAIL,
-    ]
-    return ", ".join(parts)
+    ])
+    return _assemble("leader_profile", inner)
 
 
 def build_action_prompt(req: LeaderRequest) -> str:
-    parts = [
-        f"epic cinematic scene depicting {req.leader_description.strip()}",
+    inner = ", ".join([
+        req.leader_description.strip(),
         req.action_description.strip(),
         f"in {CULTURE[req.culture]}",
         TIME_OF_DAY[req.time_of_day],
         MOOD[req.mood],
         ACTION_CATEGORY[req.action_category],
-        ACTION_TAIL,
-    ]
-    return ", ".join(parts)
+    ])
+    return _assemble("leader_action", inner)
 
 
 def build_multi_action_prompt(
@@ -265,7 +246,6 @@ def build_multi_action_prompt(
     Composes all leader descriptions into a single prompt describing
     their interaction within the action scene.
     """
-    # Build the character descriptions part
     if len(leader_descriptions) == 1:
         char_part = f"epic cinematic scene depicting {leader_descriptions[0].strip()}"
     elif len(leader_descriptions) == 2:
@@ -281,16 +261,15 @@ def build_multi_action_prompt(
         )
         char_part = f"epic cinematic scene depicting multiple leaders: {named}"
 
-    parts = [
+    inner = ", ".join([
         char_part,
         req.action_description.strip(),
         f"in {CULTURE[req.culture]}",
         TIME_OF_DAY[req.time_of_day],
         MOOD[req.mood],
         ACTION_CATEGORY[req.action_category],
-        ACTION_TAIL,
-    ]
-    return ", ".join(parts)
+    ])
+    return _assemble("leader_action", inner)
 
 
 def build_prompt(req: LeaderRequest) -> str:

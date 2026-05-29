@@ -3,9 +3,10 @@
 Routes unit sprite generation requests through the appropriate generator
 based on the per-family generation mode (comfyui, static, placeholder).
 
-Each unit generates a single south-facing (front view) sprite at 512×512.
+Each unit generates a single south-facing (front view) sprite.
 
-Mirrors the tile engine pattern: UnitEngine / StaticUnitEngine / _PlaceholderUnitEngine.
+Resolution (1024→128) and all sampling parameters are baked into the
+workflow JSON.  The engine only injects: positive_prompt, seed.
 """
 
 import logging
@@ -31,7 +32,9 @@ logger = logging.getLogger(__name__)
 #  Constants
 # ---------------------------------------------------------------------------
 
-_SPRITE_WIDTH, _SPRITE_HEIGHT = 512, 512
+# Game asset target resolution — must match the ComfyUI Image Resize node
+# in workflows/txt2img.json (128×128 output from 1024×1024 generation).
+GAME_ASSET_SIZE = 128
 
 # Colour palette for placeholder unit sprites
 _UNIT_COLORS: dict[str, tuple[int, int, int, int]] = {
@@ -77,8 +80,6 @@ class UnitEngine:
         img = await self._client.generate(
             os.path.join(settings.workflow_dir, "txt2img.json"),
             positive_prompt=prompt,
-            width=_SPRITE_WIDTH,
-            height=_SPRITE_HEIGHT,
             seed=seed,
         )
         filename = f"{uuid.uuid4()}.png"
@@ -111,7 +112,7 @@ class UnitEngine:
             seed=seed,
             generation_mode="comfyui",
             prompt_used=prompt,
-            resolution=f"{_SPRITE_WIDTH}x{_SPRITE_HEIGHT}",
+            resolution=f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
             generation_time_ms=elapsed,
         )
 
@@ -167,7 +168,7 @@ class StaticUnitEngine:
             seed=seed,
             generation_mode="static",
             prompt_used=prompt,
-            resolution=f"{_SPRITE_WIDTH}x{_SPRITE_HEIGHT}",
+            resolution=f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
             generation_time_ms=elapsed,
         )
 
@@ -189,12 +190,12 @@ class _PlaceholderUnitEngine:
         color = _UNIT_COLORS.get(req.unit_type, (128, 128, 128, 255))
         font = _get_font()
 
-        img = Image.new("RGBA", (_SPRITE_WIDTH, _SPRITE_HEIGHT), color)
+        img = Image.new("RGBA", (GAME_ASSET_SIZE, GAME_ASSET_SIZE), color)
         draw = ImageDraw.Draw(img)
 
         # Border
         draw.rectangle(
-            [4, 4, _SPRITE_WIDTH - 5, _SPRITE_HEIGHT - 5],
+            [4, 4, GAME_ASSET_SIZE - 5, GAME_ASSET_SIZE - 5],
             outline=(255, 255, 255, 255), width=2,
         )
 
@@ -202,7 +203,7 @@ class _PlaceholderUnitEngine:
         unit_label = req.unit_type.upper()
         unit_w = draw.textlength(unit_label, font=font)
         draw.text(
-            ((_SPRITE_WIDTH - unit_w) // 2, _SPRITE_HEIGHT // 2 - 12),
+            ((GAME_ASSET_SIZE - unit_w) // 2, GAME_ASSET_SIZE // 2 - 12),
             unit_label, fill=(255, 255, 255, 255), font=font,
         )
 
@@ -236,6 +237,6 @@ class _PlaceholderUnitEngine:
             seed=seed,
             generation_mode="placeholder",
             prompt_used=prompt,
-            resolution=f"{_SPRITE_WIDTH}x{_SPRITE_HEIGHT}",
+            resolution=f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
             generation_time_ms=elapsed,
         )

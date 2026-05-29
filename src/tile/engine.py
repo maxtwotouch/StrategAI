@@ -1,10 +1,13 @@
 """Tile generation orchestrator.
 
 Routes structure/object/terrain requests through the appropriate generator
-based on the per-family generation mode (comfyui, static, placeholder, random).
+based on the per-family generation mode (comfyui, static, placeholder).
 
 Unlike the leader pipeline, tiles are single-shot txt2img — no multi-stage
 dependencies, no reference images, no seed anchoring.
+
+Resolution (1024→128) and all sampling parameters are baked into the
+workflow JSON.  The engine only injects: positive_prompt, seed.
 """
 
 import logging
@@ -42,7 +45,9 @@ logger = logging.getLogger(__name__)
 #  Constants
 # ---------------------------------------------------------------------------
 
-_TILE_WIDTH, _TILE_HEIGHT = 512, 512
+# Game asset target resolution — must match the ComfyUI Image Resize node
+# in workflows/txt2img.json (128×128 output from 1024×1024 generation).
+GAME_ASSET_SIZE = 128
 
 # Colour palette for placeholder tiles
 _PLACEHOLDER_COLORS = {
@@ -138,8 +143,6 @@ class TileEngine:
         img = await self._client.generate(
             os.path.join(settings.workflow_dir, "txt2img.json"),
             positive_prompt=prompt,
-            width=_TILE_WIDTH,
-            height=_TILE_HEIGHT,
             seed=seed,
         )
 
@@ -297,19 +300,19 @@ class _PlaceholderTileEngine:
         start = time.time()
 
         color = _PLACEHOLDER_COLORS.get(family, (128, 128, 128, 255))
-        img = Image.new("RGBA", (_TILE_WIDTH, _TILE_HEIGHT), color)
+        img = Image.new("RGBA", (GAME_ASSET_SIZE, GAME_ASSET_SIZE), color)
         draw = ImageDraw.Draw(img)
         font = _get_font()
 
         # Border
-        draw.rectangle([4, 4, _TILE_WIDTH - 5, _TILE_HEIGHT - 5],
+        draw.rectangle([4, 4, GAME_ASSET_SIZE - 5, GAME_ASSET_SIZE - 5],
                        outline=(255, 255, 255, 255), width=2)
 
         # Label (supports embedded newlines)
         for i, line in enumerate(label.split("\n")):
             text_w = draw.textlength(line, font=font)
             draw.text(
-                ((_TILE_WIDTH - text_w) // 2, (_TILE_HEIGHT // 2) + (i * 20) - 10),
+                ((GAME_ASSET_SIZE - text_w) // 2, (GAME_ASSET_SIZE // 2) + (i * 20) - 10),
                 line, fill=(255, 255, 255, 255), font=font,
             )
 

@@ -33,36 +33,22 @@ class PathSettings(BaseModel):
 class GenerationSettings(BaseModel):
     """Per-family generation mode routing."""
     modes: dict[str, str] = Field(default_factory=lambda: {
-        "background_tile": "comfyui",
         "structure": "comfyui",
         "object": "comfyui",
         "terrain": "comfyui",
-        "nature_object": "comfyui",
-        "character_sprite": "comfyui",
-        "story": "comfyui",
-        "splash": "comfyui",
         "leader": "comfyui",
         "unit": "comfyui",
     })
     default_mode: str = "comfyui"
-    random_probability: float = 0.5
-
-
-class SplashSettings(BaseModel):
-    """Default dimensions for splash-art generation."""
-    width: int = 256
-    height: int = 256
 
 
 class LeaderSettings(BaseModel):
-    """Prompt and behaviour settings for the leader pipeline."""
-    negative_prompt: str = (
-        "blurry, low quality, distorted, ugly, deformed face, bad hands, "
-        "missing fingers, text, watermark, signature, logo, cartoon, 3D render, "
-        "photograph, selfie, modern clothing, jeans, t-shirt, plastic, "
-        "oversaturated colors, bad anatomy, extra limbs, cloned face, disfigured, "
-        "jpeg artifacts"
-    )
+    """Prompt and behaviour settings for the leader pipeline.
+
+    Flux2 Klein does not use negative prompts — this block is kept
+    for future configuration needs.
+    """
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +82,6 @@ class Settings(BaseSettings):
     comfyui: ComfyUISettings = Field(default_factory=ComfyUISettings)
     paths: PathSettings = Field(default_factory=PathSettings)
     generation: GenerationSettings = Field(default_factory=GenerationSettings)
-    splash: SplashSettings = Field(default_factory=SplashSettings)
     leader: LeaderSettings = Field(default_factory=LeaderSettings)
 
     # ------------------------------------------------------------------

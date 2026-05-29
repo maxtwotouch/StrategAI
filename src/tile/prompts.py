@@ -1,44 +1,16 @@
 """Assembles final prompts from request fields and enum injection maps
 for the structure, object, and terrain pipelines.
 
-Mirrors the leader_prompts.py pattern: the client never writes raw
-prompts. The server builds them from structured enums plus the
-free-form description field, then wraps them in a template from
-prompt_templates.json.
+The client never writes raw prompts.  The server builds them from
+structured enums plus the free-form description field, then wraps them
+in a template from ``config/prompt_templates.json`` via the centralized
+``PromptTemplateLoader``.
 """
 
-import json
-import os
-from pathlib import Path
-
+from src.prompt_templates import assemble as _assemble
 from .models import (
     StructureRequest, ObjectRequest, TerrainRequest,
 )
-
-# ---------------------------------------------------------------------------
-#  Prompt template loader
-# ---------------------------------------------------------------------------
-
-_PROMPT_TEMPLATES_PATH = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "config" / "prompt_templates.json"
-
-_templates: dict[str, str] | None = None
-
-
-def _load_templates() -> dict[str, str]:
-    global _templates
-    if _templates is None:
-        with open(_PROMPT_TEMPLATES_PATH) as fh:
-            data = json.load(fh)
-        _templates = data["templates"]
-    return _templates
-
-
-def load_template(key: str) -> str:
-    """Return the raw template string for a tile family.
-
-    Keys: ``"structure"``, ``"object"``, ``"terrain"``.
-    """
-    return _load_templates()[key]
 
 
 # ===========================================================================
@@ -280,8 +252,7 @@ def build_structure_prompt(req: StructureRequest) -> str:
         STRUCTURE_CONDITION[req.condition],
         req.description.strip(),
     ])
-    template = load_template("structure")
-    return template.replace("{PROMPT_HERE}", inner)
+    return _assemble("structure", inner)
 
 
 def build_object_prompt(req: ObjectRequest) -> str:
@@ -291,8 +262,7 @@ def build_object_prompt(req: ObjectRequest) -> str:
         f"during {SEASON[req.season]}",
         req.description.strip(),
     ])
-    template = load_template("object")
-    return template.replace("{PROMPT_HERE}", inner)
+    return _assemble("object", inner)
 
 
 def build_terrain_prompt(req: TerrainRequest) -> str:
@@ -301,5 +271,4 @@ def build_terrain_prompt(req: TerrainRequest) -> str:
         f"with {TERRAIN_MATERIAL[req.material]} material",
         req.description.strip(),
     ])
-    template = load_template("terrain")
-    return template.replace("{PROMPT_HERE}", inner)
+    return _assemble("terrain", inner)

@@ -1,8 +1,38 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "templates": {
-    "structure": "<tdp> Front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
-    "object": "<tdp> Front view overhead shot elevated shot medium shot. The object faces the camera straight from the front. The object should flow into any inserted background. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. Grounded, stable perspective, no floating objects.",
-    "terrain": "<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature faces the camera straight from the front. The terrain should flow into any inserted background at its base edges. Isolate the object on a plain white background, only focusing on the specified object. {PROMPT_HERE}. Pixel art 16x16 for game tile assets, crisp pixel edges, no anti-aliasing, centered single asset on white. The base of the terrain feature should sit flush with the bottom of the frame. Grounded, stable perspective, no floating objects."
+    "structure": {
+      "prefix": "<tdp> Front view overhead shot elevated shot medium shot. The structure faces the camera straight from the front. The structure blends naturally at its base edges. Isolate on a plain white background. ",
+      "suffix": ". Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
+    },
+    "object": {
+      "prefix": "<tdp> Front view overhead shot elevated shot medium shot. The object faces the camera straight from the front. The object blends naturally at its base edges. Isolate on a plain white background. ",
+      "suffix": ". Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
+    },
+    "terrain": {
+      "prefix": "<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature faces the camera straight from the front. The terrain blends naturally at its base edges. Isolate on a plain white background. ",
+      "suffix": ". Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective."
+    },
+    "unit": {
+      "prefix": "<tdp> Front view overhead shot elevated shot medium shot. pixel art top-down 2d game character sprite, ",
+      "suffix": ", facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset"
+    },
+    "background_tile": {
+      "prefix": "top-down seamless repeating game tile texture, ",
+      "suffix": ", seamless tiling pattern, fills entire frame edge to edge, consistent texture density across whole image, top-down orthographic view, flat ground plane, crisp pixel edges sharp blocky pixels"
+    },
+    "leader_splash": {
+      "prefix": "epic cinematic wide composition of ",
+      "suffix": ", epic civilization leader splash screen, cinematic composition with dramatic chiaroscuro lighting, painterly oil style, widescreen 16:9 format"
+    },
+    "leader_profile": {
+      "prefix": "professional close-up portrait of ",
+      "suffix": ", professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format"
+    },
+    "leader_action": {
+      "prefix": "epic cinematic scene depicting ",
+      "suffix": ", dramatic civilization event scene, painterly oil style with dynamic composition, consistent character rendering, widescreen 16:9 cinematic format"
+    }
   }
 }
+
