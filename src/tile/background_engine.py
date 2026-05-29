@@ -130,6 +130,7 @@ class StaticBackgroundTileEngine:
         path = static_catalog.resolve_tile(tile_type)
         if path:
             filename = _load_and_save(path)
+            _persist_bg_tile(filename, tile_type, "static")
             logger.info("Served static background tile '%s' → %s", tile_type, filename)
             return filename
 
@@ -165,6 +166,7 @@ class _PlaceholderBackgroundTileEngine:
 
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
+        _persist_bg_tile(filename, tile_type, "placeholder")
         logger.info("Placeholder background tile '%s' → %s", tile_type, filename)
         return filename
 
@@ -172,6 +174,25 @@ class _PlaceholderBackgroundTileEngine:
 # ===========================================================================
 #  Helper
 # ===========================================================================
+
+
+def _persist_bg_tile(filename: str, tile_type: str, mode: str) -> None:
+    """Persist an AssetRecord for a background tile (idempotent helper)."""
+    try:
+        with SessionLocal() as db:
+            db.add(AssetRecord(
+                id=filename,
+                asset_family="background_tile",
+                generation_mode=mode,
+                tile_type=tile_type,
+            ))
+            db.commit()
+    except Exception:
+        logger.warning(
+            "Failed to persist AssetRecord for background tile '%s' — "
+            "asset may not appear in listings.", filename, exc_info=True,
+        )
+
 
 def _load_and_save(src_path: str) -> str:
     """Open a PNG from disk, save to AssetStore, return the UUID filename."""

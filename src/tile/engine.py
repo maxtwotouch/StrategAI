@@ -220,7 +220,9 @@ class StaticTileEngine:
 
         path = static_catalog.resolve_random("structure", req.category)
         if path:
+            start = time.time()
             filename = _load_and_save(path)
+            elapsed = int((time.time() - start) * 1000)
             static_seed = req.seed if req.seed is not None else secrets.randbits(31)
             _register_tile(
                 StructureRegistry.register,
@@ -232,7 +234,8 @@ class StaticTileEngine:
                 generation_mode="static",
             )
             return _build_response(StructureResponse, req, asset_id, filename,
-                                   prompt, "static", seed=static_seed)
+                                   prompt, "static", elapsed, f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
+                                   seed=static_seed)
 
         # Fall through to placeholder
         return await _PlaceholderTileEngine().generate_structure(req)
@@ -243,7 +246,9 @@ class StaticTileEngine:
 
         path = static_catalog.resolve_random("nature_object")
         if path:
+            start = time.time()
             filename = _load_and_save(path)
+            elapsed = int((time.time() - start) * 1000)
             static_seed = req.seed if req.seed is not None else secrets.randbits(31)
             _register_tile(
                 ObjectRegistry.register,
@@ -255,7 +260,8 @@ class StaticTileEngine:
                 generation_mode="static",
             )
             return _build_response(ObjectResponse, req, asset_id, filename,
-                                   prompt, "static", seed=static_seed)
+                                   prompt, "static", elapsed, f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
+                                   seed=static_seed)
 
         return await _PlaceholderTileEngine().generate_object(req)
 

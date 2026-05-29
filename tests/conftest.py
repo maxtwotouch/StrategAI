@@ -113,6 +113,7 @@ def test_db(monkeypatch):
     monkeypatch.setattr("src.tile.registry.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.unit.registry.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.tile.engine.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.tile.background_engine.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.leader.engine.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.unit.engine.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.main.SessionLocal", SessionLocal)

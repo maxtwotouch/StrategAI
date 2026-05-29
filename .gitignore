@@ -23,6 +23,8 @@ mock_assets/
 splash_assets/
 leader_references/
 
+reports/
+
 # Database
 tilemap.db
 *.db-journal

@@ -706,7 +706,7 @@ class StaticLeaderEngine:
             leader_id=asset_id,
             leader_ids=leader_ids,
             leader_names=leader_names,
-            seed=0,
+            seed=req.seed if req.seed is not None else secrets.randbits(31),
             generation_mode="static",
             prompt_used=prompt,
             resolution=f"{img.width}x{img.height}",

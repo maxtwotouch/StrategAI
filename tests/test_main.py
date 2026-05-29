@@ -882,3 +882,169 @@ class TestSchemaHealthEndpoint:
         monkeypatch.setattr("src.main._db_schema_ok", True)
 
 
+# ===========================================================================
+#  Background tile endpoints
+# ===========================================================================
+
+
+class TestBackgroundTileEndpoints:
+    """Tests for POST/GET/DELETE /background_tile and /background_tile/catalog."""
+
+    @pytest.mark.asyncio
+    async def test_generate_background_tile(self, async_client):
+        """POST /background_tile returns 200 with valid response fields."""
+        resp = await async_client.post("/background_tile", json={
+            "tile_type": "grass",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["asset_type"] == "background_tile"
+        assert data["tile_type"] == "grass"
+        assert data["url"].startswith("/assets/")
+        assert data["status"] == "completed"
+        assert isinstance(data["seed"], int)
+        assert data["seed"] > 0  # Regression: was 0 before fix
+        assert data["generation_mode"] in ("comfyui", "static", "placeholder")
+        # Response completeness — these should be populated (regression: were null before fix)
+        assert data.get("resolution") is not None, "resolution should be populated"
+        assert data.get("generation_time_ms") is not None, "generation_time_ms should be populated"
+        assert data.get("prompt_used") is not None, "prompt_used should be populated"
+
+    @pytest.mark.asyncio
+    async def test_generate_background_tile_with_seed(self, async_client):
+        """Providing a seed produces deterministic results."""
+        payload = {"tile_type": "water", "seed": 999888}
+        resp = await async_client.post("/background_tile", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["seed"] == 999888
+
+    @pytest.mark.asyncio
+    async def test_background_tile_invalid_type_400(self, async_client):
+        """Invalid tile_type → 422 (Pydantic validation)."""
+        resp = await async_client.post("/background_tile", json={
+            "tile_type": "lava",
+        })
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_list_background_tiles(self, async_client):
+        """GET /background_tile returns list."""
+        await async_client.post("/background_tile", json={"tile_type": "grass"})
+        resp = await async_client.get("/background_tile")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_background_tile_catalog(self, async_client):
+        """GET /background_tile/catalog returns tile types."""
+        resp = await async_client.get("/background_tile/catalog")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "tile_types" in data
+        assert isinstance(data["tile_types"], list)
+        assert "grass" in data["tile_types"]
+
+    @pytest.mark.asyncio
+    async def test_delete_background_tile(self, async_client):
+        """DELETE /background_tile/{filename} removes record."""
+        gen_resp = await async_client.post("/background_tile", json={
+            "tile_type": "grass",
+        })
+        assert gen_resp.status_code == 200, f"POST failed: {gen_resp.text}"
+        data = gen_resp.json()
+        url = data["url"]
+        assert url.startswith("/assets/"), f"Unexpected URL: {url}"
+        filename = url.split("/")[-1]
+
+        resp = await async_client.delete(f"/background_tile/{filename}")
+        assert resp.status_code == 200, f"DELETE failed for {filename}: {resp.text}"
+        assert resp.json()["status"] == "deleted"
+
+        # Verify gone — second delete should 404
+        resp2 = await async_client.delete(f"/background_tile/{filename}")
+        assert resp2.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_background_tile_not_found(self, async_client):
+        """DELETE nonexistent background tile → 404."""
+        resp = await async_client.delete("/background_tile/nonexistent_file.png")
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+#  Response field consistency (regression tests)
+# ===========================================================================
+
+
+class TestResponseFields:
+    """Ensure all asset families return consistent response shapes."""
+
+    @pytest.mark.asyncio
+    async def test_structure_response_has_resolution_and_timing(self, async_client):
+        """Regression: static mode responses must include resolution and generation_time_ms."""
+        resp = await async_client.post("/structure", json={
+            "category": "fortification",
+            "style": "nordic_wooden",
+            "condition": "pristine",
+            "scale": "small",
+            "description": "A small wooden watchtower with a pointed roof and a lookout platform.",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data.get("resolution") is not None, \
+            "structure response must have resolution (regression: was null for static mode)"
+        assert data.get("generation_time_ms") is not None, \
+            "structure response must have generation_time_ms (regression: was null for static mode)"
+
+    @pytest.mark.asyncio
+    async def test_object_response_has_resolution_and_timing(self, async_client):
+        """Regression: static object responses must include resolution and generation_time_ms."""
+        resp = await async_client.post("/object", json={
+            "category": "vegetation",
+            "biome": "temperate_forest",
+            "season": "summer",
+            "description": "A large oak tree with a thick trunk and sprawling branches full of green leaves.",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data.get("resolution") is not None, \
+            "object response must have resolution"
+        assert data.get("generation_time_ms") is not None, \
+            "object response must have generation_time_ms"
+
+    @pytest.mark.asyncio
+    async def test_multi_action_seed_not_zero(self, async_client):
+        """Regression: multi-leader action seed must not be 0 (was hardcoded)."""
+        # Create a splash first
+        splash = await async_client.post("/leader", json={
+            "asset_type": "splash",
+            "leader_name": "Multi Action Test Leader",
+            "leader_description": "A regal monarch with a commanding presence, wearing an ornate golden crown and deep crimson robes, standing before a great audience hall.",
+            "archetype": "warrior_king",
+            "culture": "medieval_european",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+        })
+        assert splash.status_code == 200
+        lid = splash.json()["leader_id"]
+
+        # Multi-leader action
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Multi Action Test Leader",
+            "leader_description": "A regal monarch with a commanding presence, wearing an ornate golden crown and deep crimson robes.",
+            "archetype": "warrior_king",
+            "culture": "medieval_european",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "leader_ids": [lid],
+            "action_category": "military",
+            "action_description": "Leading a grand cavalry charge across the battlefield with banners flying high.",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["seed"] > 0, \
+            f"multi-action seed should be > 0, got {data['seed']} (regression: was hardcoded to 0)"
+        assert data["leader_ids"] == [lid]
+        assert lid in data["leader_ids"]
+

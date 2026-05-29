@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import time
 from contextlib import asynccontextmanager
 
@@ -852,12 +853,12 @@ async def generate_background_tile(request: BackgroundTileRequest):
     try:
         # Build prompt (same logic as in BackgroundTileEngine.generate)
         prompt = _assemble("background_tile", f"{request.tile_type} ground texture")
-        seed = request.seed if request.seed is not None else random.randint(10**14, 10**15 - 1)
+        seed = request.seed if request.seed is not None else secrets.randbits(31)
 
-        t0 = _time.time()
+        t0 = time.time()
         filename = await background_tile_engine.generate(request.tile_type, seed)
 
-        elapsed = int((_time.time() - t0) * 1000)
+        elapsed = int((time.time() - t0) * 1000)
         logger.info("Background tile '%s' generated in %dms → %s", request.tile_type, elapsed, filename)
 
         return BackgroundTileResponse(
