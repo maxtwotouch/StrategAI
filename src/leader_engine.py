@@ -22,13 +22,13 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .comfyui_client import ComfyUIClient
-from .config import settings, BASE_DIR
-from .database import SessionLocal, AssetRecord
-from .leader_models import LeaderRequest, LeaderResponse
-from .leader_prompts import build_prompt, build_multi_action_prompt
-from .leader_registry import LeaderRegistry, generate_leader_id
-from .storage import store
+from src.comfyui_client import ComfyUIClient
+from src.config import settings, BASE_DIR
+from src.database import SessionLocal, AssetRecord
+from src.leader_models import LeaderRequest, LeaderResponse
+from src.leader_prompts import build_prompt, build_multi_action_prompt
+from src.leader_registry import LeaderRegistry, generate_leader_id
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 

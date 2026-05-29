@@ -1,7 +1,7 @@
 import os
 import io
 from PIL import Image
-from .config import settings, BASE_DIR
+from src.config import settings, BASE_DIR
 import logging
 from collections import OrderedDict
 

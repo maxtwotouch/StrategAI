@@ -18,12 +18,12 @@ from abc import ABC, abstractmethod
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .comfyui_client import ComfyUIClient
-from .config import settings
-from .inpainting import create_inpaint_mask, get_inpaint_prompt
-from .models import GenerationRequest, SplashRequest
-from .static_catalog import catalog as static_catalog
-from .storage import store
+from src.comfyui_client import ComfyUIClient
+from src.config import settings
+from src.inpainting import create_inpaint_mask, get_inpaint_prompt
+from src.models import GenerationRequest, SplashRequest
+from src.static_catalog import catalog as static_catalog
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 

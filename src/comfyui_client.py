@@ -23,7 +23,7 @@ import websockets.exceptions
 
 from PIL import Image
 
-from .config import settings
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 

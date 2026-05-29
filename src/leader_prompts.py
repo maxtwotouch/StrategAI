@@ -5,8 +5,8 @@ enums (archetype, culture, time_of_day, mood, action_category) plus the
 leader_description and action_description prose fields.
 """
 
-from .config import settings
-from .leader_models import LeaderRequest
+from src.config import settings
+from src.leader_models import LeaderRequest
 
 # ---------------------------------------------------------------------------
 # Enum injection maps  (hand-crafted, rich prose per value)

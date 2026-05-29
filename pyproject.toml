@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topdown-medieval-pixelart"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "Pillow",
+    "numpy",
+    "sqlalchemy",
+    "httpx",
+    "websockets",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

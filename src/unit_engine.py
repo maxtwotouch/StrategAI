@@ -16,14 +16,14 @@ import os
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .comfyui_client import ComfyUIClient
-from .config import settings
-from .database import SessionLocal, AssetRecord
-from .unit_models import UnitRequest, UnitResponse, UnitType
-from .unit_prompts import build_unit_prompt
-from .unit_registry import generate_unit_id, UnitRegistry
-from .static_catalog import catalog as static_catalog
-from .storage import store
+from src.comfyui_client import ComfyUIClient
+from src.config import settings
+from src.database import SessionLocal, AssetRecord
+from src.unit_models import UnitRequest, UnitResponse, UnitType
+from src.unit_prompts import build_unit_prompt
+from src.unit_registry import generate_unit_id, UnitRegistry
+from src.static_catalog import catalog as static_catalog
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 

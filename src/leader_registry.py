@@ -14,8 +14,8 @@ from typing import Optional
 
 from sqlalchemy.orm.attributes import flag_modified
 
-from .config import settings, BASE_DIR
-from .database import SessionLocal, LeaderRecord
+from src.config import settings, BASE_DIR
+from src.database import SessionLocal, LeaderRecord
 
 logger = logging.getLogger(__name__)
 

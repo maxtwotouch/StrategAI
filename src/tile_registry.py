@@ -9,7 +9,7 @@ import re
 import uuid
 from typing import Optional
 
-from .database import SessionLocal, StructureRecord, ObjectRecord, TerrainRecord
+from src.database import SessionLocal, StructureRecord, ObjectRecord, TerrainRecord
 
 logger = logging.getLogger(__name__)
 

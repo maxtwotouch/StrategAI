@@ -177,18 +177,41 @@ Use `__` (double underscore) as the nesting delimiter. For example,
 - A running [ComfyUI](https://github.com/comfyanonymous/ComfyUI) instance (for `comfyui` mode)
 - (Optional) Pre-made PNGs in `static_tiles/` (for `static` mode)
 
-### Install
+### Install (recommended)
+
+Install the package in editable mode — this resolves all imports and makes
+`src` available as a Python package:
 
 ```bash
 cd TopDownMedievalPixelArt-Prod
+pip install -e ".[dev]"
+# or without dev extras:
+pip install -e .
+```
+
+The `pyproject.toml` declares all dependencies (`fastapi`, `pydantic`,
+`pydantic-settings`, `Pillow`, `sqlalchemy`, `httpx`, `websockets`, etc.)
+so you do **not** need `requirements.txt`.  It is kept for backward
+compatibility.
+
+### Install (legacy — requirements.txt)
+
+```bash
 pip install -r requirements.txt
 ```
+
+> **Important:** With the legacy install the `src/` directory must be on
+> `PYTHONPATH`.  The `pytest.ini` already sets `pythonpath = src` for the
+> test suite, but running `python3 src/main.py` directly will fail with
+> `ImportError: attempted relative import with no known parent package`.
+> Prefer the editable install above.
 
 ### Run (Static Mode — No GPU Required)
 
 ```bash
-# Edit config.yaml: set generation.modes.* to "static"
-# Example:
+# All modes default to "placeholder" for zero-dependency testing.
+# To use static PNGs from static_tiles/, edit config.yaml:
+#
 #   generation:
 #     modes:
 #       background_tile: "static"
@@ -208,6 +231,17 @@ The service is now live at `http://localhost:8000`. All endpoints work with pre-
 echo 'COMFYUI__BASE_URL=http://your-comfyui-host:8188' > .env
 
 uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+
+### Run Tests
+
+```bash
+# All 341 tests (zero external dependencies — uses placeholder mode):
+python3 -m pytest tests/ -v
+
+# Or just a subset:
+python3 -m pytest tests/test_config.py -v
+python3 -m pytest tests/test_leader_engine.py -v
 ```
 
 ---

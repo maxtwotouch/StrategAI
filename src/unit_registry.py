@@ -8,7 +8,7 @@ TerrainRegistry.
 import uuid
 import logging
 
-from .database import SessionLocal, UnitRecord
+from src.database import SessionLocal, UnitRecord
 
 logger = logging.getLogger(__name__)
 

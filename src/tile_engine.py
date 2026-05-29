@@ -16,25 +16,25 @@ from typing import Union
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .comfyui_client import ComfyUIClient
-from .config import settings
-from .database import SessionLocal, AssetRecord
-from .tile_models import (
+from src.comfyui_client import ComfyUIClient
+from src.config import settings
+from src.database import SessionLocal, AssetRecord
+from src.tile_models import (
     StructureRequest, StructureResponse,
     ObjectRequest, ObjectResponse,
     TerrainRequest, TerrainResponse,
 )
-from .tile_prompts import (
+from src.tile_prompts import (
     build_structure_prompt,
     build_object_prompt,
     build_terrain_prompt,
 )
-from .tile_registry import (
+from src.tile_registry import (
     generate_structure_id, generate_object_id, generate_terrain_id,
     StructureRegistry, ObjectRegistry, TerrainRegistry,
 )
-from .static_catalog import catalog as static_catalog
-from .storage import store
+from src.static_catalog import catalog as static_catalog
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 

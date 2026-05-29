@@ -18,16 +18,6 @@ from PIL import Image
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# ---------------------------------------------------------------------------
-#  Ensure src/ is on sys.path (pytest.ini / pyproject.toml handles this,
-#  but we also set it here for safety when running directly)
-# ---------------------------------------------------------------------------
-import sys
-
-SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
-
 
 # ===========================================================================
 #  Temp project root

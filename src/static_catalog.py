@@ -4,7 +4,7 @@ import os
 import random
 from collections import defaultdict
 
-from .config import settings, BASE_DIR
+from src.config import settings, BASE_DIR
 
 _VALID_STRUCTURE_SUBTYPES = {"fortification", "production", "civilian", "religious"}
 
