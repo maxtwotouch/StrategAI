@@ -7,7 +7,7 @@ with the same txt2img.json workflow used by structure/object/terrain.
 All sprites are south-facing (front view) — the canonical game-facing direction.
 """
 
-from src.unit_models import UnitType
+from .models import UnitType
 
 
 # ===========================================================================

@@ -1623,9 +1623,9 @@ Mock-mode tests use a mock ComfyUIClient.
 """
 
 import pytest
-from src.leader_models import LeaderRequest
-from src.leader_prompts import build_splash_prompt, build_profile_prompt, build_action_prompt
-from src.leader_registry import LeaderRegistry, generate_leader_id
+from src.leader.models import LeaderRequest
+from src.leader.prompts import build_splash_prompt, build_profile_prompt, build_action_prompt
+from src.leader.registry import LeaderRegistry, generate_leader_id
 
 
 class TestPromptEngine:

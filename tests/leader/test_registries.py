@@ -2,12 +2,12 @@
 
 import os
 import pytest
-from src.leader_registry import LeaderRegistry, generate_leader_id
-from src.tile_registry import (
+from src.leader.registry import LeaderRegistry, generate_leader_id
+from src.tile.registry import (
     StructureRegistry, ObjectRegistry, TerrainRegistry,
     generate_structure_id, generate_object_id, generate_terrain_id,
 )
-from src.unit_registry import UnitRegistry, generate_unit_id
+from src.unit.registry import UnitRegistry, generate_unit_id
 
 
 # ===========================================================================
@@ -20,7 +20,7 @@ class TestLeaderRegistry:
 
     def test_register_and_get(self, test_db, tmp_project_root, monkeypatch):
         """Insert → get → fields match."""
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         # Ensure reference dir exists
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
@@ -31,8 +31,8 @@ class TestLeaderRegistry:
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_test.png"), format="PNG")
 
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_test_a1b2c3"
         LeaderRegistry.register(
@@ -56,7 +56,7 @@ class TestLeaderRegistry:
 
     def test_register_copies_reference_image(self, test_db, tmp_project_root, monkeypatch):
         """ref_{leader_id}.png exists in reference dir."""
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
         out_dir = os.path.join(tmp_project_root, "generated_assets")
@@ -65,8 +65,8 @@ class TestLeaderRegistry:
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_ref.png"), format="PNG")
 
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_ref_test"
         LeaderRegistry.register(
@@ -84,7 +84,7 @@ class TestLeaderRegistry:
         assert LeaderRegistry.get("nonexistent") is None
 
     def test_exists_true(self, test_db, tmp_project_root, monkeypatch):
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
         out_dir = os.path.join(tmp_project_root, "generated_assets")
@@ -92,8 +92,8 @@ class TestLeaderRegistry:
         from PIL import Image
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_ex.png"), format="PNG")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_exists_test"
         LeaderRegistry.register(
@@ -111,7 +111,7 @@ class TestLeaderRegistry:
 
     def test_list_all_ordering(self, test_db, tmp_project_root, monkeypatch):
         """Newest first."""
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
         out_dir = os.path.join(tmp_project_root, "generated_assets")
@@ -119,8 +119,8 @@ class TestLeaderRegistry:
         from PIL import Image
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_list.png"), format="PNG")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         for i in range(3):
             LeaderRegistry.register(
@@ -136,7 +136,7 @@ class TestLeaderRegistry:
         assert len(records) >= 3
 
     def test_record_profile(self, test_db, tmp_project_root, monkeypatch):
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
         out_dir = os.path.join(tmp_project_root, "generated_assets")
@@ -144,8 +144,8 @@ class TestLeaderRegistry:
         from PIL import Image
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_prof.png"), format="PNG")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_profile_test"
         LeaderRegistry.register(
@@ -161,7 +161,7 @@ class TestLeaderRegistry:
         assert record.profile_image_id == "profile_img.png"
 
     def test_record_action_appends(self, test_db, tmp_project_root, monkeypatch):
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
         out_dir = os.path.join(tmp_project_root, "generated_assets")
@@ -169,8 +169,8 @@ class TestLeaderRegistry:
         from PIL import Image
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_act.png"), format="PNG")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_action_test"
         LeaderRegistry.register(
@@ -187,7 +187,7 @@ class TestLeaderRegistry:
         assert record.action_image_ids == ["action1.png", "action2.png"]
 
     def test_delete(self, test_db, tmp_project_root, monkeypatch):
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
         ref_dir = os.path.join(tmp_project_root, "leader_references")
         os.makedirs(ref_dir, exist_ok=True)
         out_dir = os.path.join(tmp_project_root, "generated_assets")
@@ -195,8 +195,8 @@ class TestLeaderRegistry:
         from PIL import Image
         img = Image.new("RGBA", (1, 1), (0, 0, 0, 255))
         img.save(os.path.join(out_dir, "splash_del.png"), format="PNG")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_delete_test"
         LeaderRegistry.register(

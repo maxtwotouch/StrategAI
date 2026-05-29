@@ -72,8 +72,8 @@ def test_settings(tmp_project_root, monkeypatch):
     """
     monkeypatch.setattr("src.config.BASE_DIR", tmp_project_root)
     monkeypatch.setattr("src.storage.BASE_DIR", tmp_project_root)
-    monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
-    monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
+    monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
+    monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
 
     # Force reimport of settings to pick up the new BASE_DIR
     from src.config import Settings
@@ -109,12 +109,12 @@ def test_db(monkeypatch):
     # Monkeypatch the module-level engine + SessionLocal
     monkeypatch.setattr("src.database.engine", engine)
     monkeypatch.setattr("src.database.SessionLocal", SessionLocal)
-    monkeypatch.setattr("src.leader_registry.SessionLocal", SessionLocal)
-    monkeypatch.setattr("src.tile_registry.SessionLocal", SessionLocal)
-    monkeypatch.setattr("src.unit_registry.SessionLocal", SessionLocal)
-    monkeypatch.setattr("src.tile_engine.SessionLocal", SessionLocal)
-    monkeypatch.setattr("src.leader_engine.SessionLocal", SessionLocal)
-    monkeypatch.setattr("src.unit_engine.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.leader.registry.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.tile.registry.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.unit.registry.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.tile.engine.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.leader.engine.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.unit.engine.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.main.SessionLocal", SessionLocal)
 
     yield engine
@@ -210,8 +210,8 @@ async def async_client(test_db, monkeypatch, tmp_project_root):
     # 1. Set BASE_DIR before any module that uses it is imported
     import src.config
     monkeypatch.setattr("src.config.BASE_DIR", tmp_project_root)
-    monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
-    monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
+    monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
+    monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
     monkeypatch.setattr("src.storage.BASE_DIR", tmp_project_root)
 
     # 2. Mutate the actual src.config.settings in-place
@@ -268,9 +268,9 @@ def mock_comfyui_client():
 def sample_requests():
     """Dict of valid request objects for each pipeline."""
     from src.models import GenerationRequest, SplashRequest
-    from src.tile_models import StructureRequest, ObjectRequest, TerrainRequest
-    from src.leader_models import LeaderRequest
-    from src.unit_models import UnitRequest
+    from src.tile.models import StructureRequest, ObjectRequest, TerrainRequest
+    from src.leader.models import LeaderRequest
+    from src.unit.models import UnitRequest
 
     return {
         "structure": StructureRequest(

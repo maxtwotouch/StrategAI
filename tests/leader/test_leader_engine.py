@@ -1,12 +1,12 @@
-"""Unit tests for leader engine (src/leader_engine.py)."""
+"""Unit tests for leader engine (src/leader/engine.py)."""
 
 import os
 import pytest
 from unittest.mock import AsyncMock, patch
 from PIL import Image
 
-from src.leader_models import LeaderRequest
-from src.leader_engine import LeaderEngine, StaticLeaderEngine
+from src.leader.models import LeaderRequest
+from src.leader.engine import LeaderEngine, StaticLeaderEngine
 
 
 def _make_leader_req(asset_type="splash", **overrides):
@@ -33,16 +33,15 @@ class TestLeaderEngineSplash:
     @pytest.mark.asyncio
     async def test_generate_splash(self, mock_comfyui_client, test_store, test_db, tmp_project_root, monkeypatch):
         """Returns LeaderResponse with correct fields."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
-        monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
-        # Ensure directories exist
+        monkeypatch.setattr("src.leader.engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
         os.makedirs(os.path.join(tmp_project_root, "leader_references"), exist_ok=True)
         os.makedirs(os.path.join(tmp_project_root, "generated_assets"), exist_ok=True)
-        monkeypatch.setattr("src.leader_engine.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_engine.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.engine.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
 
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (1920, 1088), (0, 255, 0, 255))
 
@@ -63,15 +62,15 @@ class TestLeaderEngineSplash:
     @pytest.mark.asyncio
     async def test_registers_leader(self, mock_comfyui_client, test_store, test_db, tmp_project_root, monkeypatch):
         """LeaderRegistry.register called, leader exists after."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
-        monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
         os.makedirs(os.path.join(tmp_project_root, "leader_references"), exist_ok=True)
         os.makedirs(os.path.join(tmp_project_root, "generated_assets"), exist_ok=True)
-        monkeypatch.setattr("src.leader_engine.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_engine.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.engine.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
 
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (1920, 1088), (0, 255, 0, 255))
 
@@ -79,7 +78,7 @@ class TestLeaderEngineSplash:
         req = _make_leader_req("splash")
         resp = await engine.generate(req)
 
-        from src.leader_registry import LeaderRegistry
+        from src.leader.registry import LeaderRegistry
         record = LeaderRegistry.get(resp.leader_id)
         assert record is not None
         assert record.leader_name == "Cleopatra VII"
@@ -91,7 +90,7 @@ class TestLeaderEngineProfile:
     @pytest.mark.asyncio
     async def test_profile_requires_leader_id(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Missing leader_id → ValueError."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = LeaderEngine(mock_comfyui_client)
         req = _make_leader_req("profile", leader_id=None)
         with pytest.raises(ValueError, match="leader_id"):
@@ -100,7 +99,7 @@ class TestLeaderEngineProfile:
     @pytest.mark.asyncio
     async def test_profile_leader_not_found(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Nonexistent leader_id → ValueError."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = LeaderEngine(mock_comfyui_client)
         req = _make_leader_req("profile", leader_id="nonexistent")
         with pytest.raises(ValueError, match="not found"):
@@ -112,7 +111,7 @@ class TestLeaderEngineAction:
 
     @pytest.mark.asyncio
     async def test_action_requires_leader_id(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = LeaderEngine(mock_comfyui_client)
         req = _make_leader_req("action", leader_id=None)
         with pytest.raises(ValueError, match="leader_id"):
@@ -120,7 +119,7 @@ class TestLeaderEngineAction:
 
     @pytest.mark.asyncio
     async def test_action_requires_category(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = LeaderEngine(mock_comfyui_client)
         req = _make_leader_req("action", action_category=None)
         with pytest.raises(ValueError, match="action_category"):
@@ -128,7 +127,7 @@ class TestLeaderEngineAction:
 
     @pytest.mark.asyncio
     async def test_action_requires_description(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = LeaderEngine(mock_comfyui_client)
         req = _make_leader_req("action", action_description=None)
         with pytest.raises(ValueError, match="action_description"):
@@ -141,15 +140,15 @@ class TestStaticLeaderEngine:
     @pytest.mark.asyncio
     async def test_generate_splash(self, test_store, test_db, tmp_project_root, monkeypatch):
         """Returns LeaderResponse with generation_mode='static'."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
-        monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
         os.makedirs(os.path.join(tmp_project_root, "leader_references"), exist_ok=True)
         os.makedirs(os.path.join(tmp_project_root, "generated_assets"), exist_ok=True)
-        monkeypatch.setattr("src.leader_engine.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_engine.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.engine.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
 
         engine = StaticLeaderEngine()
         req = _make_leader_req("splash")
@@ -163,15 +162,15 @@ class TestStaticLeaderEngine:
     @pytest.mark.asyncio
     async def test_generate_profile(self, test_store, test_db, tmp_project_root, monkeypatch):
         """Profile after splash → works."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
-        monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
         os.makedirs(os.path.join(tmp_project_root, "leader_references"), exist_ok=True)
         os.makedirs(os.path.join(tmp_project_root, "generated_assets"), exist_ok=True)
-        monkeypatch.setattr("src.leader_engine.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_engine.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.engine.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
 
         engine = StaticLeaderEngine()
         # First generate splash
@@ -189,15 +188,15 @@ class TestStaticLeaderEngine:
     @pytest.mark.asyncio
     async def test_generate_action(self, test_store, test_db, tmp_project_root, monkeypatch):
         """Action after splash → works."""
-        monkeypatch.setattr("src.leader_engine.store", test_store)
-        monkeypatch.setattr("src.leader_engine.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.BASE_DIR", tmp_project_root)
         os.makedirs(os.path.join(tmp_project_root, "leader_references"), exist_ok=True)
         os.makedirs(os.path.join(tmp_project_root, "generated_assets"), exist_ok=True)
-        monkeypatch.setattr("src.leader_engine.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_engine.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.settings.paths.output_dir", "generated_assets")
-        monkeypatch.setattr("src.leader_registry.settings.paths.leader_reference_dir", "leader_references")
-        monkeypatch.setattr("src.leader_registry.BASE_DIR", tmp_project_root)
+        monkeypatch.setattr("src.leader.engine.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.engine.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
+        monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
+        monkeypatch.setattr("src.leader.registry.BASE_DIR", tmp_project_root)
 
         engine = StaticLeaderEngine()
         splash_req = _make_leader_req("splash")
@@ -216,7 +215,7 @@ class TestStaticLeaderEngine:
 
     @pytest.mark.asyncio
     async def test_profile_requires_leader_id(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = StaticLeaderEngine()
         req = _make_leader_req("profile", leader_id=None)
         with pytest.raises(ValueError, match="leader_id"):
@@ -224,9 +223,8 @@ class TestStaticLeaderEngine:
 
     @pytest.mark.asyncio
     async def test_action_requires_leader_id(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.leader_engine.store", test_store)
+        monkeypatch.setattr("src.leader.engine.store", test_store)
         engine = StaticLeaderEngine()
         req = _make_leader_req("action", leader_id=None)
         with pytest.raises(ValueError, match="leader_id"):
             await engine.generate(req)
-

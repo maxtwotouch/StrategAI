@@ -1,11 +1,11 @@
-"""Unit tests for tile engine (src/tile_engine.py)."""
+"""Unit tests for tile engine (src/tile/engine.py)."""
 
 import pytest
 from unittest.mock import AsyncMock, patch
 from PIL import Image
 
-from src.tile_models import StructureRequest, ObjectRequest, TerrainRequest
-from src.tile_engine import TileEngine, StaticTileEngine, _PlaceholderTileEngine
+from src.tile.models import StructureRequest, ObjectRequest, TerrainRequest
+from src.tile.engine import TileEngine, StaticTileEngine, _PlaceholderTileEngine
 
 
 def _make_structure_req(**overrides):
@@ -48,7 +48,7 @@ class TestTileEngine:
     @pytest.mark.asyncio
     async def test_generate_structure(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Returns StructureResponse with correct fields."""
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
@@ -68,7 +68,7 @@ class TestTileEngine:
 
     @pytest.mark.asyncio
     async def test_generate_object(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
@@ -82,7 +82,7 @@ class TestTileEngine:
 
     @pytest.mark.asyncio
     async def test_generate_terrain(self, mock_comfyui_client, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
@@ -97,7 +97,7 @@ class TestTileEngine:
     @pytest.mark.asyncio
     async def test_seed_propagation(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Explicit seed → used in response."""
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
@@ -108,7 +108,7 @@ class TestTileEngine:
     @pytest.mark.asyncio
     async def test_persists_asset_record(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """AssetRecord created in DB."""
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = TileEngine(mock_comfyui_client)
@@ -128,8 +128,8 @@ class TestStaticTileEngine:
     @pytest.mark.asyncio
     async def test_generate_structure_static(self, test_store, test_catalog, test_db, monkeypatch):
         """Resolves from static catalog → StructureResponse."""
-        monkeypatch.setattr("src.tile_engine.store", test_store)
-        monkeypatch.setattr("src.tile_engine.static_catalog", test_catalog)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.static_catalog", test_catalog)
 
         engine = StaticTileEngine()
         req = _make_structure_req()
@@ -141,8 +141,8 @@ class TestStaticTileEngine:
 
     @pytest.mark.asyncio
     async def test_generate_object_static(self, test_store, test_catalog, test_db, monkeypatch):
-        monkeypatch.setattr("src.tile_engine.store", test_store)
-        monkeypatch.setattr("src.tile_engine.static_catalog", test_catalog)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.static_catalog", test_catalog)
 
         engine = StaticTileEngine()
         req = _make_object_req()
@@ -154,8 +154,8 @@ class TestStaticTileEngine:
     @pytest.mark.asyncio
     async def test_generate_terrain_falls_to_placeholder(self, test_store, test_catalog, test_db, monkeypatch):
         """Terrain has no static folder → placeholder."""
-        monkeypatch.setattr("src.tile_engine.store", test_store)
-        monkeypatch.setattr("src.tile_engine.static_catalog", test_catalog)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.static_catalog", test_catalog)
 
         engine = StaticTileEngine()
         req = _make_terrain_req()
@@ -170,7 +170,7 @@ class TestPlaceholderTileEngine:
 
     @pytest.mark.asyncio
     async def test_generate_structure(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
 
         engine = _PlaceholderTileEngine()
         req = _make_structure_req()
@@ -183,7 +183,7 @@ class TestPlaceholderTileEngine:
 
     @pytest.mark.asyncio
     async def test_generate_object(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
 
         engine = _PlaceholderTileEngine()
         req = _make_object_req()
@@ -194,7 +194,7 @@ class TestPlaceholderTileEngine:
 
     @pytest.mark.asyncio
     async def test_generate_terrain(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
 
         engine = _PlaceholderTileEngine()
         req = _make_terrain_req()
@@ -206,14 +206,13 @@ class TestPlaceholderTileEngine:
     @pytest.mark.asyncio
     async def test_persists_registry_record(self, test_store, test_db, monkeypatch):
         """Placeholder engine persists to tile-specific table."""
-        monkeypatch.setattr("src.tile_engine.store", test_store)
+        monkeypatch.setattr("src.tile.engine.store", test_store)
 
         engine = _PlaceholderTileEngine()
         req = _make_structure_req()
         resp = await engine.generate_structure(req)
 
-        from src.tile_registry import StructureRegistry
+        from src.tile.registry import StructureRegistry
         record = StructureRegistry.get(resp.asset_id)
         assert record is not None
         assert record.category == "fortification"
-

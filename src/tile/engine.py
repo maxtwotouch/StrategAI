@@ -19,17 +19,17 @@ from PIL import Image, ImageDraw, ImageFont
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
 from src.database import SessionLocal, AssetRecord
-from src.tile_models import (
+from .models import (
     StructureRequest, StructureResponse,
     ObjectRequest, ObjectResponse,
     TerrainRequest, TerrainResponse,
 )
-from src.tile_prompts import (
+from .prompts import (
     build_structure_prompt,
     build_object_prompt,
     build_terrain_prompt,
 )
-from src.tile_registry import (
+from .registry import (
     generate_structure_id, generate_object_id, generate_terrain_id,
     StructureRegistry, ObjectRegistry, TerrainRegistry,
 )

@@ -1,11 +1,11 @@
-"""Unit tests for unit engine (src/unit_engine.py)."""
+"""Unit tests for unit engine (src/unit/engine.py)."""
 
 import pytest
 from unittest.mock import AsyncMock, patch
 from PIL import Image
 
-from src.unit_models import UnitRequest
-from src.unit_engine import UnitEngine, StaticUnitEngine, _PlaceholderUnitEngine
+from src.unit.models import UnitRequest
+from src.unit.engine import UnitEngine, StaticUnitEngine, _PlaceholderUnitEngine
 
 
 def _make_unit_req(**overrides):
@@ -23,7 +23,7 @@ class TestUnitEngine:
     @pytest.mark.asyncio
     async def test_generate(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Returns UnitResponse with a single sprite URL."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = UnitEngine(mock_comfyui_client)
@@ -43,7 +43,7 @@ class TestUnitEngine:
     @pytest.mark.asyncio
     async def test_generates_single_image(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """client.generate called once (single sprite)."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = UnitEngine(mock_comfyui_client)
@@ -55,14 +55,14 @@ class TestUnitEngine:
     @pytest.mark.asyncio
     async def test_persists_unit_record(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """UnitRegistry record created."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = UnitEngine(mock_comfyui_client)
         req = _make_unit_req()
         resp = await engine.generate(req)
 
-        from src.unit_registry import UnitRegistry
+        from src.unit.registry import UnitRegistry
         record = UnitRegistry.get(resp.unit_id)
         assert record is not None
         assert record.unit_type == "archer"
@@ -70,7 +70,7 @@ class TestUnitEngine:
     @pytest.mark.asyncio
     async def test_seed_propagation(self, mock_comfyui_client, test_store, test_db, monkeypatch):
         """Explicit seed → used in response."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
         mock_comfyui_client.generate.return_value = Image.new("RGBA", (512, 512), (0, 255, 0, 255))
 
         engine = UnitEngine(mock_comfyui_client)
@@ -85,8 +85,8 @@ class TestStaticUnitEngine:
     @pytest.mark.asyncio
     async def test_generate_from_static(self, test_store, test_catalog, test_db, monkeypatch):
         """Resolves from static catalog → UnitResponse."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
-        monkeypatch.setattr("src.unit_engine.static_catalog", test_catalog)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.static_catalog", test_catalog)
 
         engine = StaticUnitEngine()
         req = _make_unit_req(unit_type="archer")
@@ -99,8 +99,8 @@ class TestStaticUnitEngine:
     @pytest.mark.asyncio
     async def test_falls_back_to_placeholder(self, test_store, test_catalog, test_db, monkeypatch):
         """No static sprite for warrior → placeholder."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
-        monkeypatch.setattr("src.unit_engine.static_catalog", test_catalog)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.static_catalog", test_catalog)
 
         engine = StaticUnitEngine()
         req = _make_unit_req(unit_type="warrior")
@@ -115,7 +115,7 @@ class TestPlaceholderUnitEngine:
 
     @pytest.mark.asyncio
     async def test_generate(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
 
         engine = _PlaceholderUnitEngine()
         req = _make_unit_req()
@@ -129,13 +129,13 @@ class TestPlaceholderUnitEngine:
 
     @pytest.mark.asyncio
     async def test_persists_unit_record(self, test_store, test_db, monkeypatch):
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
 
         engine = _PlaceholderUnitEngine()
         req = _make_unit_req()
         resp = await engine.generate(req)
 
-        from src.unit_registry import UnitRegistry
+        from src.unit.registry import UnitRegistry
         record = UnitRegistry.get(resp.unit_id)
         assert record is not None
         assert record.unit_type == "archer"
@@ -143,7 +143,7 @@ class TestPlaceholderUnitEngine:
     @pytest.mark.asyncio
     async def test_different_unit_types_different_colors(self, test_store, test_db, monkeypatch):
         """Archer vs warrior → different placeholder colors."""
-        monkeypatch.setattr("src.unit_engine.store", test_store)
+        monkeypatch.setattr("src.unit.engine.store", test_store)
 
         engine = _PlaceholderUnitEngine()
         resp1 = await engine.generate(_make_unit_req(unit_type="archer"))
@@ -152,4 +152,3 @@ class TestPlaceholderUnitEngine:
         assert resp1.unit_type == "archer"
         assert resp2.unit_type == "warrior"
         assert resp2.unit_type == "warrior"
-

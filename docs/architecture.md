@@ -40,18 +40,25 @@ The web server is a lightweight orchestrator — it never loads model weights. A
 - Calculates precise A/B bounds binary masks with optional Gaussian blur.
 - Manages an internal vocabulary mapping (`get_inpaint_prompt`) to decouple game logic ("water") from prompt engineering ("sparkling blue pixel art river water texture, seamless, top-down 2d game").
 
-### F. Leader Pipeline (`leader_engine.py`, `leader_models.py`, `leader_prompts.py`, `leader_registry.py`)
+### F. Leader Pipeline (`src/leader/`)
 - **Three-stage generation**: splash (txt2img, establishes canonical visual identity) → profile (img2img, close-crop portrait using splash as reference, denoise=0.30) → action.
 - **Single-leader action**: img2img using the leader's reference image (denoise=0.60), preserving character identity while placing them in a new scene.
-- **Multi-leader action**: txt2img with a composite prompt that weaves together all leaders' physical descriptions and names via `build_multi_action_prompt()`. No reference image is used because ComfyUI can only accept one reference image for img2img, but a multi-leader scene needs to depict multiple distinct faces. Triggered by providing `leader_ids` (list) in the request body alongside `asset_type: "action"`.
-- **Structured prompt injection**: clients select from enum values (archetype, culture, time_of_day, mood, action_category). The server maps these to rich, hand-crafted prose via `leader_prompts.py`.
-- **Seed anchoring**: splash seed is stored in `leader_records` and re-used for profile/action to maximize img2img consistency.
+- **Multi-leader action**: txt2img with a composite prompt that weaves together all leaders' physical descriptions and names via `build_multi_action_prompt()` (in `src/leader/prompts.py`). No reference image is used because ComfyUI can only accept one reference image for img2img, but a multi-leader scene needs to depict multiple distinct faces. Triggered by providing `leader_ids` (list) in the request body alongside `asset_type: "action"`.
+- **Structured prompt injection**: clients select from enum values (archetype, culture, time_of_day, mood, action_category). The server maps these to rich, hand-crafted prose via `src/leader/prompts.py`.
+- **Seed anchoring**: splash seed is stored in `LeaderRecord` (via `src/leader/registry.py`) and re-used for profile/action to maximize img2img consistency.
 - **Reference image**: splash art is copied to `leader_references/ref_{leader_id}.png` and re-uploaded to ComfyUI before each profile and single-leader action generation.
-- **SQLite-backed**: `LeaderRecord` table tracks all leaders alongside `AssetRecord`.
+- **SQLite-backed**: `LeaderRecord` table (in `src/leader/models.py`) tracks all leaders alongside `AssetRecord`.
 
-### G. Unit Pipeline (`unit_engine.py`, `unit_models.py`, `unit_prompts.py`, `unit_registry.py`)
+### G. Tile Pipeline (`src/tile/`)
+- **Three subtypes**: structures (`structure_subtype`), objects (`object_subtype`), terrain (`terrain_subtype`).
+- **Single-tile generation**: each request generates one 512×512 tile.
+- **Enum-driven prompt assembly**: `src/tile/prompts.py` maps subtype enums to rich pixel-art prose, combined with the client's free-form `description`.
+- **Static fallback**: `StaticTileEngine` resolves sprites from `static_tiles/`, falling back to procedural placeholders for subtypes without static PNGs.
+- **SQLite-backed**: `StructureRecord`, `ObjectRecord`, `TerrainRecord` tables store generated tile metadata.
+
+### H. Unit Pipeline (`src/unit/`)
 - **Single-sprite generation**: each unit type (archer, scout, settler, warrior) generates one south-facing (front view) sprite at 512×512.
-- **Enum-driven prompt assembly**: `unit_prompts.py` maps `unit_type` to rich pixel-art prose, combined with the client's free-form `description`. South-facing direction is hardcoded into the prompt.
+- **Enum-driven prompt assembly**: `src/unit/prompts.py` maps `unit_type` to rich pixel-art prose, combined with the client's free-form `description`. South-facing direction is hardcoded into the prompt.
 - **Static fallback**: `StaticUnitEngine` resolves sprites from `static_tiles/unit/{type}.png`, falling back to procedural placeholders if no static PNG exists.
 - **SQLite-backed**: `UnitRecord` table stores a single `image_id` per unit.
 

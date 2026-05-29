@@ -8,14 +8,14 @@ from fastapi.responses import JSONResponse
 from src.config import settings
 from src.database import SessionLocal, AssetRecord
 from src.generators import close_comfyui_client, get_generator, _get_comfyui_client
-from src.leader_engine import LeaderEngine, StaticLeaderEngine
-from src.leader_models import LeaderRequest, LeaderResponse, LeaderInfo
-from src.leader_registry import LeaderRegistry
+from src.leader.engine import LeaderEngine, StaticLeaderEngine
+from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
+from src.leader.registry import LeaderRegistry
 from src.models import GenerationRequest, GenerationResponse, SplashRequest, SplashResponse
 from src.static_catalog import catalog as static_catalog
 from src.storage import store
-from src.tile_engine import TileEngine, StaticTileEngine
-from src.tile_models import (
+from src.tile.engine import TileEngine, StaticTileEngine
+from src.tile.models import (
     StructureRequest, StructureResponse,
     ObjectRequest, ObjectResponse,
     TerrainRequest, TerrainResponse,
@@ -24,13 +24,13 @@ from src.tile_models import (
     ObjectCategory, Biome, Season,
     TerrainCategory, TerrainScale, TerrainMaterial,
 )
-from src.tile_registry import StructureRegistry, ObjectRegistry, TerrainRegistry
-from src.unit_engine import UnitEngine, StaticUnitEngine
-from src.unit_models import (
+from src.tile.registry import StructureRegistry, ObjectRegistry, TerrainRegistry
+from src.unit.engine import UnitEngine, StaticUnitEngine
+from src.unit.models import (
     UnitRequest, UnitResponse, UnitCatalog,
     UnitType,
 )
-from src.unit_registry import UnitRegistry
+from src.unit.registry import UnitRegistry
 
 # Setup production logging
 logging.basicConfig(

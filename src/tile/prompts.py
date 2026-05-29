@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from src.tile_models import (
+from .models import (
     StructureRequest, ObjectRequest, TerrainRequest,
 )
 

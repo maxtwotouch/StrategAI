@@ -12,10 +12,10 @@ This document tracks remaining work after the ComfyUI migration and leader pipel
 - [x] Copy-on-Write inpainting via ComfyUI
 - [x] Seven workflow JSONs exported (txt2img, inpaint, story, splash, leader_splash, leader_profile, leader_action)
 - [x] Leader pipeline: splash → profile → action with img2img consistency
-- [x] Multi-leader action scene generation: txt2img composite prompt via `build_multi_action_prompt()`. Triggered by providing `leader_ids` list in the request body alongside `asset_type: "action"`. No reference image used because ComfyUI can only accept one for img2img, but multiple distinct faces must be depicted.
-- [x] Leader registry: SQLite-backed CRUD (`leader_registry.py`)
-- [x] Prompt engine: structured enum → rich prose injection (`leader_prompts.py`)
-- [x] In-memory LRU cache with disk fallback (`AssetStore`)
+- [x] Multi-leader action scene generation: txt2img composite prompt via `build_multi_action_prompt()` (in `src/leader/prompts.py`). Triggered by providing `leader_ids` list in the request body alongside `asset_type: "action"`. No reference image used because ComfyUI can only accept one for img2img, but multiple distinct faces must be depicted.
+- [x] Leader registry: SQLite-backed CRUD (`src/leader/registry.py`)
+- [x] Prompt engine: structured enum → rich prose injection (`src/leader/prompts.py`)
+- [x] In-memory LRU cache with disk fallback (`AssetStore` in `src/storage.py`)
 - [x] SQLite database for `AssetRecord` and `LeaderRecord`
 - [x] `GET /catalog` discovery endpoint
 - [x] `GET /health` with ComfyUI status and leader count
@@ -23,6 +23,7 @@ This document tracks remaining work after the ComfyUI migration and leader pipel
 - [x] Async ComfyUI client: replaced blocking `requests` + `websocket-client` with `async` `httpx` + `websockets`. Generation runs on the asyncio event loop — no `ThreadPoolExecutor` required. Removed `requests` and `websocket-client` from `requirements.txt`. Added `close_comfyui_client()` shutdown hook.
 - [x] `.env.testing` drop-in file for zero-dependency testing (all families in static/placeholder mode)
 - [x] Documentation polish: README, architecture.md, and .env.example reflect the project as-is
+- [x] **Directory restructuring**: Flat `src/` reorganized into vertical pipeline slices (`src/leader/`, `src/tile/`, `src/unit/`) with shared infrastructure at root. Test files mirrored into `tests/leader/`, `tests/tile/`, `tests/unit/`. See `docs/restructuring-plan.md` for details.
 
 ---
 

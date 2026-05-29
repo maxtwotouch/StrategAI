@@ -647,27 +647,33 @@ tests/
 ├── conftest.py                          # All fixtures
 ├── test_config.py
 ├── test_models.py                       # GenerationRequest, SplashRequest, etc.
-├── test_tile_models.py                  # Structure/Object/Terrain request/response
-├── test_leader_models.py                # LeaderRequest, LeaderResponse
-├── test_unit_models.py                  # UnitRequest, UnitResponse, UnitDirections
 ├── test_database.py
 ├── test_storage.py
 ├── test_static_catalog.py
-├── test_leader_prompts.py
-├── test_tile_prompts.py
-├── test_unit_prompts.py
-├── test_registries.py                   # Leader + Structure + Object + Terrain + Unit
 ├── test_inpainting.py
 ├── test_comfyui_client.py               # _patch_workflow unit tests
 ├── test_comfyui_integration.py          # Mocked HTTP/WS integration
 ├── test_generators.py
-├── test_tile_engine.py                  # Placeholder + Static tile engine
-├── test_leader_engine.py                # StaticLeaderEngine
-├── test_unit_engine.py                  # Placeholder + StaticUnitEngine
-├── test_api.py                          # All endpoint integration tests
-├── test_pipelines.py                    # End-to-end flows
-├── test_errors.py                       # Error handling
-└── fixtures/
+├── test_main.py                         # All endpoint integration tests
+├── test_doc_code_consistency.py
+├── leader/
+│   ├── __init__.py
+│   ├── test_leader_engine.py            # StaticLeaderEngine
+│   ├── test_leader_models.py            # LeaderRequest, LeaderResponse
+│   ├── test_leader_prompts.py           # Prompt builders
+│   └── test_leader_registry.py          # CRUD + ID generation
+├── tile/
+│   ├── __init__.py
+│   ├── test_tile_engine.py              # Placeholder + Static tile engine
+│   ├── test_tile_models.py              # Structure/Object/Terrain request/response
+│   ├── test_tile_prompts.py             # Prompt builders
+│   └── test_tile_registry.py            # CRUD + ID generation
+└── unit/
+    ├── __init__.py
+    ├── test_unit_engine.py              # Placeholder + StaticUnitEngine
+    ├── test_unit_models.py              # UnitRequest, UnitResponse, UnitDirections
+    ├── test_unit_prompts.py             # Prompt builders
+    └── test_unit_registry.py            # CRUD + ID generation
     ├── sample_workflow.json
     └── static_tiles_tree/               # Controlled directory trees for catalog tests
         ├── background_tile/

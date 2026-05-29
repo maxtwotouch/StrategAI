@@ -6,7 +6,7 @@ leader_description and action_description prose fields.
 """
 
 from src.config import settings
-from src.leader_models import LeaderRequest
+from .models import LeaderRequest
 
 # ---------------------------------------------------------------------------
 # Enum injection maps  (hand-crafted, rich prose per value)

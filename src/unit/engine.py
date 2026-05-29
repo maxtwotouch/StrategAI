@@ -19,9 +19,9 @@ from PIL import Image, ImageDraw, ImageFont
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
 from src.database import SessionLocal, AssetRecord
-from src.unit_models import UnitRequest, UnitResponse, UnitType
-from src.unit_prompts import build_unit_prompt
-from src.unit_registry import generate_unit_id, UnitRegistry
+from .models import UnitRequest, UnitResponse, UnitType
+from .prompts import build_unit_prompt
+from .registry import generate_unit_id, UnitRegistry
 from src.static_catalog import catalog as static_catalog
 from src.storage import store
 

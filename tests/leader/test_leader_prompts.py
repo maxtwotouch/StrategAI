@@ -1,8 +1,8 @@
-"""Unit tests for leader prompts (src/leader_prompts.py)."""
+"""Unit tests for leader prompts (src/leader/prompts.py)."""
 
 import pytest
-from src.leader_models import LeaderRequest
-from src.leader_prompts import (
+from src.leader.models import LeaderRequest
+from src.leader.prompts import (
     build_splash_prompt, build_profile_prompt, build_action_prompt, build_prompt,
     SPLASH_TAIL, PROFILE_TAIL, ACTION_TAIL,
     ARCHETYPE, CULTURE, TIME_OF_DAY, MOOD, ACTION_CATEGORY,
@@ -110,27 +110,26 @@ class TestEnumMaps:
     """Verify all enum values have entries in injection maps."""
 
     def test_archetype_map_complete(self):
-        from src.leader_models import Archetype
+        from src.leader.models import Archetype
         for key in Archetype.ALL:
             assert key in ARCHETYPE, f"Missing archetype: {key}"
 
     def test_culture_map_complete(self):
-        from src.leader_models import Culture
+        from src.leader.models import Culture
         for key in Culture.ALL:
             assert key in CULTURE, f"Missing culture: {key}"
 
     def test_time_of_day_map_complete(self):
-        from src.leader_models import TimeOfDay
+        from src.leader.models import TimeOfDay
         for key in TimeOfDay.ALL:
             assert key in TIME_OF_DAY, f"Missing time_of_day: {key}"
 
     def test_mood_map_complete(self):
-        from src.leader_models import Mood
+        from src.leader.models import Mood
         for key in Mood.ALL:
             assert key in MOOD, f"Missing mood: {key}"
 
     def test_action_category_map_complete(self):
-        from src.leader_models import ActionCategory
+        from src.leader.models import ActionCategory
         for key in ActionCategory.ALL:
             assert key in ACTION_CATEGORY, f"Missing action_category: {key}"
-

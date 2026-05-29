@@ -25,9 +25,9 @@ from PIL import Image, ImageDraw, ImageFont
 from src.comfyui_client import ComfyUIClient
 from src.config import settings, BASE_DIR
 from src.database import SessionLocal, AssetRecord
-from src.leader_models import LeaderRequest, LeaderResponse
-from src.leader_prompts import build_prompt, build_multi_action_prompt
-from src.leader_registry import LeaderRegistry, generate_leader_id
+from .models import LeaderRequest, LeaderResponse
+from .prompts import build_prompt, build_multi_action_prompt
+from .registry import LeaderRegistry, generate_leader_id
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -668,4 +668,3 @@ class StaticLeaderEngine:
             resolution=f"{img.width}x{img.height}",
             generation_time_ms=elapsed,
         )
-

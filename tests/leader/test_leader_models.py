@@ -1,8 +1,8 @@
-"""Unit tests for leader models (src/leader_models.py)."""
+"""Unit tests for leader models (src/leader/models.py)."""
 
 import pytest
 from pydantic import ValidationError
-from src.leader_models import (
+from src.leader.models import (
     LeaderRequest, LeaderResponse, LeaderInfo,
     LeaderAssetType, Archetype, Culture, TimeOfDay, Mood, ActionCategory,
 )
@@ -185,4 +185,3 @@ class TestEnums:
 
     def test_action_category_all(self):
         assert len(ActionCategory.ALL) == 7
-
