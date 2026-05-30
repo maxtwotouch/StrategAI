@@ -38,7 +38,7 @@
   },
   "5": {
     "inputs": {
-      "value": "epic cinematic scene depicting two leaders interacting: Cleopatra VII, A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress., and Marcus Aurelius, A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations., Two leaders meeting at a marble negotiating table in a grand hall, exchanging treaty scrolls while advisors look on, in a vast sandstone temple with towering hieroglyph-carved pillars, gold and lapis lazuli accents, bronze braziers burning incense, desert beyond colonnades, low golden sunlight casting long dramatic shadows, warm amber glow suffusing everything, dust motes dancing in light beams, expression of hard-won victory, proud celebratory atmosphere, head held high, formal court or neutral meeting ground, treaty documents on the table, multiple parties present, ceremonial exchange unfolding, the character has correct human anatomy with five fingers on each hand, proportional limbs, two arms and two legs, anatomically correct pose, dramatic civilization event scene, painterly oil style with dynamic composition, consistent character rendering, widescreen 16:9 cinematic format, professional cinematic quality, dynamic action"
+      "value": ""
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -106,7 +106,7 @@
   },
   "15": {
     "inputs": {
-      "noise_seed": 160270581989742
+      "noise_seed": 0
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -230,7 +230,7 @@
   },
   "35": {
     "inputs": {
-      "image": "leader_splash_00001_.png"
+      "image": "__LEADER_REF_1__"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -239,7 +239,7 @@
   },
   "36": {
     "inputs": {
-      "image": "leader_splash_00002_.png"
+      "image": "__LEADER_REF_2__"
     },
     "class_type": "LoadImage",
     "_meta": {

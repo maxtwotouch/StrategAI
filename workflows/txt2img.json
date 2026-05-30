@@ -38,7 +38,7 @@
   },
   "5": {
     "inputs": {
-      "value": "<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background. The structure is a stony church. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective.\n"
+      "value": ""
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -120,7 +120,7 @@
   },
   "15": {
     "inputs": {
-      "noise_seed": 1110103388192622
+      "noise_seed": 0
     },
     "class_type": "RandomNoise",
     "_meta": {

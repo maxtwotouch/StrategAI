@@ -38,7 +38,7 @@
   },
   "5": {
     "inputs": {
-      "value": "An extremely close-up professional portrait of A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations., expression of deep thought, quiet introspective atmosphere, weighing profound decisions, face filling the frame, headpiece and collar visible at the edges of the frame, professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format, professional cinematic quality, close-up portrait\n"
+      "value": ""
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -106,7 +106,7 @@
   },
   "15": {
     "inputs": {
-      "noise_seed": 308646749835700
+      "noise_seed": 0
     },
     "class_type": "RandomNoise",
     "_meta": {

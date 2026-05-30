@@ -38,7 +38,7 @@
   },
   "5": {
     "inputs": {
-      "value": "top-down seamless repeating grass ground texture. The entire image must be one single 16x16 pixel art tile that fully fills the frame with continuous texture. No borders, no centered composition, no empty space. Generate one cohesive tile that can be seamlessly repeated in all directions. No disruptive features or objects touching the outermost pixel edges. Consistent texture density across whole image, top-down orthographic view, flat ground plane, crisp pixel edges, no anti-aliasing, sharp blocky pixels, perfect seamless tiling, simple and readable at small scale"
+      "value": ""
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -106,7 +106,7 @@
   },
   "15": {
     "inputs": {
-      "noise_seed": 399049242984707
+      "noise_seed": 0
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -258,7 +258,7 @@
   },
   "33": {
     "inputs": {
-      "filename_prefix": "backgorund_tile",
+      "filename_prefix": "background_tile",
       "images": [
         "27",
         0
