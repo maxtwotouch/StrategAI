@@ -71,6 +71,9 @@ leader portraits use separate templates/workflows without this LoRA.
   image upload, workflow submission, progress polling, result download, and
   health checks.  Workflow patching targets Flux2 Klein node types
   (SamplerCustomAdvanced, EmptyFlux2LatentImage — no negative prompts).
+- **Setup guide**: See [`docs/comfyui-setup-guide.md`](comfyui-setup-guide.md)
+  for step-by-step ComfyUI provisioning with Flux2 Klein 4B models and an
+  automated setup script (`scripts/setup_comfyui.sh`).
 
 ### D. Static Catalog (`src/static_catalog.py`)
 - Scans `static_tiles/` at startup and builds an in-memory lookup by family
