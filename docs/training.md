@@ -171,7 +171,7 @@ All configs: 2500 steps, adamw8bit, flowmatch scheduler, weighted timestep sampl
 
 | Parameter | Value |
 |-----------|-------|
-| Base model | `black-forest-labs/FLUX.2-klein-4B` |
+| Base model | `black-forest-labs/FLUX.2-klein-base-4B` |
 | Method | LoRA |
 | Steps | 2500 |
 | Optimizer | adamw8bit |

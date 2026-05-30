@@ -62,7 +62,6 @@ ok "Found ${#CONFIGS[@]} experiment config(s)"
 
 log "Validating derived datasets..."
 
-VALIDATE_SCRIPT="$PROJECT_ROOT/src/validate_dataset.py"
 VARIANTS=(minimal detailed ultra_minimal)
 
 for variant in "${VARIANTS[@]}"; do

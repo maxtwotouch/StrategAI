@@ -29,9 +29,9 @@ from typing import Dict, List, Tuple
 
 # ── Path defaults (relative to project root) ──────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_SOURCE_DIR = PROJECT_ROOT / "dataset"
+DEFAULT_SOURCE_DIR = PROJECT_ROOT / "dataset" / "hf" / "images"
 DEFAULT_MANIFEST = DEFAULT_SOURCE_DIR / "metadata.jsonl"
-DEFAULT_DERIVED_DIR = DEFAULT_SOURCE_DIR / "derived"
+DEFAULT_DERIVED_DIR = PROJECT_ROOT / "dataset" / "derived"
 
 # ── Angle phrase (manifest captions already use this) ──────────────────
 NEW_ANGLE = "top-down view."
@@ -46,7 +46,7 @@ CATEGORY_RULES: List[Tuple[str, str]] = [
     (r"\b(bramble|reeds|bush|shrub|tree|forest|vine|thicket|undergrowth|fungus|mushroom|crop|foliage|canopy)\b",
      "vegetation"),
     (r"\b(building|tower|house|hall|forge\b|workshop|mill|farm|cottage|monastery|barracks|granary|sawmill|watchtower|outpost|station|laboratory|observatory|wall|keep|castle|temple|church|tavern|inn|shop|market|bridge|gate|mine|quarry|foundry|windmill|watermill|stronghold|fortress|citadel|spire)\b",
-     "building"),
+     "structure"),
     (r"\b(chest|barrel|crate|anvil|tool|weapon|shield|torch|lantern|bench|throne|statue|fountain|cart|wagon|cauldron|bookcase|bed|chair)\b",
      "object"),
     (r"\b(tile|texture|terrain|ground|floor|path|road)\b",
@@ -61,7 +61,7 @@ def classify_category(text: str) -> str:
     for pattern, category in CATEGORY_RULES:
         if re.search(pattern, lower):
             return category
-    return "building"
+    return "structure"
 
 
 def extract_description(caption: str) -> str:

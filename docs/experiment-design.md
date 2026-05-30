@@ -191,11 +191,12 @@ the best one post-hoc.  Over-training is detectable via the sample images.
 - Total storage across 6 experiments × 13 checkpoints ≈ 13–14 GB — manageable
 - `max_step_saves_to_keep: 15` retains all 13 checkpoints with headroom
 
-### 6.3 Why no gradient checkpointing
+### 6.3 Why gradient checkpointing
 
-Gradient checkpointing trades compute for VRAM.  With 96 GB VRAM and
-fp8 base weights (~8 GB), we have ample headroom.  Disabling it improves
-training throughput.
+Gradient checkpointing trades compute for VRAM.  It is enabled as a
+conservative default to ensure training stability across a range of
+GPU configurations.  With sufficient VRAM (≥48 GB), it can be safely
+disabled for higher throughput.
 
 ### 6.4 Why adamw8bit
 

@@ -48,6 +48,20 @@ coverage.xml
 *.cover
 *.py.cover
 *.lcov
+
+# Virtual environment
+.venv/
+venv/
+
+# Training outputs
+output/
+*.safetensors
+
+# Generated dataset images (large, license-encumbered)
+dataset/raw/
+
+# IDE
+.vscode/
 .hypothesis/
 .pytest_cache/
 cover/

@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
         default=",".join(f"{k}={v}" for k, v in DEFAULT_RATIOS.items()),
         help="Comma-separated key=value pairs, e.g. structure=0.50,terrain=0.30,...",
     )
-    p.add_argument("--type-column", type=str, default="asset_type", help="JSONL column name for the category.")
+    p.add_argument("--type-column", type=str, default="asset_family", help="JSONL column name for the category.")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--dry-run", action="store_true", help="Print plan only, don't write files.")
     p.add_argument(

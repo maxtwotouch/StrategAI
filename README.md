@@ -37,7 +37,6 @@ flowchart TD
 | **LoRA Training** | [`docs/training.md`](docs/training.md) | [`src/training/`](src/training/) | [`config/training/`](config/training/) |
 | ComfyUI deep-dive | [`docs/comfyui-workflows.md`](docs/comfyui-workflows.md) | — | — |
 | Experiment design | [`docs/experiment-design.md`](docs/experiment-design.md) | — | — |
-| Publishing | [`PUBLISHING.md`](PUBLISHING.md) | — | — |
 
 ## Directory Map
 
@@ -60,7 +59,6 @@ flowchart TD
 │   ├── prompts/             # Prompt JSONL data
 │   └── derived/             # Caption variants (minimal/detailed/ultra_minimal)
 ├── tests/
-│   ├── generation/
 │   └── training/
 └── output/                  # Training checkpoints and samples
 ```

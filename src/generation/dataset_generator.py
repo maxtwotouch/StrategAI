@@ -237,8 +237,6 @@ def main():
     if args.guidance_randomize:
         if args.guidance_min > args.guidance_max:
             raise ValueError("Invalid global guidance range")
-            raise ValueError("Invalid tile guidance range")
-            raise ValueError("Invalid nature guidance range")
 
     base_dir = Path(args.base_dir)
     primary_workflow = load_json(Path(args.workflow_api_json))
@@ -261,7 +259,6 @@ def main():
         "metadata_embedded": 0,
         "guidance_policy": {
             "global": [args.guidance_min, args.guidance_max],
-            "enabled": args.guidance_randomize,
             "enabled": args.guidance_randomize
         }
     }
@@ -285,15 +282,6 @@ def main():
             guidance_key = args.guidance_key
             ksampler_node = args.ksampler_node
             stats["used_primary_workflow"] += 1
-
-            if tile_row:
-                workflow = json.loads(json.dumps(primary_workflow))
-                prompt_node = args.prompt_node
-                prompt_key = args.prompt_input_key
-                guidance_node = args.guidance_node
-                guidance_key = args.guidance_key
-                ksampler_node = args.ksampler_node
-                stats["used_primary_workflow"] += 1
 
             # Inject prompt
             set_node_input(workflow, prompt_node, prompt_key, row["positive_prompt"])
