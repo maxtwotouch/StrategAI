@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.extract_training_set import _format_caption, _resolve_image, group_by_type, parse_ratios, sample, write_output
+from src.training.extract_training_set import _format_caption, _resolve_image, group_by_type, parse_ratios, sample, write_output
 
 
 def test_parse_ratios_basic():

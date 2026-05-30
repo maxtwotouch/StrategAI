@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 # ── Path defaults (relative to project root) ──────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "dataset"
 DEFAULT_MANIFEST = DEFAULT_SOURCE_DIR / "metadata.jsonl"
 DEFAULT_DERIVED_DIR = DEFAULT_SOURCE_DIR / "derived"

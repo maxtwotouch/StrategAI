@@ -36,7 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-dir", default="hf")
     parser.add_argument("--caption-txt-extension", default=".txt")
     parser.add_argument("--image-extensions", default="png,jpg,jpeg")
-    parser.add_argument("--training-config", type=Path, default=Path("config/lora_4b.yaml"))
+    parser.add_argument("--training-config", type=Path, default=Path("config/training/lora_4b_detailed_high.yaml"))
     parser.add_argument("--max-prompts", type=int, default=6)
     parser.add_argument("--max-chars", type=int, default=420)
     parser.add_argument("--caption-column", default="text")

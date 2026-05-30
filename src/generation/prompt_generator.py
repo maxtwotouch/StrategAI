@@ -245,35 +245,6 @@ PALETTES_TERRAIN = [
 ]
 
 # ------------------------------------------------------------
-# BACKGROUND TILE VARIANTS
-# ------------------------------------------------------------
-TILE_VARIANTS = [
-    ("sand", "soft grain, subtle micro-dunes, gentle color noise, faint dithering"),
-    ("sand", "dry fine grain clusters, smooth dune ripples, low-contrast color noise, subtle dithering"),
-    ("grass", "short blade clusters, earthy undertone, mild color noise, subtle dithering"),
-    ("lush grass", "dense micro-blade clusters, soft green variation, gentle color noise, faint dithering"),
-    ("autumn grass", "dry yellow-green blade texture, muted tonal shifts, subtle dithering"),
-    ("swamp grass", "damp mossy grain, muddy-green variation, restrained noise, faint dithering"),
-    ("stone", "fine pebbled grain, low-contrast mineral variation, subtle dithering"),
-    ("stone", "weathered flat-rock grain, gentle fracture rhythm, controlled color noise, faint dithering"),
-    ("cobblestone", "tight stone pattern, even mortar rhythm, mild tonal variation, subtle dithering"),
-    ("shallow water", "soft ripple bands, gentle wave noise, restrained highlights, faint dithering"),
-    ("water", "calm surface texture, micro-ripple variation, smooth tonal transitions, subtle dithering"),
-    ("deep water", "darker pooled texture, low-frequency ripple noise, controlled highlight specks, faint dithering"),
-    ("wheat-ground", "dry straw flecks, golden grain noise, subtle directional variation, faint dithering"),
-]
-
-PALETTES_TILE = [
-    "earthy palette",
-    "cool medieval palette",
-    "desaturated retro palette",
-    "high contrast retro palette",
-    "storm-muted palette",
-    "ash-and-ember palette",
-    "golden harvest palette",
-]
-
-# ------------------------------------------------------------
 # CAPTION BUILDERS (clean, template-free, descriptive)
 # ------------------------------------------------------------
 def structure_caption(structure, theme, motif, personality, detail, complexity, material, condition, palette):
@@ -284,14 +255,12 @@ def structure_caption(structure, theme, motif, personality, detail, complexity, 
         f"{detail}, {complexity}, {material}, {condition}, {palette}"
     )
 
-
 def object_caption(obj, drama, complexity, material, condition, palette):
     return (
         f"Front view overhead elevated medium shot. "
         f"a dramatic medieval world asset of a {obj} with {drama}, "
         f"{complexity}, {material}, {condition}, {palette}"
     )
-
 
 def terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, material, condition, palette):
     return (
@@ -301,33 +270,20 @@ def terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, m
         f"{material}, {condition}, {palette}"
     )
 
-
-def background_caption(material, texture_details, palette):
-    return (
-        f"Front view overhead elevated medium shot. "
-        f"{material} texture with {texture_details}, "
-        f"stable tile state, {palette}"
-    )
-
-
 # ------------------------------------------------------------
 # POSITIVE PROMPT BUILDERS (ComfyUI template injection)
 # ------------------------------------------------------------
 def structure_positive_prompt(story_text, template):
     return template.replace("{PROMPT_HERE}", story_text)
 
-
 def object_positive_prompt(story_text, template):
     return template.replace("{PROMPT_HERE}", story_text)
-
 
 def terrain_positive_prompt(story_text, template):
     return template.replace("{PROMPT_HERE}", story_text)
 
-
 def background_positive_prompt(material, texture_details, template):
     return template.format(material=material, texture_details=texture_details)
-
 
 # ------------------------------------------------------------
 # Template loader
@@ -338,7 +294,7 @@ def load_prompt_templates(path: Path) -> dict:
     if not isinstance(templates, dict):
         raise ValueError("Invalid templates JSON: `templates` must be an object")
 
-    required = ["structure", "object", "terrain", "background"]
+    required = ["structure", "object", "terrain"]
     for key in required:
         val = templates.get(key)
         if not isinstance(val, str) or not val.strip():
@@ -350,11 +306,8 @@ def load_prompt_templates(path: Path) -> dict:
         raise ValueError("`templates.object` must contain {PROMPT_HERE}")
     if "{PROMPT_HERE}" not in templates["terrain"]:
         raise ValueError("`templates.terrain` must contain {PROMPT_HERE}")
-    if "{material}" not in templates["background"] or "{texture_details}" not in templates["background"]:
-        raise ValueError("`templates.background` must contain {material} and {texture_details}")
 
     return templates
-
 
 # ------------------------------------------------------------
 # Ratio helpers
@@ -379,14 +332,12 @@ def ratio_to_counts(total_target: int, ratios: dict) -> dict:
 
     return {keys[i]: base[i] for i in range(len(keys))}
 
-
 # ------------------------------------------------------------
 # Row builders
 # ------------------------------------------------------------
 def _pick_one(choices):
     """Return random.choice without materializing product space."""
     return random.choice(choices)
-
 
 def build_structure_rows(target_count, start_idx, templates):
     rows, idx = [], start_idx
@@ -423,7 +374,6 @@ def build_structure_rows(target_count, start_idx, templates):
         idx += 1
     return rows, idx
 
-
 def build_object_rows(target_count, start_idx, templates):
     rows, idx = [], start_idx
     if target_count <= 0:
@@ -454,7 +404,6 @@ def build_object_rows(target_count, start_idx, templates):
         })
         idx += 1
     return rows, idx
-
 
 def build_terrain_rows(target_count, start_idx, templates):
     rows, idx = [], start_idx
@@ -489,30 +438,6 @@ def build_terrain_rows(target_count, start_idx, templates):
         idx += 1
     return rows, idx
 
-
-def build_background_rows(target_count, start_idx, templates):
-    rows, idx = [], start_idx
-    if target_count <= 0:
-        return rows, idx
-
-    for _ in range(target_count):
-        (material, texture_details) = _pick_one(TILE_VARIANTS)
-        palette = _pick_one(PALETTES_TILE)
-
-        caption = background_caption(material, texture_details, palette)
-        positive_prompt = background_positive_prompt(material, texture_details, templates["background"])
-
-        rows.append({
-            "id": f"mdv_{idx:07d}",
-            "asset_type": "background",
-            "caption": caption,
-            "positive_prompt": positive_prompt,
-            "palette": palette,
-        })
-        idx += 1
-    return rows, idx
-
-
 # ------------------------------------------------------------
 # Main
 # ------------------------------------------------------------
@@ -523,7 +448,6 @@ def parse_args():
     ap.add_argument("--total-target", type=int, default=28000)
     ap.add_argument("--ratio-structure", type=float, default=0.50)
     ap.add_argument("--ratio-object", type=float, default=0.20)
-    ap.add_argument("--ratio-background", type=float, default=0.20)
     ap.add_argument("--ratio-terrain", type=float, default=0.10)
     ap.add_argument(
         "--templates-json",
@@ -532,7 +456,6 @@ def parse_args():
         help="Path to JSON file containing prompt templates.",
     )
     return ap.parse_args()
-
 
 def main():
     args = parse_args()
@@ -545,7 +468,6 @@ def main():
     ratios = {
         "structure": args.ratio_structure,
         "object": args.ratio_object,
-        "background": args.ratio_background,
         "terrain": args.ratio_terrain,
     }
     counts = ratio_to_counts(args.total_target, ratios)
@@ -590,7 +512,6 @@ def main():
 
     print(f"Wrote {len(all_rows)} prompts to {out_jsonl}")
     print(f"Wrote summary to {summary_path}")
-
 
 if __name__ == "__main__":
     main()

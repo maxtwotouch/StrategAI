@@ -35,23 +35,23 @@ from typing import Dict, List
 # ── Hard-coded defaults ────────────────────────────────────────────────
 
 DEFAULT_RATIOS = {
-    "structure": 0.50,
-    "terrain": 0.30,
+    "structure": 0.55,
+    "terrain": 0.25,
     "object": 0.20,
-    "background": 0.10,
+
 }
 
 TRIGGER_MODES = ("manual", "placeholder", "none")
-DEFAULT_TRIGGER_WORD = "<tdmp>"
+DEFAULT_TRIGGER_WORD = "<tdp>"
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Extract a ratio-controlled training set.")
-    p.add_argument("--metadata", type=Path, default=Path("dataset/metadata.jsonl"))
+    p.add_argument("--metadata", type=Path, default=Path("dataset/hf/images/metadata.jsonl"))
     p.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path("dataset"),
+        default=Path("dataset/hf/images"),
         help="Dataset root directory. file_name paths in metadata are resolved relative to this.",
     )
     p.add_argument("--out", type=Path, default=Path("training_set"),

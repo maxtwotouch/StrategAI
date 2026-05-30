@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.validate_dataset import (
+from src.training.validate_dataset import (
     _check_trigger_in_caption,
     validate_row,
 )

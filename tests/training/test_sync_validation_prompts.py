@@ -1,4 +1,4 @@
-from src.sync_validation_prompts import clip_prompt, normalize_text
+from src.training.sync_validation_prompts import clip_prompt, normalize_text
 
 
 def test_normalize_text_collapses_whitespace() -> None:

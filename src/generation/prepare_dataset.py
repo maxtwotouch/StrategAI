@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from image_metadata import read_metadata_from_file
+from src.generation.image_metadata import read_metadata_from_file
 
 
 def strip_png_metadata(src: Path, dest: Path) -> None:

@@ -19,7 +19,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 TOOLKIT="$PROJECT_ROOT/AI_TOOLKIT/run.py"
-CONFIG_DIR="$PROJECT_ROOT/config"
+CONFIG_DIR="$PROJECT_ROOT/config/training"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="$PROJECT_ROOT/output/logs"
 mkdir -p "$LOG_DIR"
@@ -69,11 +69,11 @@ for variant in "${VARIANTS[@]}"; do
     DATA_DIR="$PROJECT_ROOT/dataset/derived/$variant"
     if [ ! -d "$DATA_DIR" ]; then
         err "Derived dataset missing: $DATA_DIR"
-        err "Run: python -m src.derive_captions"
+        err "Run: python -m src.training.derive_captions"
         exit 1
     fi
     log "  Validating $variant ..."
-    python -m src.validate_dataset \
+    python -m src.training.validate_dataset \
         --mode sidecar_txt \
         --dataset-root "$DATA_DIR" \
         --image-dir . \

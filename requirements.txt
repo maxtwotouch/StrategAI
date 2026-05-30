@@ -1,3 +1,9 @@
-PyYAML==6.0.2
+# ── Dataset Generation ──────────────────────────────────────────
+requests
 Pillow==10.4.0
+tqdm
+jsonschema
+
+# ── LoRA Training ──────────────────────────────────────────────
+PyYAML==6.0.2
 pytest>=8.0

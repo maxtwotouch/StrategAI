@@ -30,7 +30,7 @@ risk of memorising style details.
 
 ### 3.1 What we have
 
-92 top-down medieval pixel-art PNGs (1024×1024), each with a detailed
+100 top-down medieval pixel-art PNGs (1024×1024), each with a detailed
 caption.  The images were **generated** by a ComfyUI pipeline:
 
 ```
@@ -41,12 +41,18 @@ The camera angle was enforced at generation time by the Multi-Angles LoRA,
 not by prompt engineering.  This means every image truly IS top-down —
 there is no variation in perspective.
 
-### 3.2 Why 92 images is sufficient
+### 3.2 Why 100 images
 
-Camera angle is a **low-rank concept** — it affects global composition
-(layout, occlusion, vanishing-point geometry) rather than fine texture
-details.  LoRA ranks of 32–128 have enough capacity to capture this
-without needing hundreds of examples.
+We settled on 100 images as a clean, round target that balances several
+concerns:
+
+| Reason | Detail |
+|--------|--------|
+| **Low-rank concept** | Camera angle affects global composition (layout, occlusion, vanishing-point geometry) rather than fine texture details. LoRA ranks of 32–128 have enough capacity to capture this without needing hundreds of examples |
+| **Practical curation** | Generating ~150–200 raw images and curating down to the best 100 is manageable for one person in a single review session |
+| **Checkpoint evaluation** | 100 images ÷ 6 evaluation prompts = ~16–17 images per prompt at each checkpoint — enough to judge quality without noise from a single outlier |
+| **Training stability** | 100 samples is well above the minimum for LoRA training (~15–20), giving headroom for the ultra-minimal variant where all captions are identical |
+| **Round number** | Clean target; easy to communicate in model cards and papers
 
 The risk with a small dataset is overfitting to individual assets rather
 than learning the shared angle.  Our countermeasures:
@@ -58,12 +64,15 @@ than learning the shared angle.  Our countermeasures:
 
 | Family | Count | Description |
 |--------|------:|-------------|
-| structure | 89 | Buildings, towers, mills, workshops, outposts |
-| vegetation | 2 | Bramble mass, reeds cluster |
-| terrain | 1 | Jagged boulder |
+| structure | ~90 | Buildings, towers, mills, workshops, outposts (the dominant category, reflecting the target use case) |
+| object | ~7 | Trees, boulders, stumps, props — non-walkable world scenery |
+| terrain | ~3 | Hills and plateaus with wide flat tops for unit placement |
 
-The heavy skew toward structures is acceptable — the angle concept should
-transfer across asset types because the perspective geometry is identical.
+The heavy skew toward structures is deliberate — game-development asset pipelines
+primarily need consistent building sprites. The angle concept should transfer
+across categories because the perspective geometry is identical regardless of
+what occupies the ground plane.
+
 
 ## 4. Caption Design
 
@@ -93,7 +102,16 @@ We created three variants of every caption to test a core hypothesis:
 |---------|---------------|------------|
 | **detailed** | `[trigger] top-down view. [full description — building type, setting, materials, condition, palette]` | Rich text gives the model more conditioning signal, but risks binding style descriptors (e.g. "warm muted palette") to the trigger token |
 | **minimal** | `[trigger] top-down view. A medieval [category].` | Strips all descriptive detail; model must learn content variation from pixels. Category provides minimal discriminative signal |
-| **ultra-minimal** | `[trigger] top-down view.` | All 92 images share an identical caption. Model must learn EVERYTHING from pixels — the ultimate test of image-driven learning. Risk: mode collapse or inability to respond to text prompts at inference |
+| **ultra-minimal** | `[trigger] top-down view.` | All 100 images share an identical caption. Model must learn EVERYTHING from pixels — the ultimate test of image-driven learning. Risk: mode collapse or inability to respond to text prompts at inference |
+
+**Why sidecar `.txt` files are essential for our experiment:** The Ostris
+toolkit reads captions from `.txt` files alongside images (not from `metadata.jsonl`
+directly). Since we need three different caption variants pointing at the same
+images, we use `src/training/derive_captions.py` to create three separate dataset
+directories (`dataset/derived/detailed/`, `minimal/`, `ultra_minimal/`), each with
+symlinks to the original PNGs plus variant-specific `.txt` files. This lets us
+swap caption detail while keeping the pixel data identical — the core variable
+we're testing.
 
 **Why not test caption dropout as a separate axis?**  Caption dropout
 randomly blanks the text during training, forcing the model to rely on
@@ -258,7 +276,7 @@ No additional dependency or abstraction layer is needed.
 
 The source images have non-sequential IDs (0000001, 0000009, 0000011, ...)
 inherited from the generation pipeline.  For a public dataset, sequential
-numbering (00001–00092) is cleaner, easier to reference, and follows
+numbering (00001–00100) is cleaner, easier to reference, and follows
 HuggingFace conventions.
 
 ### 9.2 Why metadata.jsonl co-located with images
@@ -268,19 +286,32 @@ simplifies the `file_name` references (bare filenames, no subdirectory
 prefixes) and matches the simplest HF `imagefolder` convention.  No
 subdirectory nesting means one less thing for users to configure.
 
-### 9.3 Why no .txt sidecar files
+### 9.3 Why we generate captions ourselves
 
-The HF `imagefolder` format uses `metadata.jsonl` as the canonical source
-of captions.  Sidecar `.txt` files are redundant and add clutter.  The
-Ostris AI Toolkit can read captions from JSONL metadata, so `.txt` files
-are unnecessary for training either.
+The published dataset uses HF `imagefolder` format: images + `metadata.jsonl`
+in a flat directory.  However, the Ostris AI Toolkit reads captions from
+`.txt` sidecar files (one per image, same base name), not from JSONL — so
+we must generate `.txt` files before training.
+
+We generate them ourselves rather than relying on pre-made sidecars for
+three reasons:
+
+| Reason | Detail |
+|--------|--------|
+| **Multi-variant experiment** | Our 6-experiment matrix tests three caption detail levels (detailed, minimal, ultra-minimal) against the same 100 images. The toolkit reads one `.txt` file per image — we need three different ones. `src/training/derive_captions.py` creates three symlinked dataset directories, each with variant-specific `.txt` files, so we can swap caption detail while keeping pixel data identical |
+| **Clean published captions** | The HF dataset stores captions in their purest form: descriptive natural language, no trigger tokens, no style keywords. This keeps the dataset reusable for any training framework. `src/training/extract_training_set.py` layers on the training-specific concerns — injecting `[trigger]` placeholder and `top-down view.` angle phrase — at generation time |
+| **Reproducibility** | `.txt` files are generated deterministically from `metadata.jsonl` via a version-controlled script. There is no risk of hand-edited sidecar files drifting from the canonical captions, and any pipeline improvement (e.g. a better angle phrase) can be applied by re-running the script |
+
+The `.txt` files are generated on demand and never committed to the HF
+dataset repository — they are training artifacts, not publishing artifacts.
 
 ### 9.4 Dataset card auto-generation
 
-The `build_manifest.py` script generates a `README.md` with live statistics
-(total images, family breakdown, caption lengths, resolution) embedded
-at build time.  This guarantees the card never drifts from the actual
-dataset contents and eliminates manual update errors.
+The `src/generation/prepare_dataset.py` script generates a `README.md`
+dataset card with live statistics (total images, asset type breakdown,
+caption lengths, resolution) embedded at build time.  This guarantees
+the card never drifts from the actual dataset contents and eliminates
+manual update errors.
 
 ## 10. Expected Outcomes
 
@@ -322,7 +353,7 @@ the concept, even at the cost of some style leakage.
   isometric, side-scroller, or 3/4 view would require separate experiments.
 - **Single base model**: Only FLUX.2 Klein 4B is tested.  Results may
   not transfer to SDXL, SD3, or other architectures.
-- **Small dataset size**: 92 images is sufficient for a narrow concept
+- **Small dataset size**: 100 images is sufficient for a narrow concept
   but limits statistical power for detecting subtle differences between
   configurations.
 - **Qualitative evaluation only**: No automated metric for "angle fidelity"

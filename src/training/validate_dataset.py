@@ -55,7 +55,7 @@ def parse_args() -> argparse.Namespace:
         "--training-config",
         type=Path,
         default=None,
-        help="Path to training config (e.g. config/lora_4b.yaml) to read trigger_word for caption validation.",
+        help="Path to training config (e.g. config/training/lora_4b_detailed_high.yaml) to read trigger_word for caption validation.",
     )
     parser.add_argument(
         "--trigger-mode",

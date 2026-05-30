@@ -99,38 +99,19 @@ The built-in compositing nodes bridge these two worlds:
 
 The first three nodes are identical for both output variants.
 
-```
-[Generated Image]
-      │
-      ▼
-┌──────────────────┐
-│  Remove Background │  ← rembg / BRIA RMBG
-│  (your node)      │     Runs on full-color original.
-│                   │     Produces clean, accurate mask.
-│  Output: RGBA     │
-└────────┬─────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  SplitImageWithAlpha     │  ← Built-in (Mask → Compositing)
-│                          │
-│  Input:  RGBA IMAGE      │
-│  Output: IMAGE (RGB)     │  → (B,H,W,3) — clean RGB, no alpha
-│          MASK            │  → (B,H,W)   — alpha channel as mask
-└──────┬──────────┬───────┘
-       │          │
-   (RGB)      (MASK)
-       │          │
-       ▼          │
-┌────────────┐    │
-│ PixelArt-  │    │  ← Your palette quantization node
-│ Detector   │    │     Now only sees 3-channel RGB.
-│            │    │     No alpha to corrupt.
-│ bg = black │    │     Background pixels become (0,0,0).
-└─────┬──────┘    │
-      │           │
-      ▼           ▼
-   [quantized]  [clean mask]
+```mermaid
+flowchart TD
+    A["Generated Image"] --> B["Remove Background<br/>(rembg / BRIA RMBG)<br/>Runs on full-color original<br/>Output: RGBA"]
+    B --> C["SplitImageWithAlpha<br/>(Built-in)<br/>Input: RGBA IMAGE<br/>Output: RGB + MASK"]
+    C -->|"RGB"| D["PixelArt-Detector<br/>(palette quantization)<br/>Only sees 3-channel RGB<br/>Background → black"]
+    C -->|"MASK"| E["clean mask<br/>(1.0 = subject, 0.0 = bg)"]
+    D --> F["quantized RGB<br/>(subject correct, bg black)"]
+
+    style B fill:#fff3e0,stroke:#e65100
+    style C fill:#e3f2fd,stroke:#1565c0
+    style D fill:#e8f5e9,stroke:#2e7d32
+    style E fill:#fce4ec,stroke:#c62828
+    style F fill:#e8f5e9,stroke:#2e7d32
 ```
 
 At this point we have:
@@ -197,35 +178,17 @@ The dimensions match your batch size automatically.
 
 ### Pipeline Diagram
 
-```
-[From shared pipeline]
-      │
-      ├── quantized image (bg=black)
-      │
-      └── rembg MASK
-              │
-              ├──────────────────────────────┐
-              │                              │
-              ▼                              ▼
-     ┌────────────────┐    ┌─────────────────────────────────────┐
-     │  SolidMask      │    │        PorterDuffImageComposite       │
-     │  value = 1.0    │    │                                      │
-     └───────┬────────┘    │  source:            ← quantized img   │
-             │             │  source_alpha:      ← rembg MASK      │
-             ▼             │  destination:       ← white image     │
-     ┌────────────────┐    │  destination_alpha: ← SolidMask(1.0)  │
-     │  MaskToImage    │    │  mode:              ← SrcOver         │
-     │  → white image  │────┤                                      │
-     └────────────────┘    └──────────────────┬───────────────────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────┐
-                                    │  PreviewImage /   │
-                                    │  Save Image       │
-                                    └──────────────────┘
-                                              │
-                                              ▼
-                              [16-color subject on white background]
+```mermaid
+flowchart TD
+    Q["quantized image<br/>(bg=black)"] --> PDC["PorterDuffImageComposite<br/>mode: SrcOver"]
+    M["rembg MASK"] --> PDC
+    SM["SolidMask<br/>value = 1.0"] --> MTI["MaskToImage<br/>→ white image"]
+    MTI --> PDC
+    PDC --> OUT["Save Image / Preview"]
+    OUT --> RESULT["16-color subject<br/>on white background"]
+
+    style PDC fill:#e3f2fd,stroke:#1565c0
+    style RESULT fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ---
@@ -240,31 +203,17 @@ Instead of compositing onto white, we re-attach the original mask as the alpha c
 
 ### Pipeline Diagram
 
-```
-[From shared pipeline]
-      │
-      ├── quantized image (bg=black)
-      │
-      └── rembg MASK ────────────────────────┐
-              │                               │
-              │                               │
-              ▼                               ▼
-     ┌────────────────────┐    ┌──────────────────────────┐
-     │  ThresholdMask      │    │   JoinImageWithAlpha       │
-     │  value = 0.5        │    │                            │
-     │  (optional but      │    │  image: ← quantized img    │
-     │   recommended)      │────┤  alpha: ← thresholded MASK │
-     └────────────────────┘    └─────────────┬──────────────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────┐
-                                    │  Save Image       │
-                                    │  (saves as PNG    │
-                                    │   with alpha)     │
-                                    └──────────────────┘
-                                              │
-                                              ▼
-                              [16-color RGBA sprite with transparency]
+```mermaid
+flowchart TD
+    Q["quantized image<br/>(bg=black)"] --> JIA["JoinImageWithAlpha<br/>(Built-in)"]
+    M["rembg MASK"] --> TM["ThresholdMask<br/>value = 0.5<br/>(crisp pixel edges)"]
+    TM --> JIA
+    JIA --> SAVE["Save Image<br/>(PNG with alpha)"]
+    SAVE --> RESULT["16-color RGBA sprite<br/>with transparency"]
+
+    style TM fill:#fff3e0,stroke:#e65100
+    style JIA fill:#e3f2fd,stroke:#1565c0
+    style RESULT fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ### Why `ThresholdMask` Is Recommended
