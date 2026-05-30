@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+python3 src/dataset_generator.py \
+  --comfy-url http://127.0.0.1:8188 \
+  --base-dir ./dataset \
+  --workflow-api-json ./config/structure_workflow.json \
+  --limit 2000 \
+  --prompt-node 100 \
+  --guidance-node 101 \
+  --guidance-randomize \
+  --guidance-min 15 \
+  --guidance-max 60 \
+  --guidance-decimals 3 \
+  --tile-workflow-api-json ./config/background_tile_workflow.json \
+  --prompt-data ./dataset/prompts/generated_prompts.jsonl \
+  --tile-prompt-node 100 \
+  --tile-guidance-node 101 \
+  --guidance-key guidance \
+  --tile-guidance-key guidance \
+  --tile-guidance-min 1.0 \
+  --tile-guidance-max 2.5 \
+  --use-category-guidance-policy \
+  --nature-guidance-min 60.0 \
+  --nature-guidance-max 80.0 \
+  --override-seed-mode random \
+  --ksampler-node 70 \
+  --tile-ksampler-node 70
