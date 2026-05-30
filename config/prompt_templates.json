@@ -3,19 +3,19 @@
   "schema_version": 3,
   "templates": {
     "structure": {
-      "template": "<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects."
     },
     "object": {
-      "template": "<tdp> Front view overhead shot elevated shot medium shot. The object is viewed from directly above, showing its top surface. The object blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. The object is viewed from directly above, showing its top surface. The object blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects."
     },
     "terrain": {
-      "template": "<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective."
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective, no floating objects."
     },
     "unit": {
       "template": "<tdp> Front view overhead shot elevated shot medium shot. pixel art top-down 2d game character sprite, {unit_archetype}, {description}, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset"
     },
     "background_tile": {
-      "template": "top-down seamless repeating {tile_type} ground texture, seamless tiling pattern, fills entire frame edge to edge, consistent texture density across whole image, top-down orthographic view, flat ground plane, crisp pixel edges sharp blocky pixels"
+      "template": "top-down seamless repeating {tile_type} ground texture. The entire image must be one single 16x16 pixel art tile that fully fills the frame with continuous texture. No borders, no centered composition, no empty space. Generate one cohesive tile that can be seamlessly repeated in all directions. No disruptive features or objects touching the outermost pixel edges. Consistent texture density across whole image, top-down orthographic view, flat ground plane, crisp pixel edges, no anti-aliasing, sharp blocky pixels, perfect seamless tiling, simple and readable at small scale."
     },
     "leader_splash": {
       "template": "epic cinematic wide composition of {leader_description}, {archetype}, in {culture}, {time_of_day}, {mood}, epic civilization leader splash screen, cinematic composition with dramatic chiaroscuro lighting, painterly oil style, anatomically correct human figure with proper limb proportions, well-formed hands with five distinct fingers, natural joint articulation, symmetrical facial features, widescreen 16:9 format, professional cinematic quality, ultra-detailed"

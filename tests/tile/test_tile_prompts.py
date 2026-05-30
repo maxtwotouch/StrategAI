@@ -144,3 +144,38 @@ class TestEnumMaps:
         from src.tile.models import TerrainMaterial
         for member in TerrainMaterial:
             assert member.value in TERRAIN_MATERIAL, f"Missing terrain material: {member.value}"
+
+
+class TestQualityDirectives:
+    """Ensure tile templates include v1 quality directives (no anti-aliasing, no floating objects, isolation focus)."""
+
+    def test_structure_has_quality_directives(self):
+        req = _make_structure_req()
+        prompt = build_structure_prompt(req)
+        assert "no anti-aliasing" in prompt
+        assert "no floating objects" in prompt
+        assert "only focusing on the specified object" in prompt
+
+    def test_object_has_quality_directives(self):
+        req = _make_object_req()
+        prompt = build_object_prompt(req)
+        assert "no anti-aliasing" in prompt
+        assert "no floating objects" in prompt
+        assert "only focusing on the specified object" in prompt
+
+    def test_terrain_has_quality_directives(self):
+        req = _make_terrain_req()
+        prompt = build_terrain_prompt(req)
+        assert "no anti-aliasing" in prompt
+        assert "no floating objects" in prompt
+        assert "only focusing on the specified object" in prompt
+
+    def test_background_tile_has_tiling_directives(self):
+        from src.prompt_templates import render
+        prompt = render("background_tile", tile_type="grass")
+        assert "no anti-aliasing" in prompt
+        assert "perfect seamless tiling" in prompt
+        assert "simple and readable at small scale" in prompt
+        assert "No disruptive features" in prompt
+        assert "No borders, no centered composition" in prompt
+        assert "16x16 pixel art tile" in prompt
