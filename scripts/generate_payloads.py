@@ -264,9 +264,13 @@ _LEADER_COMPONENTS = {
         "ageless with an intense gaze",
     ],
     "build": [
-        "tall and imposing", "lean and sharp-featured",
-        "broad-shouldered and muscular", "slender and graceful",
-        "stocky with a powerful presence", "elegant and refined",
+        "tall and imposing, with proportionate athletic limbs",
+        "lean and sharp-featured, with a wiry agile frame",
+        "broad-shouldered and muscular, with powerful arms and a strong neck",
+        "slender and graceful, with long elegant limbs and delicate hands",
+        "stocky with a powerful presence, compact frame with thick sturdy limbs",
+        "elegant and refined, with balanced harmonious proportions",
+        "towering and gaunt, with elongated limbs and angular bone structure",
     ],
     "skin": [
         "olive skin", "dark brown skin", "fair complexion",

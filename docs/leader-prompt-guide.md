@@ -65,6 +65,13 @@ Describe the person. Be specific about materials, not generic.
     • One distinctive feature (scar, unusual jewelry, tattoo, unique weapon)
     • What they wear — exact materials and colors
     • Expression and bearing
+    • Physical build specifics — use precise body-type language ("broad-shouldered",
+      "lean and wiry", "stocky", "towering and gaunt") rather than vague terms;
+      the model uses these cues to establish anatomically correct proportions
+
+  TIP: Describing the leader's physical frame accurately helps the model
+  produce anatomically correct proportions. Avoid contradictory cues
+  (e.g., "massive muscular" combined with "slender dancer's grace").
 
   DO NOT INCLUDE:
     • Camera directions ("close-up", "wide shot")

@@ -132,3 +132,33 @@ class TestEnumMaps:
         from src.leader.models import ActionCategory
         for member in ActionCategory:
             assert member.value in ACTION_CATEGORY, f"Missing action_category: {member.value}"
+
+
+class TestAnatomicalDirectives:
+    """Ensure leader prompt templates include anatomical correctness language."""
+
+    def test_splash_contains_anatomical_directives(self):
+        """Splash prompt includes full-body anatomical correctness terms."""
+        req = _make_leader_req("splash")
+        prompt = build_splash_prompt(req)
+        assert "anatomically correct human figure" in prompt
+        assert "proper limb proportions" in prompt
+        assert "well-formed hands with five distinct fingers" in prompt
+        assert "natural joint articulation" in prompt
+        assert "symmetrical facial features" in prompt
+
+    def test_action_contains_anatomical_directives(self):
+        """Action prompt includes full-body anatomical correctness terms."""
+        req = _make_leader_req("action")
+        prompt = build_action_prompt(req)
+        assert "anatomically correct human figure" in prompt
+        assert "proper limb proportions" in prompt
+        assert "well-formed hands with five distinct fingers" in prompt
+        assert "natural joint articulation" in prompt
+        assert "symmetrical facial features" in prompt
+
+    def test_profile_contains_facial_anatomy(self):
+        """Profile prompt includes facial-specific anatomical correctness term."""
+        req = _make_leader_req("profile")
+        prompt = build_profile_prompt(req)
+        assert "symmetrical well-proportioned facial anatomy" in prompt
