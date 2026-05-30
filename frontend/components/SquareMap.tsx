@@ -541,6 +541,52 @@ export function SquareMap(props: StrategyMapProps) {
             })}
           </g>
 
+          {/* Terrain sprites — drawn over the color fill, which shows through
+              wherever an asset hasn't been resolved (missing or unconfigured). */}
+          {props.assets && (
+            <g pointerEvents="none">
+              {pixels.map(({ tile, x, y }) => {
+                const href = props.assets?.terrain[tile.terrain];
+                if (!href) return null;
+                return (
+                  <image
+                    key={tileKey(tile.q, tile.r) + ":img"}
+                    href={href}
+                    x={x - half}
+                    y={y - half}
+                    width={TILE_SIZE}
+                    height={TILE_SIZE}
+                    preserveAspectRatio="none"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                );
+              })}
+            </g>
+          )}
+
+          {/* Terrain elevation overlays — relief sprites (hills, cliffs) that
+              sit on top of the base tile. Transparent cutouts. */}
+          {props.assets && (
+            <g pointerEvents="none">
+              {pixels.map(({ tile, x, y }) => {
+                const href = props.assets?.elevation?.[tile.terrain];
+                if (!href) return null;
+                return (
+                  <image
+                    key={tileKey(tile.q, tile.r) + ":elev"}
+                    href={href}
+                    x={x - half}
+                    y={y - half}
+                    width={TILE_SIZE}
+                    height={TILE_SIZE}
+                    preserveAspectRatio="none"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                );
+              })}
+            </g>
+          )}
+
           {/* Rivers */}
           <g
             pointerEvents="none"
@@ -904,25 +950,51 @@ export function SquareMap(props: StrategyMapProps) {
               const key = tileKey(city.q, city.r);
               const { x, y } = hexToPixel({ q: city.q, r: city.r });
               const color = CIV_COLORS[city.owner % CIV_COLORS.length];
+              const buildingUrl = props.assets?.structures?.[city.owner];
               return (
                 <g key={key + ":city"}>
-                  <rect
-                    x={x - half + 2}
-                    y={y - half + 4}
-                    width={TILE_SIZE - 4}
-                    height={TILE_SIZE - 6}
-                    fill={color}
-                    stroke="#0a0f14"
-                    strokeWidth={strokeWidth}
-                  />
-                  <rect
-                    x={x - half + 2}
-                    y={y - half + 4}
-                    width={TILE_SIZE - 4}
-                    height={2.5}
-                    fill="#fff"
-                    fillOpacity={0.22}
-                  />
+                  {buildingUrl ? (
+                    <>
+                      <image
+                        href={buildingUrl}
+                        x={x - half}
+                        y={y - half}
+                        width={TILE_SIZE}
+                        height={TILE_SIZE}
+                        preserveAspectRatio="none"
+                        style={{ imageRendering: "pixelated" }}
+                      />
+                      <rect
+                        x={x - half + 1}
+                        y={y - half + 1}
+                        width={TILE_SIZE - 2}
+                        height={TILE_SIZE - 2}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={borderWidth * 0.7}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <rect
+                        x={x - half + 2}
+                        y={y - half + 4}
+                        width={TILE_SIZE - 4}
+                        height={TILE_SIZE - 6}
+                        fill={color}
+                        stroke="#0a0f14"
+                        strokeWidth={strokeWidth}
+                      />
+                      <rect
+                        x={x - half + 2}
+                        y={y - half + 4}
+                        width={TILE_SIZE - 4}
+                        height={2.5}
+                        fill="#fff"
+                        fillOpacity={0.22}
+                      />
+                    </>
+                  )}
                   <text
                     x={x}
                     y={y + half + TILE_SIZE * 0.2}
@@ -950,6 +1022,8 @@ export function SquareMap(props: StrategyMapProps) {
               const color = CIV_COLORS[unit.owner % CIV_COLORS.length];
               const isSelected = unit.id === props.selectedUnitId;
               const size = TILE_SIZE * 0.62;
+              const spriteUrl = props.assets?.units?.[unit.type];
+              const spriteSize = TILE_SIZE * 0.82;
               return (
                 <g key={key + ":unit:" + unit.id}>
                   {isSelected && (
@@ -963,26 +1037,44 @@ export function SquareMap(props: StrategyMapProps) {
                       strokeWidth={borderWidth}
                     />
                   )}
-                  <rect
-                    x={x - size / 2}
-                    y={y - size / 2}
-                    width={size}
-                    height={size}
-                    fill={color}
-                    stroke="#0a0f14"
-                    strokeWidth={strokeWidth}
-                  />
-                  <text
-                    x={x}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={Math.max(10, TILE_SIZE * 0.44)}
-                    fontWeight={700}
-                    fill="#f5eedb"
-                  >
-                    {UNIT_GLYPH[unit.type] ?? unit.type[0]?.toUpperCase() ?? "?"}
-                  </text>
+                  {spriteUrl ? (
+                    <>
+                      {/* Faction dot anchors ownership behind the sprite. */}
+                      <circle cx={x} cy={y + size * 0.34} r={size * 0.16} fill={color} />
+                      <image
+                        href={spriteUrl}
+                        x={x - spriteSize / 2}
+                        y={y - spriteSize / 2}
+                        width={spriteSize}
+                        height={spriteSize}
+                        preserveAspectRatio="xMidYMid meet"
+                        style={{ imageRendering: "pixelated" }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <rect
+                        x={x - size / 2}
+                        y={y - size / 2}
+                        width={size}
+                        height={size}
+                        fill={color}
+                        stroke="#0a0f14"
+                        strokeWidth={strokeWidth}
+                      />
+                      <text
+                        x={x}
+                        y={y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={Math.max(10, TILE_SIZE * 0.44)}
+                        fontWeight={700}
+                        fill="#f5eedb"
+                      >
+                        {UNIT_GLYPH[unit.type] ?? unit.type[0]?.toUpperCase() ?? "?"}
+                      </text>
+                    </>
+                  )}
                   {unit.work_order && (
                     <text
                       x={x}

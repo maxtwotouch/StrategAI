@@ -12,6 +12,7 @@ import {
   tileKey,
 } from "@/lib/hex";
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
+import { AssetManifest, resolveManifest } from "@/lib/assetManifest";
 
 type PendingAction = { kind: "found"; unit: UnitDTO } | null;
 type Setup = { radius: number; seed: number; humanName: string };
@@ -107,36 +108,64 @@ export default function HomePage() {
   const [mapViewMode, setMapViewMode] = useState<MapViewMode>("local");
   const [bannerEvents, setBannerEvents] = useState<TurnEvent[] | null>(null);
   const [eventLog, setEventLog] = useState<TurnEvent[]>([]);
+  const [assets, setAssets] = useState<AssetManifest | null>(null);
+  const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
   const prevStateRef = useRef<GameStateDTO | null>(null);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadGame = async (nextSetup: Setup) => {
     setBusy(true);
     setError(null);
+    setHasStarted(true);
+    setState(null);
+    setAssets(null);
+    setAssetProgress(null);
+    setSelectedUnit(null);
+    setHoveredTile(null);
+    setPending(null);
+    setCityName("");
+    setMessageTargetId(null);
+    setMessageKind("chat");
+    setMessageText("");
+    setActiveConversationCivId(null);
+    setMapViewMode("local");
+    setBannerEvents(null);
+    setEventLog([]);
     try {
       const next = await api.createGame(
         nextSetup.radius,
         nextSetup.seed,
         nextSetup.humanName,
       );
+      // Resolve generated assets while the load screen is up. No-op (null) when
+      // NEXT_PUBLIC_ASSET_API_URL is unset, so the game still renders normally.
+      const civs = next.civs.map((c) => ({
+        civId: c.id,
+        leaderName: c.leader_name,
+      }));
+      let manifest: AssetManifest | null = null;
+      try {
+        manifest = await resolveManifest(
+          {
+            gameId: next.id,
+            terrains: next.tiles.map((t) => t.terrain),
+            civs,
+            leaders: civs.filter((_, i) => !next.civs[i].is_human),
+          },
+          { onProgress: (done, total) => setAssetProgress({ done, total }) },
+        );
+      } catch {
+        // Asset service unreachable — fall back to built-in rendering.
+      }
+      setAssets(manifest);
       setState(next);
-      setSelectedUnit(null);
-      setHoveredTile(null);
-      setPending(null);
-      setCityName("");
-      setMessageTargetId(null);
-      setMessageKind("chat");
-      setMessageText("");
-      setActiveConversationCivId(null);
-      setHasStarted(true);
-      setMapViewMode("local");
-      setBannerEvents(null);
-      setEventLog([]);
       prevStateRef.current = next;
     } catch (e: unknown) {
       setError(formatError(e));
+      setHasStarted(false);
     } finally {
       setBusy(false);
+      setAssetProgress(null);
     }
   };
 
@@ -278,6 +307,14 @@ export default function HomePage() {
   const activeConversationCiv = useMemo(
     () => otherCivs.find((civ) => civ.id === activeConversationCivId) ?? null,
     [otherCivs, activeConversationCivId],
+  );
+
+  const activeLeaderSplash = useMemo(
+    () =>
+      activeConversationCivId !== null
+        ? assets?.leaders[activeConversationCivId]?.splashUrl ?? null
+        : null,
+    [assets, activeConversationCivId],
   );
 
   const activeStance = useMemo(
@@ -563,6 +600,11 @@ export default function HomePage() {
           <p className="start-screen__copy">
             Surveying the land, placing the first capitals, and opening the campaign map.
           </p>
+          {assetProgress && assetProgress.total > 0 && (
+            <p className="start-screen__copy">
+              Conjuring world art… {assetProgress.done}/{assetProgress.total}
+            </p>
+          )}
         </section>
         {error && <div className="toast">{error}</div>}
       </main>
@@ -733,6 +775,7 @@ export default function HomePage() {
               focusHex={mapFocusHex}
               humanCivId={humanCiv?.id ?? null}
               visibleTiles={activeVisibleTiles}
+              assets={assets}
               onTileClick={onTileClick}
               onTileHover={(q, r) =>
                 setHoveredTile(state.tiles.find((t) => t.q === q && t.r === r) ?? null)
@@ -883,12 +926,12 @@ export default function HomePage() {
                       className={`leader-row${activeConversationCivId === civ.id ? " is-active" : ""}`}
                       onClick={() => setActiveConversationCivId(civ.id)}
                     >
-                      <span
+                      <LeaderPortrait
                         className="leader-row__portrait"
-                        style={{ background: CIV_COLORS[civ.id % CIV_COLORS.length] }}
-                      >
-                        {civ.name.slice(0, 1)}
-                      </span>
+                        name={civ.name}
+                        color={CIV_COLORS[civ.id % CIV_COLORS.length]}
+                        url={assets?.leaders[civ.id]?.profileUrl}
+                      />
                       <span className="leader-row__body">
                         <strong>{civ.name}</strong>
                         <span>
@@ -1028,14 +1071,21 @@ export default function HomePage() {
       >
         {activeConversationCiv && (
           <>
+            {activeLeaderSplash && (
+              <img
+                className="diplomacy-drawer__splash"
+                src={activeLeaderSplash}
+                alt={`${activeConversationCiv.name} splash art`}
+              />
+            )}
             <header className="diplomacy-drawer__header">
               <div className="diplomacy-drawer__heading">
-                <span
+                <LeaderPortrait
                   className="leader-row__portrait diplomacy-drawer__portrait"
-                  style={{ background: CIV_COLORS[activeConversationCiv.id % CIV_COLORS.length] }}
-                >
-                  {activeConversationCiv.name.slice(0, 1)}
-                </span>
+                  name={activeConversationCiv.name}
+                  color={CIV_COLORS[activeConversationCiv.id % CIV_COLORS.length]}
+                  url={assets?.leaders[activeConversationCiv.id]?.profileUrl}
+                />
                 <div>
                   <div className="plate-label">Open Channel</div>
                   <strong>{activeConversationCiv.name}</strong>
@@ -1217,6 +1267,28 @@ function YieldLine({ label, value }: { label: string; value: number }) {
 
 function EmptyCopy({ children }: { children: React.ReactNode }) {
   return <p className="empty-copy">{children}</p>;
+}
+
+function LeaderPortrait({
+  name,
+  color,
+  url,
+  className,
+}: {
+  name: string;
+  color: string;
+  url?: string;
+  className: string;
+}) {
+  return (
+    <span className={className} style={{ background: color }}>
+      {url ? (
+        <img className="leader-portrait__img" src={url} alt={name} />
+      ) : (
+        name.slice(0, 1)
+      )}
+    </span>
+  );
 }
 
 function MiniMap({

@@ -1,6 +1,7 @@
 "use client";
 
 import { GameStateDTO, UnitDTO } from "@/lib/api";
+import { AssetManifest } from "@/lib/assetManifest";
 import { Hex } from "@/lib/hex";
 
 export interface StrategyMapProps {
@@ -11,6 +12,7 @@ export interface StrategyMapProps {
   focusHex?: Hex | null;
   humanCivId?: number | null;
   visibleTiles: Set<string>;
+  assets?: AssetManifest | null;
   onTileClick?: (q: number, r: number) => void;
   onTileHover?: (q: number, r: number) => void;
   onUnitClick?: (unit: UnitDTO) => void;
