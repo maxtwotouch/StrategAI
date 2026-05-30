@@ -24,7 +24,7 @@ Key files you must be aware of:
 - `PUBLISHING.md` — model card template and publishing checklist
 - `config/training/*.yaml` — 6 training experiment configs
 - `config/comfyui/*.json` — 3 ComfyUI workflow API JSONs
-- `config/prompts/prompt_templates.json` — prompt generation templates
+- `config/prompt_templates.json` — prompt generation templates
 - `dataset/metadata.jsonl` — source caption metadata (92 images)
 - `dataset/hf/images/` — published dataset (PNGs + metadata.jsonl)
 - `dataset/derived/` — derived caption variants (detailed, minimal, ultra_minimal)
@@ -69,7 +69,7 @@ Delegate to sub-agents for domain-specific work:
 - Caption format: natural language sentences, never structured tags
 - Angle phrase: `top-down view.` (replaced old `Front view overhead elevated medium shot.`)
 - Dataset root: `dataset/` with subdirs `hf/`, `derived/`, `merge_new/`, `old/`
-- Config locations: training YAMLs in `config/training/`, ComfyUI workflows in `config/comfyui/`, prompt templates in `config/prompts/`
+- Config locations: training YAMLs in `config/training/`, ComfyUI workflows in `config/comfyui/`, prompt templates in `config/prompt_templates.json`
 - Config naming: `lora_4b_{variant}_{rank}.yaml` (e.g., `lora_4b_detailed_high.yaml`)
 - Python modules: generation tools under `src/generation/`, training tools under `src/training/`
 - Python modules run as: `python -m src.{generation|training}.{module_name}`

@@ -25,9 +25,9 @@ You are the **Code Quality Specialist** for the TopDownMedievalPixelArt-Flux2-Kl
 | `src/training/extract_training_set.py` | Generate sidecar `.txt` files | ✅ |
 | `src/training/sync_validation_prompts.py` | Sync prompts from dataset to config | ✅ |
 
-### ComfyUI Configs (`config/comfyui/`, `config/prompts/`)
+### ComfyUI Configs (`config/comfyui/`, `config/prompt_templates.json`)
 - `config/comfyui/` — ComfyUI workflow API JSONs (structure_workflow.json, background_tile_workflow.json, etc.)
-- `config/prompts/prompt_templates.json` — Prompt generation templates
+- `config/prompt_templates.json` — Prompt generation templates
 
 ### Tests (`tests/`)
 - `tests/generation/` — tests for generation modules

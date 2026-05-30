@@ -26,7 +26,7 @@ You are the **Dataset Specialist** for the TopDownMedievalPixelArt-Flux2-Klein-L
 - `src/generation/image_metadata.py` — PNG tEXt chunk injection/extraction
 - `src/generation/prepare_dataset.py` — post-curation HF dataset export
 - `config/comfyui/` — ComfyUI workflow API JSONs (structure_workflow.json, background_tile_workflow.json, etc.)
-- `config/prompts/prompt_templates.json` — prompt generation templates
+- `config/prompt_templates.json` — prompt generation templates
 
 ## Key Tools (Python Modules)
 
