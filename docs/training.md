@@ -19,10 +19,15 @@ How to prepare a dataset and fine-tune FLUX.2 Klein 4B LoRA adapters using the [
    ```
    Accept the license at [black-forest-labs/FLUX.2-klein-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B).
 
-3. Install this repo's dependencies:
+3. Install this repo's dependencies (from the project root):
    ```bash
+   # Option A — quick start:
    pip install -r requirements.txt
+
+   # Option B — editable install + console commands (recommended):
+   pip install -e .
    ```
+   See the [README Setup section](../README.md#setup) for details.
 
 ## Pipeline Steps
 
@@ -33,13 +38,13 @@ Start after dataset generation (see [`docs/generation.md`](generation.md)). You 
 Generates `.txt` caption files alongside each image, with trigger token injection.
 
 ```bash
-python3 -m src.training.extract_training_set
+extract-training-set
 
 # Ratio-controlled sampling:
-python3 -m src.training.extract_training_set --total 120 --ratios structure=0.50,terrain=0.30,object=0.20
+extract-training-set --total 120 --ratios structure=0.50,terrain=0.30,object=0.20
 
 # Preview:
-python3 -m src.training.extract_training_set --dry-run
+extract-training-set --dry-run
 ```
 
 Produces:
@@ -53,7 +58,7 @@ The tool reads `dataset/hf/metadata.jsonl`, injects `[trigger]` into captions, a
 ### 2. Validate Dataset
 
 ```bash
-python3 -m src.training.validate_dataset --mode sidecar_txt --dataset-root dataset/hf --image-dir .
+validate-dataset --mode sidecar_txt --dataset-root dataset/hf --image-dir .
 ```
 
 Checks:
@@ -71,7 +76,7 @@ Output:
 Creates three caption-detail variants for the experiment matrix.
 
 ```bash
-python3 -m src.training.derive_captions
+derive-captions
 ```
 
 | Variant | Format | Use Case |
@@ -87,7 +92,7 @@ Output: `dataset/derived/detailed/`, `dataset/derived/minimal/`, `dataset/derive
 The toolkit generates sample images during training. Keep prompts anchored to actual captions.
 
 ```bash
-python3 -m src.training.sync_validation_prompts --max-prompts 6
+sync-validation-prompts --max-prompts 6
 ```
 
 Reads captions from your dataset and writes them into `config/training/lora_4b_*.yaml` under sample prompts.

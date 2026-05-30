@@ -39,7 +39,11 @@ flowchart TD
 Creates a JSONL file with captions and ComfyUI positive prompts for all asset types.
 
 ```bash
-python3 -m src.generation.prompt_generator \
+# First install the project (see README Setup section):
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -e .
+
+generate-prompts \
   --out-dir ./dataset/prompts \
   --seed 2026 \
   --total-target 28000 \
@@ -47,6 +51,8 @@ python3 -m src.generation.prompt_generator \
   --ratio-object 0.20 \
   --ratio-terrain 0.10
 ```
+
+> Or with `python -m`: `python -m src.generation.prompt_generator ...`
 
 Output: `dataset/prompts/generated_prompts.jsonl`
 
@@ -66,7 +72,7 @@ Calls ComfyUI workflows to produce PNGs with embedded metadata.
 bash scripts/generate_images.sh
 
 # Or run directly with custom args:
-python3 -m src.generation.dataset_generator \
+generate-images \
   --comfy-url http://127.0.0.1:8188 \
   --base-dir ./dataset \
   --workflow-api-json ./config/comfyui/structure_workflow.json \
@@ -95,7 +101,7 @@ Output:
 Scans curated PNGs, reads embedded metadata, strips to clean PNGs, renumbers sequentially, and produces a HuggingFace-compatible `metadata.jsonl`.
 
 ```bash
-python3 -m src.generation.prepare_dataset ./dataset/raw --out-dir ./dataset/hf
+prepare-dataset ./dataset/raw --out-dir ./dataset/hf
 ```
 
 Output:

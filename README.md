@@ -75,46 +75,6 @@ flowchart TD
 
 The angle phrase `top-down view.` binds the overhead perspective. Both the trigger and angle phrase must be present at inference.
 
-## Getting Started
-
-### Dataset Generation
-
-See [`docs/generation.md`](docs/generation.md). Requires a running ComfyUI server.
-
-```bash
-# 1. Generate prompt data
-python3 -m src.generation.prompt_generator
-
-# 2. Generate images (use preset wrapper for complex ComfyUI args)
-bash scripts/generate_images.sh
-
-# 3. Curate: delete bad PNGs from dataset/raw/
-
-# 4. Prepare HF dataset
-python3 -m src.generation.prepare_dataset ./dataset/raw --out-dir ./dataset/hf
-```
-
-### LoRA Training
-
-See [`docs/training.md`](docs/training.md). Requires the [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit).
-
-```bash
-# 1. Extract sidecar captions
-python3 -m src.training.extract_training_set
-
-# 2. Validate dataset
-python3 -m src.training.validate_dataset
-
-# 3. Derive caption variants (optional)
-python3 -m src.training.derive_captions
-
-# 4. Sync sample prompts into config
-python3 -m src.training.sync_validation_prompts
-
-# 5. Train (batch launch)
-bash scripts/train_experiments.sh
-```
-
 ## Setup
 
 ### 1. Create a virtual environment
@@ -131,14 +91,15 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Option B — pip + pyproject.toml (includes dev tools):**
+**Option B — pip + pyproject.toml (editable install + console scripts):**
 ```bash
 pip install -e ".[dev]"
 ```
 
-> **Note:** `pyproject.toml` declares the same core dependencies as `requirements.txt`.
-> Use `requirements.txt` for a quick start; use `pip install -e .` if you want an
-> editable install with `src.*` modules importable anywhere.
+> **Note:** Option B also installs the console commands (`generate-prompts`,
+> `derive-captions`, etc.) into your venv's `bin/` so you can run them as
+> simple command names.  `pyproject.toml` declares the same core dependencies
+> as `requirements.txt` — pick whichever you prefer.
 
 ### 3. Validate the installation
 
@@ -146,9 +107,52 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 ```
 
-All 34 tests should pass.
+All 35 tests should pass.
 
-## Prerequisites
+## Getting Started
+
+### Dataset Generation
+
+See [`docs/generation.md`](docs/generation.md). Requires a running ComfyUI server.
+
+```bash
+# 1. Generate prompt data
+generate-prompts
+
+# 2. Generate images (use preset wrapper for complex ComfyUI args)
+bash scripts/generate_images.sh
+
+# 3. Curate: delete bad PNGs from dataset/raw/
+
+# 4. Prepare HF dataset
+prepare-dataset ./dataset/raw --out-dir ./dataset/hf
+```
+
+### LoRA Training
+
+See [`docs/training.md`](docs/training.md). Requires the [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit).
+
+```bash
+# 1. Extract sidecar captions
+extract-training-set
+
+# 2. Validate dataset
+validate-dataset
+
+# 3. Derive caption variants (optional)
+derive-captions
+
+# 4. Sync sample prompts into config
+sync-validation-prompts
+
+# 5. Train (batch launch)
+bash scripts/train_experiments.sh
+```
+
+> **Alternative:** You can also run modules directly with `python -m src.training.derive_captions`
+> if you prefer — the console commands above are just shorter aliases.
+
+## External Dependencies
 
 - Python 3.10+
 - **Generation**: ComfyUI server with [required custom nodes](docs/generation.md#prerequisites)

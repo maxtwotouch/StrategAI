@@ -22,6 +22,15 @@ dev = [
     "pytest>=8.0",
 ]
 
+[project.scripts]
+generate-prompts = "src.generation.prompt_generator:main"
+generate-images = "src.generation.dataset_generator:main"
+prepare-dataset = "src.generation.prepare_dataset:main"
+extract-training-set = "src.training.extract_training_set:main"
+validate-dataset = "src.training.validate_dataset:main"
+derive-captions = "src.training.derive_captions:main"
+sync-validation-prompts = "src.training.sync_validation_prompts:main"
+
 [tool.setuptools]
 packages = ["src", "src.generation", "src.training"]
 

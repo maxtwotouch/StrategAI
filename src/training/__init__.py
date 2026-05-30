@@ -1,13 +1,28 @@
 """LoRA training pipeline — caption extraction, validation, derivation, config syncing."""
 
+import importlib
 import os
 import sys
-from pathlib import Path
 
-from src.training.extract_training_set import main as extract_training_set, ANGLE_PHRASE
-from src.training.validate_dataset import main as validate_dataset
-from src.training.derive_captions import main as derive_captions
-from src.training.sync_validation_prompts import main as sync_validation_prompts
+# ── Lazy imports (all runnable modules — avoid runpy RuntimeWarning) ───
+# Each entry maps an attribute name to (module, attr) for on-demand loading.
+_LAZY = {
+    "ANGLE_PHRASE":              ("src.training.extract_training_set", "ANGLE_PHRASE"),
+    "extract_training_set":      ("src.training.extract_training_set", "main"),
+    "validate_dataset":          ("src.training.validate_dataset", "main"),
+    "derive_captions":           ("src.training.derive_captions", "main"),
+    "sync_validation_prompts":   ("src.training.sync_validation_prompts", "main"),
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY:
+        mod_name, attr = _LAZY[name]
+        mod = importlib.import_module(mod_name)
+        obj = getattr(mod, attr)
+        globals()[name] = obj  # cache for subsequent accesses
+        return obj
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _check_runtime() -> None:
