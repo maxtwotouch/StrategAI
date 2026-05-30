@@ -1,0 +1,77 @@
+job: extension
+config:
+  name: topdown_lora_ultra_high
+  process:
+  - type: diffusion_trainer
+    training_folder: ./output
+    device: cuda:0
+    trigger_word: <tdp>
+
+    network:
+      type: lora
+      linear: 128
+      linear_alpha: 64
+      conv: 64
+      conv_alpha: 32
+
+    save:
+      dtype: bf16
+      save_every: 200
+      max_step_saves_to_keep: 15
+
+    datasets:
+    - folder_path: ./dataset/derived/ultra_minimal
+      caption_ext: txt
+      caption_dropout_rate: 0.0
+      resolution:
+      - 512
+      - 768
+      - 1024
+
+    train:
+      batch_size: 1
+      gradient_accumulation: 1
+      steps: 2500
+      train_unet: true
+      train_text_encoder: false
+      gradient_checkpointing: true
+      noise_scheduler: flowmatch
+      optimizer: adamw8bit
+      timestep_type: weighted
+      content_or_style: balanced
+      lr: 0.00005
+      dtype: bf16
+      optimizer_params:
+        weight_decay: 0.0001
+      ema_config:
+        use_ema: false
+        ema_decay: 0.99
+
+    model:
+      name_or_path: black-forest-labs/FLUX.2-klein-base-4B
+      arch: flux2_klein_4b
+      quantize: true
+      qtype: qfloat8
+      quantize_te: false
+      qtype_te: qfloat8
+      low_vram: false
+
+    sample:
+      sampler: flowmatch
+      sample_every: 250
+      width: 1024
+      height: 1024
+      guidance_scale: 4
+      sample_steps: 25
+      seed: 42
+      walk_seed: true
+      neg: ""
+      prompts:
+      - "[trigger] A medieval granary building in steampunk industrial style, with aged stone masonry, dark timber bracing, and reinforced buttresses. Top-down view, isolated on a white background. 16x16 pixel art, crisp edges, no anti-aliasing."
+      - "[trigger] A lush green grass texture tile for top-down games, with dense micro-blade clusters, soft color variation, and faint dithering. Seamlessly repeatable in all directions. 16x16 pixel art, crisp edges, readable at small scale."
+      - "[trigger] A medieval watchtower in gothic style, with weathered stone battlements, arrow slits, and a conical slate roof. Top-down view, isolated on white. 16x16 pixel art."
+      - "[trigger] A medieval blacksmith workshop with a glowing forge, anvil, water trough, and hanging tools. Top-down view, isolated on white. 16x16 pixel art."
+      - "[trigger] A modern red sports car, isolated on white background, top-down view."
+      - "[trigger] A sci-fi spaceship with solar panels and thrusters, top-down view, white background."
+      - "[trigger] A steaming cup of coffee on a saucer, top-down view, white background."
+      - "[trigger] A modern suburban house with a swimming pool, top-down view, white background."

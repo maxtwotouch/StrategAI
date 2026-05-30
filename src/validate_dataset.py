@@ -299,7 +299,9 @@ def main() -> int:
 
             line_number += 1
             rows_total += 1
-            relative_image = image_path.resolve().relative_to(dataset_root)
+            # Use the symlink path (not resolved target) for relative_to,
+            # otherwise symlinks pointing outside dataset_root break validation.
+            relative_image = image_path.relative_to(dataset_root)
             caption_path = image_path.with_suffix(cap_ext)
             if not caption_path.exists():
                 issues.append(

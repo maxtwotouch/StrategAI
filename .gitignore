@@ -227,3 +227,5 @@ __marimo__/
 # Generated dataset artifacts (but keep source dataset files)
 dataset/validation_report.ostris.json
 dataset/validation_issues.ostris.jsonl
+
+dataset/
