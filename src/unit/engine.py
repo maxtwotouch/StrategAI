@@ -143,23 +143,27 @@ class StaticUnitEngine:
         img = Image.open(path).convert("RGBA")
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="unit",
-                generation_mode="static",
-            ))
-            db.commit()
-
-        UnitRegistry.register(
-            unit_id=unit_id,
-            unit_type=req.unit_type,
-            description=req.description,
-            image_id=filename,
-            seed=seed,
-            prompt_used=prompt,
-            generation_mode="static",
-        )
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="unit",
+                    generation_mode="static",
+                ))
+                UnitRegistry.register(
+                    unit_id=unit_id,
+                    unit_type=req.unit_type,
+                    description=req.description,
+                    image_id=filename,
+                    seed=seed,
+                    prompt_used=prompt,
+                    generation_mode="static",
+                    session=db,
+                )
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -213,23 +217,27 @@ class _PlaceholderUnitEngine:
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="unit",
-                generation_mode="placeholder",
-            ))
-            db.commit()
-
-        UnitRegistry.register(
-            unit_id=unit_id,
-            unit_type=req.unit_type,
-            description=req.description,
-            image_id=filename,
-            seed=seed,
-            prompt_used=prompt,
-            generation_mode="placeholder",
-        )
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="unit",
+                    generation_mode="placeholder",
+                ))
+                UnitRegistry.register(
+                    unit_id=unit_id,
+                    unit_type=req.unit_type,
+                    description=req.description,
+                    image_id=filename,
+                    seed=seed,
+                    prompt_used=prompt,
+                    generation_mode="placeholder",
+                    session=db,
+                )
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - start) * 1000)
 

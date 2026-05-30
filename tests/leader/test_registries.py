@@ -8,6 +8,22 @@ from src.tile.registry import (
     generate_structure_id, generate_object_id, generate_terrain_id,
 )
 from src.unit.registry import UnitRegistry, generate_unit_id
+from src.database import SessionLocal, AssetRecord
+
+
+def _create_asset_record(filename: str, family: str = "leader_splash", mode: str = "comfyui") -> None:
+    """Create a minimal AssetRecord so FK constraints are satisfied in tests.
+
+    Uses a late-bound import so monkeypatched SessionLocal is always picked up.
+    """
+    from src.database import SessionLocal, AssetRecord as AR
+    with SessionLocal() as db:
+        db.add(AR(
+            id=filename,
+            asset_family=family,
+            generation_mode=mode,
+        ))
+        db.commit()
 
 
 # ===========================================================================
@@ -35,6 +51,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_test_a1b2c3"
+        _create_asset_record("splash_test.png")
         LeaderRegistry.register(
             leader_id=lid,
             leader_name="Test Leader",
@@ -69,6 +86,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_ref_test"
+        _create_asset_record("splash_ref.png")
         LeaderRegistry.register(
             leader_id=lid, leader_name="Ref Test",
             leader_description="A test leader for reference image testing.",
@@ -96,6 +114,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_exists_test"
+        _create_asset_record("splash_ex.png")
         LeaderRegistry.register(
             leader_id=lid, leader_name="Exists",
             leader_description="A test leader for existence checking.",
@@ -122,6 +141,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.output_dir", "generated_assets")
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
+        _create_asset_record("splash_list.png")
         for i in range(3):
             LeaderRegistry.register(
                 leader_id=f"leader_list_{i}",
@@ -148,6 +168,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_profile_test"
+        _create_asset_record("splash_prof.png")
         LeaderRegistry.register(
             leader_id=lid, leader_name="Profile",
             leader_description="A test leader for profile recording.",
@@ -156,6 +177,7 @@ class TestLeaderRegistry:
             splash_image_filename="splash_prof.png",
             splash_seed=1, splash_prompt="p",
         )
+        _create_asset_record("profile_img.png", "leader_profile")
         LeaderRegistry.record_profile(lid, "profile_img.png")
         record = LeaderRegistry.get(lid)
         assert record.profile_image_id == "profile_img.png"
@@ -173,6 +195,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_action_test"
+        _create_asset_record("splash_act.png")
         LeaderRegistry.register(
             leader_id=lid, leader_name="Action",
             leader_description="A test leader for action recording.",
@@ -181,6 +204,8 @@ class TestLeaderRegistry:
             splash_image_filename="splash_act.png",
             splash_seed=1, splash_prompt="p",
         )
+        _create_asset_record("action1.png", "leader_action")
+        _create_asset_record("action2.png", "leader_action")
         LeaderRegistry.record_action(lid, "action1.png")
         LeaderRegistry.record_action(lid, "action2.png")
         record = LeaderRegistry.get(lid)
@@ -199,6 +224,7 @@ class TestLeaderRegistry:
         monkeypatch.setattr("src.leader.registry.settings.paths.leader_reference_dir", "leader_references")
 
         lid = "leader_delete_test"
+        _create_asset_record("splash_del.png")
         LeaderRegistry.register(
             leader_id=lid, leader_name="Delete",
             leader_description="A test leader for deletion testing.",
@@ -250,6 +276,7 @@ class TestStructureRegistry:
 
     def test_register_and_get(self, test_db):
         sid = "struct_fort_a1b2c3"
+        _create_asset_record("img.png", "structure")
         StructureRegistry.register(
             structure_id=sid,
             category="fortification",
@@ -267,6 +294,9 @@ class TestStructureRegistry:
         assert record.style == "nordic_wooden"
 
     def test_list_all(self, test_db):
+        _create_asset_record("img_0.png", "structure")
+        _create_asset_record("img_1.png", "structure")
+        _create_asset_record("img_2.png", "structure")
         for i in range(3):
             StructureRegistry.register(
                 structure_id=f"struct_list_{i}",
@@ -284,6 +314,7 @@ class TestStructureRegistry:
 
     def test_delete(self, test_db):
         sid = "struct_del_test"
+        _create_asset_record("img.png", "structure")
         StructureRegistry.register(
             structure_id=sid,
             category="fortification",
@@ -307,6 +338,7 @@ class TestObjectRegistry:
 
     def test_register_and_get(self, test_db):
         oid = "object_veg_a1b2c3"
+        _create_asset_record("img.png", "object")
         ObjectRegistry.register(
             object_id=oid,
             category="vegetation",
@@ -322,6 +354,8 @@ class TestObjectRegistry:
         assert record.biome == "temperate_forest"
 
     def test_list_all(self, test_db):
+        _create_asset_record("img_0.png", "object")
+        _create_asset_record("img_1.png", "object")
         for i in range(2):
             ObjectRegistry.register(
                 object_id=f"object_list_{i}",
@@ -337,6 +371,7 @@ class TestObjectRegistry:
 
     def test_delete(self, test_db):
         oid = "object_del"
+        _create_asset_record("img.png", "object")
         ObjectRegistry.register(
             object_id=oid, category="vegetation", biome="temperate_forest",
             season="summer", description="test", image_id="img.png",
@@ -351,6 +386,7 @@ class TestTerrainRegistry:
 
     def test_register_and_get(self, test_db):
         tid = "terrain_hill_a1b2c3"
+        _create_asset_record("img.png", "terrain")
         TerrainRegistry.register(
             terrain_id=tid,
             category="hill",
@@ -366,6 +402,8 @@ class TestTerrainRegistry:
         assert record.material == "earthen"
 
     def test_list_all(self, test_db):
+        _create_asset_record("img_0.png", "terrain")
+        _create_asset_record("img_1.png", "terrain")
         for i in range(2):
             TerrainRegistry.register(
                 terrain_id=f"terrain_list_{i}",
@@ -377,6 +415,7 @@ class TestTerrainRegistry:
 
     def test_delete(self, test_db):
         tid = "terrain_del"
+        _create_asset_record("img.png", "terrain")
         TerrainRegistry.register(
             terrain_id=tid, category="hill", scale="medium", material="earthen",
             description="test", image_id="img.png", seed=1, prompt_used="p",
@@ -411,6 +450,7 @@ class TestUnitRegistry:
 
     def test_register_and_get(self, test_db):
         uid = "unit_archer_a1b2c3"
+        _create_asset_record("sprite.png", "unit")
         UnitRegistry.register(
             unit_id=uid,
             unit_type="archer",
@@ -426,6 +466,9 @@ class TestUnitRegistry:
         assert record.image_id == "sprite.png"
 
     def test_list_all(self, test_db):
+        _create_asset_record("sprite_0.png", "unit")
+        _create_asset_record("sprite_1.png", "unit")
+        _create_asset_record("sprite_2.png", "unit")
         for i in range(3):
             UnitRegistry.register(
                 unit_id=f"unit_list_{i}",
@@ -440,6 +483,7 @@ class TestUnitRegistry:
 
     def test_delete(self, test_db):
         uid = "unit_del"
+        _create_asset_record("sprite.png", "unit")
         UnitRegistry.register(
             unit_id=uid, unit_type="archer", description="test",
             image_id="sprite.png",

@@ -17,6 +17,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from src.config import settings, BASE_DIR
 from src.database import SessionLocal, LeaderRecord
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,7 @@ class LeaderRegistry:
 
     @staticmethod
     def delete(leader_id: str) -> bool:
-        """Remove a leader and clean up their reference image.
+        """Remove a leader and clean up their reference image and all generated assets.
 
         Returns True if a leader was deleted, False if not found.
         """
@@ -212,8 +213,27 @@ class LeaderRegistry:
                 LeaderRecord.leader_id == leader_id
             ).first()
             if leader:
+                # Collect all image filenames to clean up from disk
+                image_ids_to_clean = []
+                if leader.splash_image_id:
+                    image_ids_to_clean.append(leader.splash_image_id)
+                if leader.profile_image_id:
+                    image_ids_to_clean.append(leader.profile_image_id)
+                if leader.action_image_ids:
+                    image_ids_to_clean.extend(leader.action_image_ids)
+
                 db.delete(leader)
                 db.commit()
+
+                # Best-effort cleanup of generated image files on disk
+                for image_id in image_ids_to_clean:
+                    try:
+                        store.delete(image_id)
+                    except (FileNotFoundError, OSError) as exc:
+                        logger.warning(
+                            "Failed to delete image file %s for leader %s: %s",
+                            image_id, leader_id, exc,
+                        )
                 logger.info("Leader deleted: %s", leader_id)
                 return True
         return False

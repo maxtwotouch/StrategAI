@@ -31,7 +31,7 @@ from src.tile.models import (
 )
 from src.tile.registry import StructureRegistry, ObjectRegistry, TerrainRegistry
 from src.tile.background_engine import (
-    BackgroundTileEngine, StaticBackgroundTileEngine,
+    BackgroundTileEngine, StaticBackgroundTileEngine, BackgroundTileResult,
     GAME_ASSET_SIZE as BG_ASSET_SIZE,
 )
 from src.tile.background_registry import BackgroundTileRegistry
@@ -275,6 +275,71 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestSizeLimitMiddleware)
 
 
+# ---------------------------------------------------------------------------
+#  Rate limiting (token-bucket, no external dependencies)
+# ---------------------------------------------------------------------------
+
+import time as _time_module
+import threading as _threading
+
+class _TokenBucket:
+    """Thread-safe token bucket for rate limiting."""
+
+    def __init__(self, rate: float, burst: int) -> None:
+        self._rate = rate          # tokens per second
+        self._burst = burst        # max tokens
+        self._tokens = float(burst)
+        self._last_refill = _time_module.monotonic()
+        self._lock = _threading.Lock()
+
+    def consume(self, tokens: int = 1) -> bool:
+        """Try to consume tokens. Returns True if allowed, False if rate-limited."""
+        with self._lock:
+            now = _time_module.monotonic()
+            elapsed = now - self._last_refill
+            self._tokens = min(self._burst, self._tokens + elapsed * self._rate)
+            self._last_refill = now
+            if self._tokens >= tokens:
+                self._tokens -= tokens
+                return True
+            return False
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Global token-bucket rate limiter for POST and GET endpoints.
+
+    Checks ``settings.rate_limit.enabled`` at request time so tests can
+    disable rate limiting by mutating the settings singleton.
+    """
+
+    def __init__(self, app, post_rps: float, get_rps: float, burst: int, enabled: bool = True):
+        super().__init__(app)
+        self._enabled = enabled
+        self._post_bucket = _TokenBucket(post_rps, burst)
+        self._get_bucket = _TokenBucket(get_rps, burst * 10)
+
+    async def dispatch(self, request: FastAPIRequest, call_next):
+        # Check enabled at request time so tests can toggle it
+        if not settings.rate_limit.enabled:
+            return await call_next(request)
+        bucket = self._post_bucket if request.method in ("POST", "PUT", "PATCH") else self._get_bucket
+        if not bucket.consume():
+            return StarletteJSONResponse(
+                {"detail": "Rate limit exceeded. Slow down."},
+                status_code=429,
+            )
+        return await call_next(request)
+
+
+app.add_middleware(
+    RateLimitMiddleware,
+    post_rps=settings.rate_limit.post_rps,
+    get_rps=settings.rate_limit.get_rps,
+    burst=settings.rate_limit.burst_size,
+    enabled=settings.rate_limit.enabled,
+)
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled exception on %s %s: %s", request.method, request.url, exc, exc_info=True)
@@ -507,7 +572,7 @@ async def get_leader(leader_id: str):
 
 @app.delete("/leader/{leader_id}", response_model=DeleteResponse)
 async def delete_leader(leader_id: str):
-    """Remove a leader and their reference image. Generated assets remain on disk."""
+    """Remove a leader and all their generated assets from disk."""
     _require_db()
     deleted = LeaderRegistry.delete(leader_id)
     if not deleted:
@@ -604,7 +669,7 @@ async def get_structure(structure_id: str):
 
 @app.delete("/structure/{structure_id}", response_model=DeleteResponse)
 async def delete_structure(structure_id: str):
-    """Remove a structure record. Generated asset remains on disk."""
+    """Remove a structure record and its generated asset from disk."""
     _require_db()
     deleted = StructureRegistry.delete(structure_id)
     if not deleted:
@@ -693,7 +758,7 @@ async def get_object(object_id: str):
 
 @app.delete("/object/{object_id}", response_model=DeleteResponse)
 async def delete_object(object_id: str):
-    """Remove an object record. Generated asset remains on disk."""
+    """Remove an object record and its generated asset from disk."""
     _require_db()
     deleted = ObjectRegistry.delete(object_id)
     if not deleted:
@@ -782,7 +847,7 @@ async def get_terrain(terrain_id: str):
 
 @app.delete("/terrain/{terrain_id}", response_model=DeleteResponse)
 async def delete_terrain(terrain_id: str):
-    """Remove a terrain record. Generated asset remains on disk."""
+    """Remove a terrain record and its generated asset from disk."""
     _require_db()
     deleted = TerrainRegistry.delete(terrain_id)
     if not deleted:
@@ -874,7 +939,7 @@ async def get_unit(unit_id: str):
 
 @app.delete("/unit/{unit_id}", response_model=DeleteResponse)
 async def delete_unit(unit_id: str):
-    """Remove a unit record. Generated assets remain on disk."""
+    """Remove a unit record and its generated asset from disk."""
     _require_db()
     deleted = UnitRegistry.delete(unit_id)
     if not deleted:
@@ -901,22 +966,22 @@ async def generate_background_tile(request: BackgroundTileRequest):
         raise HTTPException(503, "Background tile generation not available (ComfyUI unreachable)")
 
     try:
-        prompt = _render("background_tile", tile_type=request.tile_type)
-        seed = request.seed if request.seed is not None else secrets.randbits(31)
-
         t0 = time.time()
-        filename, bg_tile_id, seed = await background_tile_engine.generate(request.tile_type, seed)
+        result: BackgroundTileResult = await background_tile_engine.generate(
+            request.tile_type, request.seed
+        )
 
-        elapsed = int((time.time() - t0) * 1000)
-        logger.info("Background tile '%s' generated in %dms → %s", request.tile_type, elapsed, filename)
+        elapsed = result.elapsed_ms or int((time.time() - t0) * 1000)
+        logger.info("Background tile '%s' generated in %dms → %s",
+                     request.tile_type, elapsed, result.filename)
 
         return BackgroundTileResponse(
-            url=f"/assets/{filename}",
-            background_tile_id=bg_tile_id,
+            url=f"/assets/{result.filename}",
+            background_tile_id=result.bg_tile_id,
             tile_type=request.tile_type,
-            seed=seed,
-            generation_mode=settings.get_mode("background_tile"),
-            prompt_used=prompt,
+            seed=result.seed,
+            generation_mode=result.generation_mode,
+            prompt_used=result.prompt_used,
             resolution=f"{BG_ASSET_SIZE}x{BG_ASSET_SIZE}",
             generation_time_ms=elapsed,
         )
@@ -990,7 +1055,7 @@ async def get_background_tile(background_tile_id: str):
 
 @app.delete("/background_tile/{background_tile_id}", response_model=DeleteResponse)
 async def delete_background_tile(background_tile_id: str):
-    """Remove a background tile record. Generated asset remains on disk."""
+    """Remove a background tile record and its generated asset from disk."""
     _require_db()
     deleted = BackgroundTileRegistry.delete(background_tile_id)
     if not deleted:

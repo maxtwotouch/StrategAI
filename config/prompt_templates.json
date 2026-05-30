@@ -1,5 +1,5 @@
 {
-  "_comment": "The <tdp> trigger activates a LoRA that enforces top-down camera angle with medieval pixel-art styling. It appears in the structure, object, terrain, and unit templates (tile assets). The background_tile template OMITS it — background tiles are seamless ground textures, not isolated top-down assets, and use a separate workflow (workflows/background_tile.json). Leader templates also omit <tdp> — they use cinematic/painterly styles instead.  Placeholders ({...}) are filled at prompt-build time with enum-injected prose from the Python prompt builders.",
+  "_comment": "The <tdp> trigger activates a LoRA that enforces top-down camera angle with medieval pixel-art styling. It appears in the structure, object, terrain, and unit templates (tile assets). The background_tile template OMITS it \u2014 background tiles are seamless ground textures, not isolated top-down assets, and use a separate workflow (workflows/background_tile.json). Leader templates also omit <tdp> \u2014 they use cinematic/painterly styles instead.  Placeholders ({...}) are filled at prompt-build time with enum-injected prose from the Python prompt builders.",
   "schema_version": 3,
   "templates": {
     "structure": {
@@ -28,4 +28,3 @@
     }
   }
 }
-

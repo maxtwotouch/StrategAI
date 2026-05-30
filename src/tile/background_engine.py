@@ -52,6 +52,36 @@ _PLACEHOLDER_COLORS: dict[str, tuple[int, int, int, int]] = {
 
 from src.font_utils import get_font as _get_font
 
+# ---------------------------------------------------------------------------
+#  Result type
+# ---------------------------------------------------------------------------
+
+class BackgroundTileResult:
+    """Structured return from all background tile engines.
+
+    Replaces the raw ``(filename, bg_tile_id, seed)`` tuple so the HTTP
+    layer doesn't need to know engine internals or re-render the prompt.
+    """
+
+    __slots__ = ("filename", "bg_tile_id", "seed", "prompt_used",
+                 "generation_mode", "elapsed_ms")
+
+    def __init__(
+        self,
+        filename: str,
+        bg_tile_id: str,
+        seed: int,
+        prompt_used: str,
+        generation_mode: str,
+        elapsed_ms: int,
+    ) -> None:
+        self.filename = filename
+        self.bg_tile_id = bg_tile_id
+        self.seed = seed
+        self.prompt_used = prompt_used
+        self.generation_mode = generation_mode
+        self.elapsed_ms = elapsed_ms
+
 
 def _generate_bg_tile_id(tile_type: str) -> str:
     """Generate a unique background_tile_id."""
@@ -69,8 +99,8 @@ class BackgroundTileEngine:
     def __init__(self, client: ComfyUIClient) -> None:
         self._client = client
 
-    async def generate(self, tile_type: str, seed: int | None = None) -> tuple[str, str, int]:
-        """Generate a background tile and return (filename, bg_tile_id, seed).
+    async def generate(self, tile_type: str, seed: int | None = None) -> BackgroundTileResult:
+        """Generate a background tile and return a structured result.
 
         Parameters
         ----------
@@ -81,8 +111,7 @@ class BackgroundTileEngine:
 
         Returns
         -------
-        tuple[str, str, int]
-            (asset_filename, background_tile_id, seed)
+        BackgroundTileResult
         """
         if tile_type not in TILE_TYPES:
             raise ValueError(
@@ -130,7 +159,14 @@ class BackgroundTileEngine:
             "Background tile '%s' generated in %dms (%s)",
             tile_type, elapsed, filename,
         )
-        return filename, bg_tile_id, seed
+        return BackgroundTileResult(
+            filename=filename,
+            bg_tile_id=bg_tile_id,
+            seed=seed,
+            prompt_used=prompt,
+            generation_mode="comfyui",
+            elapsed_ms=elapsed,
+        )
 
 
 # ===========================================================================
@@ -140,7 +176,7 @@ class BackgroundTileEngine:
 class StaticBackgroundTileEngine:
     """Serves pre-made background tile PNGs from static_tiles/background_tile/."""
 
-    async def generate(self, tile_type: str, seed: int | None = None) -> tuple[str, str, int]:
+    async def generate(self, tile_type: str, seed: int | None = None) -> BackgroundTileResult:
         if tile_type not in TILE_TYPES:
             raise ValueError(
                 f"Unknown tile_type '{tile_type}'. Valid: {sorted(TILE_TYPES)}"
@@ -172,7 +208,14 @@ class StaticBackgroundTileEngine:
                 try_remove_asset(filename)
                 raise
             logger.info("Served static background tile '%s' → %s", tile_type, filename)
-            return filename, bg_tile_id, seed
+            return BackgroundTileResult(
+                filename=filename,
+                bg_tile_id=bg_tile_id,
+                seed=seed,
+                prompt_used=_render("background_tile", tile_type=tile_type),
+                generation_mode="static",
+                elapsed_ms=0,
+            )
 
         # Fall through to placeholder
         return await _PlaceholderBackgroundTileEngine().generate(tile_type, seed)
@@ -185,7 +228,7 @@ class StaticBackgroundTileEngine:
 class _PlaceholderBackgroundTileEngine:
     """Produces a coloured rectangle labelled with the tile type."""
 
-    async def generate(self, tile_type: str, seed: int | None = None) -> tuple[str, str, int]:
+    async def generate(self, tile_type: str, seed: int | None = None) -> BackgroundTileResult:
         color = _PLACEHOLDER_COLORS.get(tile_type, (128, 128, 128, 255))
         font = _get_font(12)
         seed = seed if seed is not None else secrets.randbits(31)
@@ -230,7 +273,14 @@ class _PlaceholderBackgroundTileEngine:
             raise
 
         logger.info("Placeholder background tile '%s' → %s", tile_type, filename)
-        return filename, bg_tile_id, seed
+        return BackgroundTileResult(
+            filename=filename,
+            bg_tile_id=bg_tile_id,
+            seed=seed,
+            prompt_used=_render("background_tile", tile_type=tile_type),
+            generation_mode="placeholder",
+            elapsed_ms=0,
+        )
 
 
 # ===========================================================================

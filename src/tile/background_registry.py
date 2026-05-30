@@ -7,6 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from src.database import SessionLocal, BackgroundTileRecord
+from src.storage import store
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class BackgroundTileRegistry:
 
     @staticmethod
     def delete(background_tile_id: str) -> bool:
-        """Delete a background tile record. Returns True if deleted."""
+        """Delete a background tile record and its generated image file. Returns True if deleted."""
         with SessionLocal() as db:
             record = (
                 db.query(BackgroundTileRecord)
@@ -73,7 +74,17 @@ class BackgroundTileRegistry:
                 .first()
             )
             if record:
+                image_id = record.image_id
                 db.delete(record)
                 db.commit()
+                # Best-effort cleanup of the image file on disk
+                try:
+                    store.delete(image_id)
+                except (FileNotFoundError, OSError) as exc:
+                    logger.warning(
+                        "Failed to delete image file %s for background tile %s: %s",
+                        image_id, background_tile_id, exc,
+                    )
+                logger.info("Background tile deleted: %s", background_tile_id)
                 return True
             return False

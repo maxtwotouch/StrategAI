@@ -130,6 +130,31 @@ class DeploymentMode(str, Enum):
     PRODUCTION = "production"
 
 
+class RateLimitSettings(BaseModel):
+    """Per-endpoint rate limiting configuration.
+
+    Uses a simple token-bucket algorithm.  Limits are enforced globally
+    (across all clients), NOT per-IP.  For per-IP limits, place a reverse
+    proxy (nginx/Caddy) in front of the service.
+    """
+    post_rps: float = Field(
+        default=2.0, gt=0,
+        description="Max POST (generation) requests per second globally.",
+    )
+    get_rps: float = Field(
+        default=50.0, gt=0,
+        description="Max GET (read) requests per second globally.",
+    )
+    burst_size: int = Field(
+        default=5, ge=1,
+        description="Max burst size for POST endpoints before throttling.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Set to false to disable rate limiting (e.g., in tests).",
+    )
+
+
 # ---------------------------------------------------------------------------
 #  Top-level Settings
 # ---------------------------------------------------------------------------
@@ -156,8 +181,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
+    database_url: str = Field(
+        default="",
+        description="Database connection URL.  Leave empty to use the default "
+                    "SQLite database at the project root (tilemap.db).  For "
+                    "PostgreSQL: postgresql://user:pass@host:5432/dbname",
+    )
     mode: DeploymentMode = Field(
         default=DeploymentMode.DEVELOPMENT,
         description="Deployment environment. 'production' enables stricter "
@@ -169,6 +200,7 @@ class Settings(BaseSettings):
     generation: GenerationSettings = Field(default_factory=GenerationSettings)
     leader: LeaderSettings = Field(default_factory=LeaderSettings)
     server: ServerSettings = Field(default_factory=ServerSettings)
+    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
 
     # ------------------------------------------------------------------
     #  Derived structural paths (never overridable — always relative to src/)

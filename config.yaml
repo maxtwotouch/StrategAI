@@ -45,6 +45,13 @@ server:
   cache_max_entries: 200
   cache_max_mb: 500
 
+# ---- Rate limiting (token-bucket, global) -----------------------------
+rate_limit:
+  post_rps: 2.0        # max POST (generation) requests per second
+  get_rps: 50.0        # max GET (read) requests per second
+  burst_size: 5         # max burst for POST before throttling
+  enabled: true
+
 # ---- Generation modes (per asset family) ------------------------------
 # Valid per-family: "comfyui" | "static" | "placeholder"
 #

@@ -206,15 +206,27 @@ class StaticTileEngine:
             filename = _load_and_save(path)
             elapsed = int((time.time() - start) * 1000)
             static_seed = req.seed if req.seed is not None else secrets.randbits(31)
-            _register_tile(
-                StructureRegistry.register,
-                asset_id=asset_id,
-                req=req,
-                image_id=filename,
-                seed=static_seed,
-                prompt_used=prompt,
-                generation_mode="static",
-            )
+            try:
+                with SessionLocal() as db:
+                    db.add(AssetRecord(
+                        id=filename,
+                        asset_family="structure",
+                        generation_mode="static",
+                    ))
+                    _register_tile(
+                        StructureRegistry.register,
+                        asset_id=asset_id,
+                        req=req,
+                        image_id=filename,
+                        seed=static_seed,
+                        prompt_used=prompt,
+                        generation_mode="static",
+                        session=db,
+                    )
+                    db.commit()
+            except Exception:
+                try_remove_asset(filename)
+                raise
             return _build_response(StructureResponse, req, asset_id, filename,
                                    prompt, "static", elapsed, f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
                                    seed=static_seed)
@@ -232,15 +244,27 @@ class StaticTileEngine:
             filename = _load_and_save(path)
             elapsed = int((time.time() - start) * 1000)
             static_seed = req.seed if req.seed is not None else secrets.randbits(31)
-            _register_tile(
-                ObjectRegistry.register,
-                asset_id=asset_id,
-                req=req,
-                image_id=filename,
-                seed=static_seed,
-                prompt_used=prompt,
-                generation_mode="static",
-            )
+            try:
+                with SessionLocal() as db:
+                    db.add(AssetRecord(
+                        id=filename,
+                        asset_family="object",
+                        generation_mode="static",
+                    ))
+                    _register_tile(
+                        ObjectRegistry.register,
+                        asset_id=asset_id,
+                        req=req,
+                        image_id=filename,
+                        seed=static_seed,
+                        prompt_used=prompt,
+                        generation_mode="static",
+                        session=db,
+                    )
+                    db.commit()
+            except Exception:
+                try_remove_asset(filename)
+                raise
             return _build_response(ObjectResponse, req, asset_id, filename,
                                    prompt, "static", elapsed, f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
                                    seed=static_seed)
@@ -325,13 +349,25 @@ class _PlaceholderTileEngine:
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
 
-        _register_tile(
-            registry_register,
-            asset_id=asset_id, req=req,
-            image_id=filename, seed=seed,
-            prompt_used=prompt,
-            generation_mode="placeholder",
-        )
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family=family,
+                    generation_mode="placeholder",
+                ))
+                _register_tile(
+                    registry_register,
+                    asset_id=asset_id, req=req,
+                    image_id=filename, seed=seed,
+                    prompt_used=prompt,
+                    generation_mode="placeholder",
+                    session=db,
+                )
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - start) * 1000)
         return _build_response(response_cls, req, asset_id, filename,

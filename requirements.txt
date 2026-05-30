@@ -1,4 +1,4 @@
-# This file is generated from pyproject.toml — pyproject.toml is the source of truth.
+# This file is auto-generated. pyproject.toml is the source of truth.
 # Install with: pip install -e .        (production)
 #                pip install -e ".[dev]"  (development + tests)
 fastapi>=0.100.0
@@ -11,5 +11,4 @@ sqlalchemy>=2.0.0
 httpx>=0.24.0
 websockets>=12.0
 python-dotenv>=1.0.0
-alembic==1.18.4
-alembic
+alembic>=1.13.0

@@ -29,12 +29,12 @@ class TestBackgroundTileEngine:
 
         engine = BackgroundTileEngine(mock_comfyui_client)
         req = _make_bg_tile_req(tile_type="grass")
-        filename, bg_tile_id, seed = await engine.generate(req.tile_type, seed=req.seed)
+        result = await engine.generate(req.tile_type, seed=req.seed)
 
-        assert isinstance(filename, str)
-        assert filename.endswith(".png")
+        assert isinstance(result.filename, str)
+        assert result.filename.endswith(".png")
         # Verify the image was saved to the store
-        assert test_store.get_image_bytes(filename) is not None
+        assert test_store.get_image_bytes(result.filename) is not None
 
     @pytest.mark.asyncio
     async def test_generate_water(self, mock_comfyui_client, test_store, monkeypatch):
@@ -44,10 +44,10 @@ class TestBackgroundTileEngine:
 
         engine = BackgroundTileEngine(mock_comfyui_client)
         req = _make_bg_tile_req(tile_type="water")
-        filename, bg_tile_id, seed = await engine.generate(req.tile_type, seed=req.seed)
+        result = await engine.generate(req.tile_type, seed=req.seed)
 
-        assert isinstance(filename, str)
-        assert test_store.get_image_bytes(filename) is not None
+        assert isinstance(result.filename, str)
+        assert test_store.get_image_bytes(result.filename) is not None
 
     @pytest.mark.asyncio
     async def test_invalid_tile_type_rejected(self, mock_comfyui_client, test_store, monkeypatch):
@@ -68,11 +68,11 @@ class TestStaticBackgroundTileEngine:
         monkeypatch.setattr("src.tile.background_engine.store", test_store)
 
         engine = StaticBackgroundTileEngine()
-        filename, bg_tile_id, seed = await engine.generate("water", seed=1)
+        result = await engine.generate("water", seed=1)
 
-        assert isinstance(filename, str)
-        assert filename.endswith(".png")
-        assert test_store.get_image_bytes(filename) is not None
+        assert isinstance(result.filename, str)
+        assert result.filename.endswith(".png")
+        assert test_store.get_image_bytes(result.filename) is not None
 
 
 class TestPlaceholderBackgroundTileEngine:
@@ -84,11 +84,11 @@ class TestPlaceholderBackgroundTileEngine:
         monkeypatch.setattr("src.tile.background_engine.store", test_store)
 
         engine = _PlaceholderBackgroundTileEngine()
-        filename, bg_tile_id, seed = await engine.generate("grass", seed=1)
+        result = await engine.generate("grass", seed=1)
 
-        assert isinstance(filename, str)
-        assert filename.endswith(".png")
-        pil_img = test_store.get_image_pil(filename)
+        assert isinstance(result.filename, str)
+        assert result.filename.endswith(".png")
+        pil_img = test_store.get_image_pil(result.filename)
         assert pil_img is not None
         assert pil_img.size == (128, 128)
         assert pil_img.mode == "RGBA"

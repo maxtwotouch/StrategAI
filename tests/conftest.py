@@ -15,7 +15,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from PIL import Image
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 
@@ -93,12 +93,27 @@ def test_settings(tmp_project_root, monkeypatch):
 def test_db(monkeypatch):
     """In-memory SQLite engine with all tables created.
 
+    Uses ``StaticPool`` so every session shares the same in-memory
+    database.  Foreign key enforcement is **disabled** in tests so
+    individual table tests don't need to create cascading records.
+    Production gets FK enforcement via the ``PRAGMA foreign_keys=ON``
+    event listener in ``src/database.py``.
+
     Monkeypatches src.database.engine and SessionLocal so all code
     that imports them uses the test database.
     """
-    from sqlalchemy.orm import declarative_base
+    from sqlalchemy.pool import StaticPool
 
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    # Disable FK enforcement in tests — tests work on individual tables
+    with engine.connect() as conn:
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.commit()
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     # Import Base and all models to ensure they're registered
@@ -222,6 +237,9 @@ async def async_client(test_db, monkeypatch, tmp_project_root):
         k: "placeholder" for k in config_mod.settings.generation.modes
     }
     config_mod.settings.generation.default_mode = "placeholder"
+
+    # Disable rate limiting during tests
+    config_mod.settings.rate_limit.enabled = False
 
     # 3. Ensure directories exist
     os.makedirs(os.path.join(tmp_project_root, "leader_references"), exist_ok=True)

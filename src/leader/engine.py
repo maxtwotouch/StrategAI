@@ -485,27 +485,31 @@ class StaticLeaderEngine:
         filename = f"{leader_id}_splash.png"
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_splash",
-                character_name=req.leader_name,
-                generation_mode="static",
-            ))
-            db.commit()
-
-        LeaderRegistry.register(
-            leader_id=leader_id,
-            leader_name=req.leader_name,
-            leader_description=req.leader_description,
-            archetype=req.archetype,
-            culture=req.culture,
-            time_of_day=req.time_of_day,
-            mood=req.mood,
-            splash_image_filename=filename,
-            splash_seed=seed,
-            splash_prompt=prompt,
-        )
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_splash",
+                    character_name=req.leader_name,
+                    generation_mode="static",
+                ))
+                LeaderRegistry.register(
+                    leader_id=leader_id,
+                    leader_name=req.leader_name,
+                    leader_description=req.leader_description,
+                    archetype=req.archetype,
+                    culture=req.culture,
+                    time_of_day=req.time_of_day,
+                    mood=req.mood,
+                    splash_image_filename=filename,
+                    splash_seed=seed,
+                    splash_prompt=prompt,
+                    session=db,
+                )
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -549,17 +553,20 @@ class StaticLeaderEngine:
         filename = f"{req.leader_id}_profile.png"
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_profile",
-                base_image_id=leader.splash_image_id,
-                character_name=req.leader_name,
-                generation_mode="static",
-            ))
-            db.commit()
-
-        LeaderRegistry.record_profile(req.leader_id, filename)
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_profile",
+                    base_image_id=leader.splash_image_id,
+                    character_name=req.leader_name,
+                    generation_mode="static",
+                ))
+                LeaderRegistry.record_profile(req.leader_id, filename, session=db)
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -613,18 +620,20 @@ class StaticLeaderEngine:
         filename = f"{req.leader_id}_action_{uuid.uuid4().hex[:6]}.png"
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_action",
-                base_image_id=leader.splash_image_id,
-                character_name=req.leader_name,
-                generation_mode="static",
-            ))
-            db.commit()
-
-        # Track action in registry
-        LeaderRegistry.record_action(req.leader_id, filename)
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_action",
+                    base_image_id=leader.splash_image_id,
+                    character_name=req.leader_name,
+                    generation_mode="static",
+                ))
+                LeaderRegistry.record_action(req.leader_id, filename, session=db)
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - start) * 1000)
 
@@ -679,14 +688,21 @@ class StaticLeaderEngine:
         filename = f"leader_multi_{asset_id}_action.png"
         store.save_image(filename, img)
 
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_action",
-                character_name=", ".join(leader_names),
-                generation_mode="static",
-            ))
-            db.commit()
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_action",
+                    character_name=", ".join(leader_names),
+                    generation_mode="static",
+                ))
+                # Link action to all participating leaders
+                for lid in leader_ids:
+                    LeaderRegistry.record_action(lid, filename, session=db)
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - t0) * 1000)
 

@@ -33,10 +33,10 @@
   },
   "6": {
     "inputs": {
-      "noise": ["13", 0],
-      "guider": ["10", 0],
-      "sampler": ["12", 0],
-      "sigmas": ["11", 0],
+      "noise": ["14", 0],
+      "guider": ["11", 0],
+      "sampler": ["13", 0],
+      "sigmas": ["12", 0],
       "latent_image": ["5", 0]
     },
     "class_type": "SamplerCustomAdvanced",

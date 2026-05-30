@@ -26,7 +26,7 @@
   },
   "5": {
     "inputs": {
-      "noise": ["4", 0],
+      "noise": ["13", 0],
       "guider": ["10", 0],
       "sampler": ["12", 0],
       "sigmas": ["11", 0],
@@ -90,6 +90,13 @@
     },
     "class_type": "KSamplerSelect",
     "_meta": {"title": "KSampler Select"}
+  },
+  "13": {
+    "inputs": {
+      "noise_seed": 0
+    },
+    "class_type": "RandomNoise",
+    "_meta": {"title": "Random Noise"}
   }
 }
 

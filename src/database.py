@@ -12,16 +12,25 @@ from sqlalchemy import (
     JSON,
     String,
     create_engine,
+    event,
     func,
     text,
 )
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 logger = logging.getLogger(__name__)
 
 # Place the database at the project root, not inside src/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'tilemap.db')}"
+
+# Import settings lazily to avoid circular imports — config.py imports nothing
+# from this module, so it is safe to import at the top.
+try:
+    from src.config import settings as _cfg
+    DATABASE_URL = getattr(_cfg, "database_url", None) or f"sqlite:///{os.path.join(BASE_DIR, 'tilemap.db')}"
+except Exception:
+    DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'tilemap.db')}"
 
 # Connection pool settings — conservative defaults for SQLite.
 # For PostgreSQL in production, increase pool_size (e.g. 20) and add
@@ -32,6 +41,24 @@ engine = create_engine(
     pool_size=5,
     max_overflow=10,
 )
+
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    """Enable foreign key enforcement on every new SQLite connection.
+
+    SQLite disables foreign keys by default.  Without this pragma ALL
+    ``ondelete=CASCADE`` / ``ondelete=SET NULL`` clauses are silently
+    ignored, leading to orphaned child rows and data integrity violations.
+
+    This is a no-op on PostgreSQL and other non-SQLite backends.
+    """
+    try:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+    except Exception:
+        pass  # Not SQLite — pragma not supported
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -208,15 +235,16 @@ def get_db() -> Generator[Session, None, None]:
 def verify_db_connectivity() -> bool:
     """Check that the database is reachable and all expected tables exist.
 
+    Uses SQLAlchemy's inspector API so the check is database-agnostic
+    (works with SQLite, PostgreSQL, MySQL, etc.).
+
     Returns True if the database is healthy, False otherwise.
     Called at startup by the application lifespan handler.
     """
+    from sqlalchemy import inspect as _sa_inspect
     try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("SELECT name FROM sqlite_master WHERE type='table'")
-            )
-            tables = {row[0] for row in result}
+        inspector = _sa_inspect(engine)
+        tables = set(inspector.get_table_names())
         expected = {
             "asset_records", "leader_records", "structure_records",
             "object_records", "terrain_records", "unit_records",
