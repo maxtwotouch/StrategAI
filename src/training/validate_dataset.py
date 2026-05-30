@@ -11,6 +11,8 @@ import yaml
 from PIL import Image
 
 
+
+
 def _read_yaml(path: Path) -> Dict[str, object]:
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
@@ -207,6 +209,8 @@ def _format_recommendation(rows_parsed: int, asset_counts: Counter, min_per_stra
 
 def main() -> int:
     args = parse_args()
+    from src.training import _check_runtime
+    _check_runtime()
 
     dataset_root = args.dataset_root.resolve()
     metadata_path = dataset_root / args.metadata_file

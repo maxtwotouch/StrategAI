@@ -32,6 +32,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List
 
+
+
 # ── Hard-coded defaults ────────────────────────────────────────────────
 
 DEFAULT_RATIOS = {
@@ -219,6 +221,8 @@ def write_output(
 
 def main() -> int:
     args = parse_args()
+    from src.training import _check_runtime
+    _check_runtime()
 
     metadata_path = args.metadata.resolve()
     dataset_root = args.dataset_root.resolve()

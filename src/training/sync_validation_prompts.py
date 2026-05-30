@@ -8,6 +8,8 @@ from typing import Any, Dict, List
 import yaml
 
 
+
+
 def _read_yaml(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
@@ -122,6 +124,8 @@ def collect_prompts_from_sidecar_txt(
 
 def main() -> int:
     args = parse_args()
+    from src.training import _check_runtime
+    _check_runtime()
 
     if args.max_prompts <= 0:
         print("[ERROR] --max-prompts must be a positive integer.")

@@ -45,6 +45,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    from src.generation import _check_runtime
+    _check_runtime()
+
     images_dir = args.images_dir.resolve()
     out_dir = args.out_dir.resolve()
 

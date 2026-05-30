@@ -27,6 +27,8 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+
+
 # ── Path defaults (relative to project root) ──────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "dataset" / "hf" / "images"
@@ -162,6 +164,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    from src.training import _check_runtime
+    _check_runtime()
+
     manifest_path = args.manifest.resolve()
     source_dir = args.source_dir.resolve()
 

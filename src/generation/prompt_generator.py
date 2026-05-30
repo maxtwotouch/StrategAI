@@ -4,8 +4,12 @@
 import argparse
 import json
 import random
+import sys
+import warnings
 from pathlib import Path
 from collections import defaultdict
+
+
 
 # ------------------------------------------------------------
 # STRUCTURES
@@ -323,14 +327,12 @@ def load_prompt_templates(path: Path) -> dict:
     # Warn if templates still use deprecated trigger / angle phrase
     for key, tmpl in templates.items():
         if "<sks>" in tmpl:
-            import warnings
             warnings.warn(
                 f"Template '{key}' contains deprecated trigger '<sks>'. "
                 f"The current trigger is '<tdp>'. Update config/prompt_templates.json.",
                 UserWarning,
             )
         if "front view overhead" in tmpl.lower():
-            import warnings
             warnings.warn(
                 f"Template '{key}' contains deprecated angle phrase 'front view overhead...'. "
                 f"The current angle phrase is 'top-down view.'. Update config/prompt_templates.json.",
@@ -489,10 +491,18 @@ def parse_args():
 
 def main():
     args = parse_args()
+    from src.generation import _check_runtime
+    _check_runtime()
+
+    templates_json_path = args.templates_json.resolve()
+    if not templates_json_path.is_file():
+        print(f"[ERROR] Required file not found: {templates_json_path} (prompt templates JSON)", file=sys.stderr)
+        print("        Make sure you are running from the project root.", file=sys.stderr)
+        raise SystemExit(1)
+
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     random.seed(args.seed)
-    templates_json_path = args.templates_json.resolve()
     templates = load_prompt_templates(templates_json_path)
 
     ratios = {

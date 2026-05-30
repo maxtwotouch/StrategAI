@@ -232,7 +232,16 @@ def parse_args():
 
 def main():
     args = parse_args()
+    from src.generation import _check_runtime
+    _check_runtime()
     random.seed(args.seed)
+
+    # ── Preflight: input files exist ───────────────────────────────
+    for fpath, label in [(args.workflow_api_json, "ComfyUI workflow JSON"), (args.prompt_data, "prompt data JSONL")]:
+        if not Path(fpath).is_file():
+            print(f"[ERROR] Required file not found: {fpath} ({label})", file=sys.stderr)
+            print("        Make sure you are running from the project root.", file=sys.stderr)
+            raise SystemExit(1)
 
     if args.guidance_randomize:
         if args.guidance_min > args.guidance_max:
