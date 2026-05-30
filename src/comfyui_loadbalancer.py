@@ -327,7 +327,8 @@ class ComfyUILoadBalancer:
         Fire-and-forget — if the node is dead this also fails silently.
         """
         try:
-            resp = await node.client.http.post(
+            http = await node.client.get_http()
+            resp = await http.post(
                 "/queue",
                 json={"delete": []},  # empty list = clear all
                 timeout=5,

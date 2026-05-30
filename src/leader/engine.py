@@ -28,25 +28,9 @@ from src.database import SessionLocal, AssetRecord
 from .models import LeaderRequest, LeaderResponse
 from .prompts import build_prompt, build_multi_action_prompt
 from .registry import LeaderRegistry, generate_leader_id
-from src.storage import store
+from src.storage import store, try_remove_asset
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-#  Helpers
-# ---------------------------------------------------------------------------
-
-
-def _try_remove_asset(filename: str) -> None:
-    """Best-effort cleanup of an orphaned image file after a DB failure."""
-    try:
-        path = os.path.join(BASE_DIR, settings.paths.output_dir, os.path.basename(filename))
-        if os.path.isfile(path):
-            os.unlink(path)
-            logger.warning("Cleaned up orphaned asset: %s", filename)
-    except Exception as exc:
-        logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
 
 
 class LeaderEngine:
@@ -125,7 +109,7 @@ class LeaderEngine:
                 db.commit()
         except Exception:
             # Clean up orphaned image file if DB persist fails
-            _try_remove_asset(filename)
+            try_remove_asset(filename)
             raise
 
         elapsed = int((time.time() - start) * 1000)
@@ -209,7 +193,7 @@ class LeaderEngine:
                 LeaderRegistry.record_profile(req.leader_id, filename, session=db)
                 db.commit()
         except Exception:
-            _try_remove_asset(filename)
+            try_remove_asset(filename)
             raise
 
         elapsed = int((time.time() - start) * 1000)
@@ -298,7 +282,7 @@ class LeaderEngine:
                 LeaderRegistry.record_action(req.leader_id, filename, session=db)
                 db.commit()
         except Exception:
-            _try_remove_asset(filename)
+            try_remove_asset(filename)
             raise
 
         elapsed = int((time.time() - start) * 1000)
@@ -358,15 +342,22 @@ class LeaderEngine:
         filename = f"leader_multi_{asset_id}_action.png"
         store.save_image(filename, img)
 
-        # Persist AssetRecord
-        with SessionLocal() as db:
-            db.add(AssetRecord(
-                id=filename,
-                asset_family="leader_action",
-                character_name=", ".join(leader_names),
-                generation_mode="comfyui",
-            ))
-            db.commit()
+        # Persist AssetRecord + link action to all participating leaders
+        try:
+            with SessionLocal() as db:
+                db.add(AssetRecord(
+                    id=filename,
+                    asset_family="leader_action",
+                    character_name=", ".join(leader_names),
+                    generation_mode="comfyui",
+                ))
+                # Link action to all participating leaders
+                for lid in leader_ids:
+                    LeaderRegistry.record_action(lid, filename, session=db)
+                db.commit()
+        except Exception:
+            try_remove_asset(filename)
+            raise
 
         elapsed = int((time.time() - t0) * 1000)
 

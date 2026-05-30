@@ -175,19 +175,25 @@ class UnitRecord(Base):
     created_at: DateTime = Column(DateTime, server_default=func.now(), index=True)  # type: ignore[assignment]
     updated_at: DateTime = Column(DateTime, server_default=func.now(), onupdate=func.now())  # type: ignore[assignment]
 
+
+class BackgroundTileRecord(Base):
+    """Tracks generated background tile assets with tile_type + seed metadata."""
+    __tablename__ = "background_tile_records"
+
+    background_tile_id: str = Column(String, primary_key=True)  # type: ignore[assignment]
+    tile_type: str = Column(String, nullable=False, index=True)  # type: ignore[assignment]
+    seed: int = Column(Integer, nullable=False)  # type: ignore[assignment]
+    image_id: str = Column(  # type: ignore[assignment]
+        String, ForeignKey("asset_records.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: DateTime = Column(DateTime, server_default=func.now())  # type: ignore[assignment]
+    updated_at: DateTime = Column(DateTime, server_default=func.now(), onupdate=func.now())  # type: ignore[assignment]
+
 # ---------------------------------------------------------------------------
-# PRODUCTION WARNING: Base.metadata.create_all() is a development convenience
-# that creates tables only if they don't exist.  It does NOT handle schema
-# changes (ALTER TABLE, column drops, renames).
-#
-# For production deployments you MUST use Alembic migrations:
-#   1. alembic init migrations
-#   2. alembic revision --autogenerate -m "initial"
-#   3. alembic upgrade head
-#
-# create_all() is retained here for zero-dependency development and testing.
+# Schema management is now handled by Alembic migrations.
+# ``alembic upgrade head`` runs automatically in the app lifespan (src/main.py).
 # ---------------------------------------------------------------------------
-Base.metadata.create_all(bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -214,6 +220,7 @@ def verify_db_connectivity() -> bool:
         expected = {
             "asset_records", "leader_records", "structure_records",
             "object_records", "terrain_records", "unit_records",
+            "background_tile_records",
         }
         missing = expected - tables
         if missing:
@@ -287,13 +294,28 @@ def verify_schema_health() -> tuple[bool, list[str]]:
 
 
 def reset_database() -> None:
-    """Drop all tables and recreate them from the current model definitions.
+    """Drop all tables and recreate them from Alembic migrations.
 
     **Destructive** — all data is lost.  Intended for development and as
-    an escape hatch when the schema has diverged and no migration system
-    is in place.
+    an escape hatch when the schema has diverged.
     """
+    import os
     logger.warning("Resetting database — dropping all tables and recreating.")
     Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database reset complete — all tables recreated from models.")
+    # Use create_all for in-memory SQLite (tests); Alembic for persistent DBs
+    engine_url = str(engine.url)
+    if ":memory:" in engine_url or engine_url == "sqlite://":
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database reset complete — tables recreated via create_all (in-memory).")
+    else:
+        try:
+            from alembic.config import Config as AlembicConfig
+            from alembic import command as alembic_command
+            alembic_cfg = AlembicConfig(os.path.join(BASE_DIR, "alembic.ini"))
+            alembic_cfg.set_main_option("sqlalchemy.url", engine_url)
+            alembic_command.upgrade(alembic_cfg, "head")
+            logger.info("Database reset complete — all tables recreated via Alembic migrations.")
+        except Exception as exc:
+            logger.warning("Alembic migration failed (%s), falling back to create_all.", exc)
+            Base.metadata.create_all(bind=engine)
+            logger.info("Database reset complete — all tables recreated via create_all.")

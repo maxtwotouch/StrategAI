@@ -29,7 +29,7 @@ class TestBackgroundTileEngine:
 
         engine = BackgroundTileEngine(mock_comfyui_client)
         req = _make_bg_tile_req(tile_type="grass")
-        filename = await engine.generate(req.tile_type, seed=req.seed)
+        filename, bg_tile_id, seed = await engine.generate(req.tile_type, seed=req.seed)
 
         assert isinstance(filename, str)
         assert filename.endswith(".png")
@@ -44,7 +44,7 @@ class TestBackgroundTileEngine:
 
         engine = BackgroundTileEngine(mock_comfyui_client)
         req = _make_bg_tile_req(tile_type="water")
-        filename = await engine.generate(req.tile_type, seed=req.seed)
+        filename, bg_tile_id, seed = await engine.generate(req.tile_type, seed=req.seed)
 
         assert isinstance(filename, str)
         assert test_store.get_image_bytes(filename) is not None
@@ -68,7 +68,7 @@ class TestStaticBackgroundTileEngine:
         monkeypatch.setattr("src.tile.background_engine.store", test_store)
 
         engine = StaticBackgroundTileEngine()
-        filename = await engine.generate("water", seed=1)
+        filename, bg_tile_id, seed = await engine.generate("water", seed=1)
 
         assert isinstance(filename, str)
         assert filename.endswith(".png")
@@ -84,7 +84,7 @@ class TestPlaceholderBackgroundTileEngine:
         monkeypatch.setattr("src.tile.background_engine.store", test_store)
 
         engine = _PlaceholderBackgroundTileEngine()
-        filename = await engine.generate("grass", seed=1)
+        filename, bg_tile_id, seed = await engine.generate("grass", seed=1)
 
         assert isinstance(filename, str)
         assert filename.endswith(".png")

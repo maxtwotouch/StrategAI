@@ -38,11 +38,22 @@ def _atomic_write(path: str, data: bytes) -> None:
 
 
 class AssetStore:
-    def __init__(self, max_cache_size: int | None = None):
-        self._memory_cache = OrderedDict()
+    def __init__(self, max_cache_size: int | None = None, max_cache_bytes: int | None = None):
+        self._memory_cache: OrderedDict[str, bytes] = OrderedDict()
         self.max_cache_size = max_cache_size if max_cache_size is not None else settings.server.cache_max_entries
+        self.max_cache_bytes = max_cache_bytes if max_cache_bytes is not None else (settings.server.cache_max_mb * 1024 * 1024)
+        self._cache_bytes: int = 0
         self._lock = threading.Lock()
         self._output_dir = os.path.join(BASE_DIR, settings.paths.output_dir)
+
+    def _evict_if_needed(self) -> None:
+        """Evict oldest entries until both limits are satisfied."""
+        while self._memory_cache and (
+            len(self._memory_cache) > self.max_cache_size
+            or self._cache_bytes > self.max_cache_bytes
+        ):
+            _, evicted = self._memory_cache.popitem(last=False)
+            self._cache_bytes -= len(evicted)
 
     def save_image(self, filename: str, img: Image.Image):
         """Saves the image to both the in-memory cache and local disk.
@@ -69,10 +80,8 @@ class AssetStore:
         with self._lock:
             self._memory_cache[filename] = data
             self._memory_cache.move_to_end(filename)
-
-            # Enforce LRU cap
-            if len(self._memory_cache) > self.max_cache_size:
-                self._memory_cache.popitem(last=False)
+            self._cache_bytes += len(data)
+            self._evict_if_needed()
 
         logger.info("Saved %s to memory cache and disk.", filename)
 
@@ -91,10 +100,8 @@ class AssetStore:
             with self._lock:
                 self._memory_cache[filename] = data
                 self._memory_cache.move_to_end(filename)
-
-                # Enforce LRU cap
-                if len(self._memory_cache) > self.max_cache_size:
-                    self._memory_cache.popitem(last=False)
+                self._cache_bytes += len(data)
+                self._evict_if_needed()
 
             logger.info("Loaded %s from disk into memory cache.", filename)
             return data
@@ -135,9 +142,27 @@ class AssetStore:
 
         # Memory cache cleanup
         with self._lock:
-            self._memory_cache.pop(filename, None)
+            if filename in self._memory_cache:
+                self._cache_bytes -= len(self._memory_cache[filename])
+                del self._memory_cache[filename]
 
         return existed
+
+
+def try_remove_asset(filename: str) -> None:
+    """Best-effort deletion of an orphaned asset file after a DB failure.
+
+    Uses ``BASE_DIR`` for consistent path resolution across all engines.
+    All engine callers should import and use this shared helper.
+    """
+    path = os.path.join(BASE_DIR, settings.paths.output_dir, os.path.basename(filename))
+    try:
+        if os.path.isfile(path):
+            os.unlink(path)
+            logger.warning("Cleaned up orphaned asset: %s", filename)
+    except Exception as exc:
+        logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
+
 
 # Global instance
 store = AssetStore()

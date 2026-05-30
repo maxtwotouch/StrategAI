@@ -6,9 +6,10 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from src.config import settings, DeploymentMode
 from src.database import SessionLocal, AssetRecord, verify_db_connectivity, verify_schema_health, reset_database
@@ -33,6 +34,7 @@ from src.tile.background_engine import (
     BackgroundTileEngine, StaticBackgroundTileEngine,
     GAME_ASSET_SIZE as BG_ASSET_SIZE,
 )
+from src.tile.background_registry import BackgroundTileRegistry
 from src.tile.background_models import (
     BackgroundTileRequest, BackgroundTileResponse, BackgroundTileCatalog,
 )
@@ -51,6 +53,18 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+#  Shared response models
+# ---------------------------------------------------------------------------
+
+
+class DeleteResponse(BaseModel):
+    """Standard response for all DELETE endpoints."""
+    status: str = "deleted"
+    id: str
+    asset_type: str
+
 
 # Leader engine (initialized in lifespan — comfyui or static mode)
 leader_engine: LeaderEngine | StaticLeaderEngine | None = None
@@ -102,6 +116,21 @@ async def lifespan(app: FastAPI):
 
     # --- Database initialisation ---
     global _db_schema_ok
+
+    # --- Run database migrations (Alembic) ---
+    from alembic.config import Config as AlembicConfig
+    from alembic import command as alembic_command
+    from src.database import DATABASE_URL, BASE_DIR
+
+    alembic_cfg = AlembicConfig(os.path.join(BASE_DIR, "alembic.ini"))
+    alembic_cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
+    try:
+        alembic_command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied successfully")
+    except Exception as exc:
+        logger.critical("Database migration failed: %s", exc)
+        _db_schema_ok = False
+        raise
 
     # Optional full reset (escape hatch when schema has diverged)
     if os.environ.get("DATABASE_RESET", "").lower() in ("1", "true", "yes"):
@@ -433,10 +462,13 @@ async def generate_leader(request: LeaderRequest):
 
 
 @app.get("/leader", response_model=list[LeaderInfo])
-async def list_leaders():
+async def list_leaders(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Return all registered leaders. Parallels GET /catalog."""
     _require_db()
-    records = LeaderRegistry.list_all()
+    records = LeaderRegistry.list_all(limit=limit, offset=offset)
     return [
         LeaderInfo(
             leader_id=r.leader_id,
@@ -473,14 +505,14 @@ async def get_leader(leader_id: str):
     )
 
 
-@app.delete("/leader/{leader_id}")
+@app.delete("/leader/{leader_id}", response_model=DeleteResponse)
 async def delete_leader(leader_id: str):
     """Remove a leader and their reference image. Generated assets remain on disk."""
     _require_db()
     deleted = LeaderRegistry.delete(leader_id)
     if not deleted:
         raise HTTPException(404, f"Leader '{leader_id}' not found")
-    return {"status": "deleted", "leader_id": leader_id}
+    return DeleteResponse(status="deleted", id=leader_id, asset_type="leader")
 
 
 # ---------------------------------------------------------------------------
@@ -514,10 +546,13 @@ async def generate_structure(request: StructureRequest):
 
 
 @app.get("/structure", response_model=list[StructureResponse])
-async def list_structures():
+async def list_structures(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Return all generated structures."""
     _require_db()
-    records = StructureRegistry.list_all()
+    records = StructureRegistry.list_all(limit=limit, offset=offset)
     return [
         StructureResponse(
             url=f"/assets/{r.image_id}",
@@ -526,6 +561,7 @@ async def list_structures():
             style=r.style,
             condition=r.condition,
             scale=r.scale,
+            description=r.description,
             seed=r.seed,
             generation_mode=r.generation_mode or "unknown",
             prompt_used=r.prompt_used,
@@ -559,20 +595,21 @@ async def get_structure(structure_id: str):
         style=record.style,
         condition=record.condition,
         scale=record.scale,
+        description=record.description,
         seed=record.seed,
         generation_mode=record.generation_mode or "unknown",
         prompt_used=record.prompt_used,
     )
 
 
-@app.delete("/structure/{structure_id}")
+@app.delete("/structure/{structure_id}", response_model=DeleteResponse)
 async def delete_structure(structure_id: str):
     """Remove a structure record. Generated asset remains on disk."""
     _require_db()
     deleted = StructureRegistry.delete(structure_id)
     if not deleted:
         raise HTTPException(404, f"Structure '{structure_id}' not found")
-    return {"status": "deleted", "structure_id": structure_id}
+    return DeleteResponse(status="deleted", id=structure_id, asset_type="structure")
 
 
 @app.post("/object", response_model=ObjectResponse)
@@ -601,10 +638,13 @@ async def generate_object(request: ObjectRequest):
 
 
 @app.get("/object", response_model=list[ObjectResponse])
-async def list_objects():
+async def list_objects(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Return all generated objects."""
     _require_db()
-    records = ObjectRegistry.list_all()
+    records = ObjectRegistry.list_all(limit=limit, offset=offset)
     return [
         ObjectResponse(
             url=f"/assets/{r.image_id}",
@@ -612,6 +652,7 @@ async def list_objects():
             category=r.category,
             biome=r.biome,
             season=r.season,
+            description=r.description,
             seed=r.seed,
             generation_mode=r.generation_mode or "unknown",
             prompt_used=r.prompt_used,
@@ -643,20 +684,21 @@ async def get_object(object_id: str):
         category=record.category,
         biome=record.biome,
         season=record.season,
+        description=record.description,
         seed=record.seed,
         generation_mode=record.generation_mode or "unknown",
         prompt_used=record.prompt_used,
     )
 
 
-@app.delete("/object/{object_id}")
+@app.delete("/object/{object_id}", response_model=DeleteResponse)
 async def delete_object(object_id: str):
     """Remove an object record. Generated asset remains on disk."""
     _require_db()
     deleted = ObjectRegistry.delete(object_id)
     if not deleted:
         raise HTTPException(404, f"Object '{object_id}' not found")
-    return {"status": "deleted", "object_id": object_id}
+    return DeleteResponse(status="deleted", id=object_id, asset_type="object")
 
 
 @app.post("/terrain", response_model=TerrainResponse)
@@ -685,10 +727,13 @@ async def generate_terrain(request: TerrainRequest):
 
 
 @app.get("/terrain", response_model=list[TerrainResponse])
-async def list_terrains():
+async def list_terrains(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Return all generated terrains."""
     _require_db()
-    records = TerrainRegistry.list_all()
+    records = TerrainRegistry.list_all(limit=limit, offset=offset)
     return [
         TerrainResponse(
             url=f"/assets/{r.image_id}",
@@ -696,6 +741,7 @@ async def list_terrains():
             category=r.category,
             scale=r.scale,
             material=r.material,
+            description=r.description,
             seed=r.seed,
             generation_mode=r.generation_mode or "unknown",
             prompt_used=r.prompt_used,
@@ -727,20 +773,21 @@ async def get_terrain(terrain_id: str):
         category=record.category,
         scale=record.scale,
         material=record.material,
+        description=record.description,
         seed=record.seed,
         generation_mode=record.generation_mode or "unknown",
         prompt_used=record.prompt_used,
     )
 
 
-@app.delete("/terrain/{terrain_id}")
+@app.delete("/terrain/{terrain_id}", response_model=DeleteResponse)
 async def delete_terrain(terrain_id: str):
     """Remove a terrain record. Generated asset remains on disk."""
     _require_db()
     deleted = TerrainRegistry.delete(terrain_id)
     if not deleted:
         raise HTTPException(404, f"Terrain '{terrain_id}' not found")
-    return {"status": "deleted", "terrain_id": terrain_id}
+    return DeleteResponse(status="deleted", id=terrain_id, asset_type="terrain")
 
 
 @app.post("/unit", response_model=UnitResponse)
@@ -778,10 +825,13 @@ async def generate_unit(request: UnitRequest):
 
 
 @app.get("/unit", response_model=list[UnitResponse])
-async def list_units():
+async def list_units(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
     """Return all generated units."""
     _require_db()
-    records = UnitRegistry.list_all()
+    records = UnitRegistry.list_all(limit=limit, offset=offset)
     return [
         UnitResponse(
             url=f"/assets/{r.image_id}",
@@ -822,14 +872,14 @@ async def get_unit(unit_id: str):
     )
 
 
-@app.delete("/unit/{unit_id}")
+@app.delete("/unit/{unit_id}", response_model=DeleteResponse)
 async def delete_unit(unit_id: str):
     """Remove a unit record. Generated assets remain on disk."""
     _require_db()
     deleted = UnitRegistry.delete(unit_id)
     if not deleted:
         raise HTTPException(404, f"Unit '{unit_id}' not found")
-    return {"status": "deleted", "unit_id": unit_id}
+    return DeleteResponse(status="deleted", id=unit_id, asset_type="unit")
 
 
 # ---------------------------------------------------------------------------
@@ -851,18 +901,18 @@ async def generate_background_tile(request: BackgroundTileRequest):
         raise HTTPException(503, "Background tile generation not available (ComfyUI unreachable)")
 
     try:
-        # Build prompt (same logic as in BackgroundTileEngine.generate)
         prompt = _render("background_tile", tile_type=request.tile_type)
         seed = request.seed if request.seed is not None else secrets.randbits(31)
 
         t0 = time.time()
-        filename = await background_tile_engine.generate(request.tile_type, seed)
+        filename, bg_tile_id, seed = await background_tile_engine.generate(request.tile_type, seed)
 
         elapsed = int((time.time() - t0) * 1000)
         logger.info("Background tile '%s' generated in %dms → %s", request.tile_type, elapsed, filename)
 
         return BackgroundTileResponse(
             url=f"/assets/{filename}",
+            background_tile_id=bg_tile_id,
             tile_type=request.tile_type,
             seed=seed,
             generation_mode=settings.get_mode("background_tile"),
@@ -883,25 +933,29 @@ async def generate_background_tile(request: BackgroundTileRequest):
 
 
 @app.get("/background_tile", response_model=list[BackgroundTileResponse])
-async def list_background_tiles():
-    """Return all generated background tiles (from AssetRecord)."""
+async def list_background_tiles(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """Return all generated background tiles (paginated)."""
     _require_db()
+    records = BackgroundTileRegistry.list_all(limit=limit, offset=offset)
+    results = []
+    for r in records:
+        results.append(BackgroundTileResponse(
+            url=f"/assets/{r.image_id}",
+            background_tile_id=r.background_tile_id,
+            tile_type=r.tile_type,
+            seed=r.seed,
+            generation_mode="unknown",  # populated from AssetRecord if needed
+        ))
+    # Enrich with generation_mode from AssetRecord
     with SessionLocal() as db:
-        records = (
-            db.query(AssetRecord)
-            .filter(AssetRecord.asset_family == "background_tile")
-            .order_by(AssetRecord.created_at.desc())
-            .all()
-        )
-    return [
-        BackgroundTileResponse(
-            url=f"/assets/{r.id}",
-            tile_type=r.tile_type or "unknown",
-            seed=0,  # not stored in AssetRecord
-            generation_mode=r.generation_mode or "unknown",
-        )
-        for r in records
-    ]
+        for i, r in enumerate(records):
+            asset = db.query(AssetRecord).filter(AssetRecord.id == r.image_id).first()
+            if asset:
+                results[i].generation_mode = asset.generation_mode or "unknown"
+    return results
 
 
 @app.get("/background_tile/catalog", response_model=BackgroundTileCatalog)
@@ -912,14 +966,33 @@ async def background_tile_catalog():
     )
 
 
-@app.delete("/background_tile/{filename}")
-async def delete_background_tile(filename: str):
+@app.get("/background_tile/{background_tile_id}", response_model=BackgroundTileResponse)
+async def get_background_tile(background_tile_id: str):
+    """Get a specific background tile by ID."""
+    _require_db()
+    record = BackgroundTileRegistry.get(background_tile_id)
+    if not record:
+        raise HTTPException(404, f"Background tile '{background_tile_id}' not found")
+    # Get generation_mode from AssetRecord
+    generation_mode = "unknown"
+    with SessionLocal() as db:
+        asset = db.query(AssetRecord).filter(AssetRecord.id == record.image_id).first()
+        if asset:
+            generation_mode = asset.generation_mode or "unknown"
+    return BackgroundTileResponse(
+        url=f"/assets/{record.image_id}",
+        background_tile_id=record.background_tile_id,
+        tile_type=record.tile_type,
+        seed=record.seed,
+        generation_mode=generation_mode,
+    )
+
+
+@app.delete("/background_tile/{background_tile_id}")
+async def delete_background_tile(background_tile_id: str):
     """Remove a background tile record. Generated asset remains on disk."""
     _require_db()
-    with SessionLocal() as db:
-        record = db.query(AssetRecord).filter(AssetRecord.id == filename).first()
-        if not record:
-            raise HTTPException(404, f"Background tile '{filename}' not found")
-        db.delete(record)
-        db.commit()
-    return {"status": "deleted", "filename": filename}
+    deleted = BackgroundTileRegistry.delete(background_tile_id)
+    if not deleted:
+        raise HTTPException(404, f"Background tile '{background_tile_id}' not found")
+    return DeleteResponse(status="deleted", id=background_tile_id, asset_type="background_tile")

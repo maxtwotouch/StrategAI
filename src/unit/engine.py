@@ -31,27 +31,9 @@ from .models import UnitRequest, UnitResponse, UnitType
 from .prompts import build_unit_prompt
 from .registry import generate_unit_id, UnitRegistry
 from src.static_catalog import catalog as static_catalog
-from src.storage import store
+from src.storage import store, try_remove_asset
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-#  Helpers
-# ---------------------------------------------------------------------------
-
-
-def _try_remove_asset(filename: str) -> None:
-    """Best-effort cleanup of an orphaned image file after a DB failure."""
-    try:
-        path = os.path.join(settings.paths.output_dir, os.path.basename(filename))
-        full = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path
-        ) if not os.path.isabs(path) else path
-        if os.path.isfile(full):
-            os.unlink(full)
-            logger.warning("Cleaned up orphaned asset: %s", filename)
-    except Exception as exc:
-        logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +101,7 @@ class UnitEngine:
                 )
                 db.commit()
         except Exception:
-            _try_remove_asset(filename)
+            try_remove_asset(filename)
             raise
 
         elapsed = int((time.time() - start) * 1000)

@@ -37,6 +37,14 @@ paths:
   static_tiles_dir: "static_tiles"
   leader_reference_dir: "leader_references"
 
+# ---- HTTP server ------------------------------------------------------
+server:
+  cors_origins:
+    - "http://localhost:3000"
+  max_request_body_mb: 10
+  cache_max_entries: 200
+  cache_max_mb: 500
+
 # ---- Generation modes (per asset family) ------------------------------
 # Valid per-family: "comfyui" | "static" | "placeholder"
 #

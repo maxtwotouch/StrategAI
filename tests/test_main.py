@@ -946,28 +946,26 @@ class TestBackgroundTileEndpoints:
 
     @pytest.mark.asyncio
     async def test_delete_background_tile(self, async_client):
-        """DELETE /background_tile/{filename} removes record."""
+        """DELETE /background_tile/{background_tile_id} removes record."""
         gen_resp = await async_client.post("/background_tile", json={
             "tile_type": "grass",
         })
         assert gen_resp.status_code == 200, f"POST failed: {gen_resp.text}"
         data = gen_resp.json()
-        url = data["url"]
-        assert url.startswith("/assets/"), f"Unexpected URL: {url}"
-        filename = url.split("/")[-1]
+        bg_tile_id = data["background_tile_id"]
 
-        resp = await async_client.delete(f"/background_tile/{filename}")
-        assert resp.status_code == 200, f"DELETE failed for {filename}: {resp.text}"
+        resp = await async_client.delete(f"/background_tile/{bg_tile_id}")
+        assert resp.status_code == 200, f"DELETE failed for {bg_tile_id}: {resp.text}"
         assert resp.json()["status"] == "deleted"
 
         # Verify gone — second delete should 404
-        resp2 = await async_client.delete(f"/background_tile/{filename}")
+        resp2 = await async_client.delete(f"/background_tile/{bg_tile_id}")
         assert resp2.status_code == 404
 
     @pytest.mark.asyncio
     async def test_delete_background_tile_not_found(self, async_client):
         """DELETE nonexistent background tile → 404."""
-        resp = await async_client.delete("/background_tile/nonexistent_file.png")
+        resp = await async_client.delete("/background_tile/nonexistent_bg_id")
         assert resp.status_code == 404
 
 

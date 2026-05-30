@@ -102,7 +102,7 @@ def test_db(monkeypatch):
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     # Import Base and all models to ensure they're registered
-    from src.database import Base, AssetRecord, LeaderRecord, StructureRecord, ObjectRecord, TerrainRecord, UnitRecord
+    from src.database import Base, AssetRecord, LeaderRecord, StructureRecord, ObjectRecord, TerrainRecord, UnitRecord, BackgroundTileRecord
 
     Base.metadata.create_all(bind=engine)
 
@@ -111,6 +111,7 @@ def test_db(monkeypatch):
     monkeypatch.setattr("src.database.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.leader.registry.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.tile.registry.SessionLocal", SessionLocal)
+    monkeypatch.setattr("src.tile.background_registry.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.unit.registry.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.tile.engine.SessionLocal", SessionLocal)
     monkeypatch.setattr("src.tile.background_engine.SessionLocal", SessionLocal)

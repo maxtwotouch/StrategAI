@@ -251,7 +251,10 @@ class TestFailover:
         # Return a MagicMock (not AsyncMock) to avoid "never awaited" warnings
         # since raise_for_status() is a sync method on the response object.
         cancel_mock.return_value = MagicMock()
-        lb._nodes[0].client.http.post = cancel_mock
+        # Mock get_http() to return a mock client whose .post is our cancel_mock
+        mock_http = MagicMock()
+        mock_http.post = cancel_mock
+        lb._nodes[0].client.get_http = AsyncMock(return_value=mock_http)
 
         await lb.generate("workflow.json")
 

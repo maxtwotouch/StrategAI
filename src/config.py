@@ -119,9 +119,8 @@ class ServerSettings(BaseModel):
         default=500,
         gt=0,
         le=16384,
-        description="Approximate maximum memory (MB) for the in-memory image cache. "
-                    "Eviction is still entry-count-based, but this provides a "
-                    "guideline for sizing.  Reduce if RAM is constrained.",
+        description="Maximum memory (MB) for the in-memory image cache. "
+                    "Images are evicted when either this limit or cache_max_entries is exceeded.",
     )
 
 

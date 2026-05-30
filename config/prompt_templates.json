@@ -3,16 +3,16 @@
   "schema_version": 3,
   "templates": {
     "structure": {
-      "template": "<tdp> Top-down overhead view. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
     },
     "object": {
-      "template": "<tdp> Top-down overhead view. The object is viewed from directly above, showing its top surface. The object blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. The object is viewed from directly above, showing its top surface. The object blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. Grounded stable perspective."
     },
     "terrain": {
-      "template": "<tdp> Top-down overhead view. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective."
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective."
     },
     "unit": {
-      "template": "<tdp> Top-down overhead view. pixel art top-down 2d game character sprite, {unit_archetype}, {description}, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset"
+      "template": "<tdp> Front view overhead shot elevated shot medium shot. pixel art top-down 2d game character sprite, {unit_archetype}, {description}, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset"
     },
     "background_tile": {
       "template": "top-down seamless repeating {tile_type} ground texture, seamless tiling pattern, fills entire frame edge to edge, consistent texture density across whole image, top-down orthographic view, flat ground plane, crisp pixel edges sharp blocky pixels"

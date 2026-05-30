@@ -145,6 +145,10 @@ class ComfyUIClient:
         seed: int | None = None,
         width: int | None = None,
         height: int | None = None,
+        cfg_guidance: float | None = None,
+        steps: int | None = None,
+        denoise: float | None = None,
+        sampler: str | None = None,
         input_images: dict[str, Image.Image] | None = None,
         extra_overrides: dict[str, Any] | None = None,
         ref_image_filename: str | None = None,
@@ -161,10 +165,19 @@ class ComfyUIClient:
         positive_prompt:
             Text prompt to inject into CLIPTextEncode nodes.
         seed:
-            Injected into ``KSampler.seed`` or ``SamplerCustomAdvanced.noise_seed``.
-            Random if None.
+            Injected into ``SamplerCustomAdvanced.noise_seed`` and
+            ``RandomNoise.noise_seed``.  Random if None.
         width / height:
-            Injected into ``EmptyLatentImage`` or ``EmptyFlux2LatentImage`` if present.
+            Injected into ``EmptyFlux2LatentImage`` if present.
+        cfg_guidance:
+            Injected into ``CFGGuider.cfg``.  Default 3.5 if None.
+        steps:
+            Injected into ``Flux2Scheduler.steps``.  Default 4 if None.
+        denoise:
+            Injected into ``Flux2Scheduler.denoise``.  Default 1.0 (txt2img)
+            if None; use 0.30 for profile, 0.60 for action.
+        sampler:
+            Injected into ``KSamplerSelect.sampler_name``.  Default "euler".
         input_images:
             Mapping of node_id → PIL Image to upload before queueing.
         extra_overrides:
@@ -199,6 +212,10 @@ class ComfyUIClient:
             seed=seed,
             width=width,
             height=height,
+            cfg_guidance=cfg_guidance,
+            steps=steps,
+            denoise=denoise,
+            sampler=sampler,
             uploaded_filenames=uploaded,
             extra_overrides=extra_overrides,
             ref_image_filename=ref_image_filename,
@@ -262,7 +279,8 @@ class ComfyUIClient:
         pil_image.save(buf, format="PNG")
         buf.seek(0)
 
-        resp = await self.http.post(
+        http = await self.get_http()
+        resp = await http.post(
             "/upload/image",
             files={"image": (filename, buf, "image/png")},
             data={"overwrite": "true"},
@@ -285,7 +303,8 @@ class ComfyUIClient:
         pil_image.save(buf, format="PNG")
         buf.seek(0)
 
-        resp = await self.http.post(
+        http = await self.get_http()
+        resp = await http.post(
             "/upload/image",
             files={"image": (filename, buf, "image/png")},
             data={"overwrite": "true", "type": "input"},
@@ -298,7 +317,8 @@ class ComfyUIClient:
     async def queue_workflow(self, workflow: dict) -> str:
         """Submit a workflow JSON.  Returns the ``prompt_id``."""
         client_id = str(uuid.uuid4())
-        resp = await self.http.post(
+        http = await self.get_http()
+        resp = await http.post(
             "/prompt",
             json={"prompt": workflow, "client_id": client_id},
             timeout=15,
@@ -330,7 +350,8 @@ class ComfyUIClient:
 
     async def get_result(self, prompt_id: str) -> dict:
         """``GET /history/{prompt_id}`` → parsed output dict."""
-        resp = await self.http.get(f"/history/{prompt_id}", timeout=self.timeout)
+        http = await self.get_http()
+        resp = await http.get(f"/history/{prompt_id}", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
@@ -342,14 +363,16 @@ class ComfyUIClient:
     ) -> bytes:
         """``GET /view`` → raw PNG bytes."""
         params = {"filename": filename, "subfolder": subfolder, "type": folder_type}
-        resp = await self.http.get("/view", params=params, timeout=30)
+        http = await self.get_http()
+        resp = await http.get("/view", params=params, timeout=30)
         resp.raise_for_status()
         return resp.content
 
     async def health_check(self) -> bool:
         """Ping ComfyUI.  Returns ``True`` if reachable."""
         try:
-            resp = await self.http.get("/system_stats", timeout=5)
+            http = await self.get_http()
+            resp = await http.get("/system_stats", timeout=5)
             return resp.status_code == 200
         except Exception:
             return False
@@ -357,7 +380,8 @@ class ComfyUIClient:
     async def cancel_prompt(self, prompt_id: str) -> bool:
         """Cancel a queued or running prompt.  Returns ``True`` if successful."""
         try:
-            resp = await self.http.post(
+            http = await self.get_http()
+            resp = await http.post(
                 "/queue",
                 json={"delete": [prompt_id]},
                 timeout=10,
@@ -373,7 +397,8 @@ class ComfyUIClient:
         or ``None`` if the node is unreachable.
         """
         try:
-            resp = await self.http.get("/queue", timeout=min(self.timeout, 15))
+            http = await self.get_http()
+            resp = await http.get("/queue", timeout=min(self.timeout, 15))
             resp.raise_for_status()
             body = resp.json()
             running = body.get("queue_running", [])
@@ -466,7 +491,8 @@ async def _cleanup_uploaded_images(
     """Best-effort deletion of uploaded images from ComfyUI's input/ folder."""
     for fname in filenames:
         try:
-            await client.http.post(
+            http = await client.get_http()
+            await http.post(
                 "/api/delete/image",
                 json={"filename": fname},
                 timeout=10,
@@ -563,21 +589,27 @@ def _patch_workflow(
     seed: int | None = None,
     width: int | None = None,
     height: int | None = None,
+    cfg_guidance: float | None = None,
+    steps: int | None = None,
+    denoise: float | None = None,
+    sampler: str | None = None,
     uploaded_filenames: dict[str, str] | None = None,
     extra_overrides: dict[str, Any] | None = None,
     ref_image_filename: str | None = None,
 ) -> dict:
     """Walk every node and replace common input parameters.
 
-    Supports both SDXL/standard workflows (KSampler) and Flux2 Klein
-    workflows (SamplerCustomAdvanced).  Node identification is by
-    ``class_type``:
+    Supports Flux2 Klein workflows (SamplerCustomAdvanced).
+    Node identification is by ``class_type``:
 
     - ``CLIPTextEncode`` → positive prompt
-    - ``KSampler`` → seed (standard SDXL workflows)
     - ``SamplerCustomAdvanced`` → noise_seed (Flux2 Klein workflows)
-    - ``EmptyLatentImage`` / ``EmptyFlux2LatentImage`` → width / height
+    - ``EmptyFlux2LatentImage`` → width / height
     - ``LoadImage`` → uploaded image or reference filename
+    - ``CFGGuider`` → cfg
+    - ``Flux2Scheduler`` → steps, denoise
+    - ``KSamplerSelect`` → sampler_name
+    - ``RandomNoise`` → noise_seed (img2img workflows)
     """
     if seed is None:
         seed = secrets.randbits(32)  # cryptographically secure, 0..2^32-1
@@ -593,22 +625,10 @@ def _patch_workflow(
             if positive_prompt is not None:
                 inputs["text"] = positive_prompt
 
-        # --- Seed: standard KSampler (SDXL workflows) ---
-        if ct == "KSampler":
-            if "seed" in inputs:
-                inputs["seed"] = seed
-
         # --- Seed: Flux2 Klein (SamplerCustomAdvanced + noise_seed) ---
         if ct == "SamplerCustomAdvanced":
             if "noise_seed" in inputs:
                 inputs["noise_seed"] = seed
-
-        # --- Latent dimensions — standard EmptyLatentImage ---
-        if ct == "EmptyLatentImage":
-            if width is not None:
-                inputs["width"] = width
-            if height is not None:
-                inputs["height"] = height
 
         # --- Latent dimensions — Flux2 Klein ---
         if ct == "EmptyFlux2LatentImage":
@@ -632,5 +652,35 @@ def _patch_workflow(
         # --- Arbitrary overrides ---
         if extra_overrides and node_id in extra_overrides:
             inputs.update(extra_overrides[node_id])
+
+    # --- CFG Guider (Flux2 Klein) ---
+    for node in workflow.values():
+        if node.get("class_type") == "CFGGuider":
+            if cfg_guidance is not None:
+                node["inputs"]["cfg"] = cfg_guidance
+            break  # only one CFGGuider per workflow
+
+    # --- Flux2 Scheduler (steps + denoise) ---
+    for node in workflow.values():
+        if node.get("class_type") == "Flux2Scheduler":
+            if steps is not None:
+                node["inputs"]["steps"] = steps
+            if denoise is not None:
+                node["inputs"]["denoise"] = denoise
+            break
+
+    # --- KSamplerSelect (sampler name) ---
+    for node in workflow.values():
+        if node.get("class_type") == "KSamplerSelect":
+            if sampler is not None:
+                node["inputs"]["sampler_name"] = sampler
+            break
+
+    # --- RandomNoise (seed for img2img workflows) ---
+    for node in workflow.values():
+        if node.get("class_type") == "RandomNoise":
+            if seed is not None:
+                node["inputs"]["noise_seed"] = seed
+            break
 
     return workflow

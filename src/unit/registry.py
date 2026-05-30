@@ -80,12 +80,12 @@ class UnitRegistry:
             return db.query(UnitRecord).filter(UnitRecord.unit_id == unit_id).first()
 
     @staticmethod
-    def list_all() -> list[UnitRecord]:
+    def list_all(limit: int = 50, offset: int = 0) -> list[UnitRecord]:
         """Return all unit records, newest first."""
         with SessionLocal() as db:
             return (
                 db.query(UnitRecord)
-                .order_by(UnitRecord.created_at.desc())
+                .order_by(UnitRecord.created_at.desc()).offset(offset).limit(limit)
                 .all()
             )
 

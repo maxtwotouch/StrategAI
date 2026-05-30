@@ -127,12 +127,12 @@ class LeaderRegistry:
             ).first() is not None
 
     @staticmethod
-    def list_all() -> list[LeaderRecord]:
+    def list_all(limit: int = 50, offset: int = 0) -> list[LeaderRecord]:
         """Return all registered leaders, most recent first."""
         with SessionLocal() as db:
             return db.query(LeaderRecord).order_by(
                 LeaderRecord.created_at.desc()
-            ).all()
+            ).offset(offset).limit(limit).all()
 
     @staticmethod
     def get_reference_filename(leader_id: str) -> Optional[str]:

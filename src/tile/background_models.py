@@ -49,6 +49,7 @@ class BackgroundTileRequest(BaseModel):
 class BackgroundTileResponse(BaseModel):
     url: str                                          # "/assets/{uuid}.png"
     asset_type: str = "background_tile"
+    background_tile_id: str                           # UUID-based ID
     tile_type: str
     seed: int
     generation_mode: str                              # "comfyui" | "static" | "placeholder"

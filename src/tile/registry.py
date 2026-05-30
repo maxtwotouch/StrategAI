@@ -95,11 +95,11 @@ class StructureRegistry:
             ).first()
 
     @staticmethod
-    def list_all() -> list[StructureRecord]:
+    def list_all(limit: int = 50, offset: int = 0) -> list[StructureRecord]:
         with SessionLocal() as db:
             return db.query(StructureRecord).order_by(
                 StructureRecord.created_at.desc()
-            ).all()
+            ).offset(offset).limit(limit).all()
 
     @staticmethod
     def delete(structure_id: str) -> bool:
@@ -173,11 +173,11 @@ class ObjectRegistry:
             ).first()
 
     @staticmethod
-    def list_all() -> list[ObjectRecord]:
+    def list_all(limit: int = 50, offset: int = 0) -> list[ObjectRecord]:
         with SessionLocal() as db:
             return db.query(ObjectRecord).order_by(
                 ObjectRecord.created_at.desc()
-            ).all()
+            ).offset(offset).limit(limit).all()
 
     @staticmethod
     def delete(object_id: str) -> bool:
@@ -250,11 +250,11 @@ class TerrainRegistry:
             ).first()
 
     @staticmethod
-    def list_all() -> list[TerrainRecord]:
+    def list_all(limit: int = 50, offset: int = 0) -> list[TerrainRecord]:
         with SessionLocal() as db:
             return db.query(TerrainRecord).order_by(
                 TerrainRecord.created_at.desc()
-            ).all()
+            ).offset(offset).limit(limit).all()
 
     @staticmethod
     def delete(terrain_id: str) -> bool:

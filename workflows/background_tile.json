@@ -1,27 +1,19 @@
 {
-  "_comment": "Workflow for seamless background ground tiles (water, grass, sand, stone, dirt).  Does NOT use the top-down pixel-art LoRA — background tiles are seamless repeating textures that fill the entire frame, not isolated top-down game assets.  The prompt template (config/prompt_templates.json → background_tile) omits the <tdp> LoRA trigger for this reason.",
+  "_comment": "Flux2 Klein txt2img workflow for seamless background ground tiles (water, grass, sand, stone, dirt). Does NOT use the top-down pixel-art LoRA. 512x512.",
   "1": {
     "inputs": {
-      "ckpt_name": "sd_xl_turbo_1.0.safetensors"
+      "unet_name": "flux-2-klein-4b-fp8.safetensors"
     },
-    "class_type": "CheckpointLoaderSimple",
-    "_meta": {"title": "Load Checkpoint"}
+    "class_type": "UNETLoader",
+    "_meta": {"title": "Load UNET"}
   },
   "2": {
     "inputs": {
       "text": "PLACEHOLDER_POSITIVE",
-      "clip": ["1", 1]
+      "clip": ["8", 0]
     },
     "class_type": "CLIPTextEncode",
     "_meta": {"title": "CLIP Text Encode (Positive)"}
-  },
-  "3": {
-    "inputs": {
-      "text": "PLACEHOLDER_NEGATIVE",
-      "clip": ["1", 1]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {"title": "CLIP Text Encode (Negative)"}
   },
   "4": {
     "inputs": {
@@ -29,29 +21,24 @@
       "height": 512,
       "batch_size": 1
     },
-    "class_type": "EmptyLatentImage",
-    "_meta": {"title": "Empty Latent Image"}
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {"title": "Empty Flux2 Latent Image"}
   },
   "5": {
     "inputs": {
-      "seed": 0,
-      "steps": 4,
-      "cfg": 1.0,
-      "sampler_name": "euler",
-      "scheduler": "normal",
-      "denoise": 1.0,
-      "model": ["1", 0],
-      "positive": ["2", 0],
-      "negative": ["3", 0],
+      "noise": ["4", 0],
+      "guider": ["10", 0],
+      "sampler": ["12", 0],
+      "sigmas": ["11", 0],
       "latent_image": ["4", 0]
     },
-    "class_type": "KSampler",
-    "_meta": {"title": "KSampler"}
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {"title": "Sampler Custom Advanced"}
   },
   "6": {
     "inputs": {
       "samples": ["5", 0],
-      "vae": ["1", 2]
+      "vae": ["9", 2]
     },
     "class_type": "VAEDecode",
     "_meta": {"title": "VAE Decode"}
@@ -63,5 +50,45 @@
     },
     "class_type": "SaveImage",
     "_meta": {"title": "Save Image"}
+  },
+  "8": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "flux2"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {"title": "Load CLIP"}
+  },
+  "9": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {"title": "Load VAE"}
+  },
+  "10": {
+    "inputs": {
+      "model": ["1", 0],
+      "conditioning": ["2", 0],
+      "cfg": 3.5
+    },
+    "class_type": "CFGGuider",
+    "_meta": {"title": "CFG Guider"}
+  },
+  "11": {
+    "inputs": {
+      "model": ["1", 0],
+      "steps": 4,
+      "denoise": 1.0
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {"title": "Flux2 Scheduler"}
+  },
+  "12": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {"title": "KSampler Select"}
   }
 }

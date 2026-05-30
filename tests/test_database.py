@@ -12,12 +12,13 @@ class TestAllTablesCreated:
     """Verify all tables exist after Base.metadata.create_all."""
 
     def test_all_tables_created(self, test_db):
-        """All 7 tables exist in SQLite after create_all."""
+        """All 7 tables exist in SQLite."""
         inspector = inspect(test_db)
         table_names = set(inspector.get_table_names())
         expected = {
             "asset_records", "leader_records", "structure_records",
             "object_records", "terrain_records", "unit_records",
+            "background_tile_records",
         }
         # Note: SQLAlchemy may not create all 7 if some are missing from Base
         for t in expected:
@@ -377,6 +378,7 @@ class TestResetDatabase:
         expected = {
             "asset_records", "leader_records", "structure_records",
             "object_records", "terrain_records", "unit_records",
+            "background_tile_records",
         }
         assert expected.issubset(table_names)
 

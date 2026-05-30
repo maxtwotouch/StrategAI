@@ -307,7 +307,7 @@ generation:
 │       ├── prompts.py           # Unit prompt builders
 │       └── registry.py          # SQLite-backed unit CRUD
 ├── workflows/                   # ComfyUI workflow JSON templates
-│   ├── txt2img.json             # SDXL txt2img (used by tile + unit engines)
+│   ├── txt2img.json             # Flux2 Klein txt2img (used by tile + unit engines)
 │   ├── background_tile.json     # Seamless texture workflow
 │   └── leader/
 │       ├── leader_splash.json   # Splash generation (txt2img)
@@ -383,7 +383,7 @@ The service expects the following on your ComfyUI server:
 
 - **Base**: ComfyUI with standard nodes (KSampler, CLIPTextEncode, VAEDecode, SaveImage)
 - **Flux2 Klein workflows**: `SamplerCustomAdvanced`, `EmptyFlux2LatentImage` (if using Flux2)
-- **Models**: SDXL or Flux2 checkpoints, VAE, LoRAs as configured in workflow JSONs
+- **Models**: Flux2 Klein checkpoints, VAE, LoRAs as configured in workflow JSONs
 - **Custom nodes**: As specified in individual workflow files
 
 The service validates workflow structure before queueing (checks for `SaveImage` nodes and prompt-injectable `CLIPTextEncode` nodes) and fails fast on missing requirements.

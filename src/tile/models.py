@@ -305,6 +305,7 @@ class StructureResponse(BaseModel):
     style: str
     condition: str
     scale: str
+    description: str = ""                             # the description that was submitted
     seed: int
     generation_mode: str
     status: str = "completed"
@@ -320,6 +321,7 @@ class ObjectResponse(BaseModel):
     category: str
     biome: str
     season: str
+    description: str = ""                             # the description that was submitted
     seed: int
     generation_mode: str
     status: str = "completed"
@@ -335,6 +337,7 @@ class TerrainResponse(BaseModel):
     category: str
     scale: str
     material: str
+    description: str = ""                             # the description that was submitted
     seed: int
     generation_mode: str
     status: str = "completed"

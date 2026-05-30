@@ -26,7 +26,8 @@ leader_references/
 reports/
 
 # Database
-tilemap.db
+*.db.*
+*.db
 *.db-journal
 
 # OS
