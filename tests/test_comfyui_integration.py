@@ -347,14 +347,12 @@ class TestGenerateOrchestration:
         mock_http.post.side_effect = _post_side_effect
         mock_http.get.side_effect = _get_side_effect
 
-        # Mock WebSocket to immediately succeed (use polling fallback path)
-        with patch.object(client, "_wait_via_ws", side_effect=OSError("no ws")):
+        # Mock WebSocket to immediately fail (use polling fallback path)
+        with patch.object(client, "_wait_via_ws", side_effect=ConnectionRefusedError("no ws")):
             img = await client.generate(
                 str(workflow_path),
                 positive_prompt="test prompt",
                 seed=42,
-                width=128,
-                height=128,
             )
 
         assert isinstance(img, Image.Image)
@@ -401,8 +399,6 @@ class TestGenerateErrorPaths:
                 str(workflow_path),
                 positive_prompt="test",
                 seed=42,
-                width=128,
-                height=128,
             )
 
     @pytest.mark.asyncio
@@ -425,15 +421,13 @@ class TestGenerateErrorPaths:
             200, json_data={"prompt-002": {}},
         )
 
-        # Override polling timeout to something tiny so the test is fast
-        with patch.object(client, "_wait_via_polling", side_effect=RuntimeError("did not complete successfully")):
+        # Override _wait_for_completion_checked to simulate timeout
+        with patch.object(client, "_wait_for_completion_checked", side_effect=RuntimeError("did not complete successfully")):
             with pytest.raises(RuntimeError, match="did not complete"):
                 await client.generate(
                     str(workflow_path),
                     positive_prompt="test",
                     seed=42,
-                    width=128,
-                    height=128,
                 )
 
 
@@ -464,13 +458,12 @@ class TestWebSocketLifecycle:
         mock_ws.__aexit__ = AsyncMock(return_value=None)
 
         with patch("websockets.connect", return_value=mock_ws):
-            result = await client._wait_via_ws("p1")
-
-        assert result is True
+            # Returns None on success (was: returned True before error-propagation refactor)
+            await client._wait_via_ws("p1")
 
     @pytest.mark.asyncio
     async def test_ws_execution_error_propagates(self):
-        """When ComfyUI sends execution_error, the error is raised."""
+        """When ComfyUI sends execution_error, RuntimeError is raised with details."""
         client = ComfyUIClient(base_url="http://mock:8188")
 
         messages = [
@@ -478,6 +471,7 @@ class TestWebSocketLifecycle:
             json.dumps({"type": "execution_error", "data": {
                 "prompt_id": "p1",
                 "exception_message": "CUDA out of memory",
+                "exception_type": "RuntimeError",
             }}),
         ]
 
@@ -487,9 +481,8 @@ class TestWebSocketLifecycle:
         mock_ws.__aexit__ = AsyncMock(return_value=None)
 
         with patch("websockets.connect", return_value=mock_ws):
-            result = await client._wait_via_ws("p1")
-
-        assert result is False  # execution_error causes poll fallback → eventually False
+            with pytest.raises(RuntimeError, match="CUDA out of memory"):
+                await client._wait_via_ws("p1")
 
     @pytest.mark.asyncio
     async def test_ws_close_falls_back_to_polling(self):
@@ -506,19 +499,19 @@ class TestWebSocketLifecycle:
 
         with patch("websockets.connect", return_value=mock_ws):
             with patch.object(client, "_wait_via_polling", return_value=True) as mock_poll:
-                result = await client._wait_via_ws("p1")
+                # Returns None on success (was: returned True before error-propagation refactor)
+                await client._wait_via_ws("p1")
 
-        assert result is True
         mock_poll.assert_called_once_with("p1")
 
     @pytest.mark.asyncio
     async def test_ws_connect_failure_falls_back_to_polling(self):
-        """Cannot establish WebSocket — wait_for_completion catches OSError, falls back."""
+        """Cannot establish WebSocket — _wait_for_completion_checked catches ConnectionRefusedError, falls back to polling."""
         client = ComfyUIClient(base_url="http://mock:8188")
 
-        with patch.object(client, "_wait_via_ws", side_effect=OSError("Connection refused")):
+        with patch.object(client, "_wait_via_ws", side_effect=ConnectionRefusedError("Connection refused")):
             with patch.object(client, "_wait_via_polling", return_value=True) as mock_poll:
-                result = await client.wait_for_completion("p1")
+                # Returns None on success (raises RuntimeError on polling failure)
+                await client._wait_for_completion_checked("p1")
 
-        assert result is True
         mock_poll.assert_called_once_with("p1")

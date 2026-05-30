@@ -152,14 +152,13 @@ class AssetStore:
 def try_remove_asset(filename: str) -> None:
     """Best-effort deletion of an orphaned asset file after a DB failure.
 
-    Uses ``BASE_DIR`` for consistent path resolution across all engines.
+    Delegates to ``store.delete()`` so both the on-disk file AND the
+    in-memory LRU cache entry are cleaned up (avoids stale cache entries).
     All engine callers should import and use this shared helper.
     """
-    path = os.path.join(BASE_DIR, settings.paths.output_dir, os.path.basename(filename))
     try:
-        if os.path.isfile(path):
-            os.unlink(path)
-            logger.warning("Cleaned up orphaned asset: %s", filename)
+        store.delete(filename)
+        logger.warning("Cleaned up orphaned asset: %s", filename)
     except Exception as exc:
         logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
 

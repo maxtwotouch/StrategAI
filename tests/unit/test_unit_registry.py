@@ -2,6 +2,18 @@
 
 import pytest
 from src.unit.registry import UnitRegistry, generate_unit_id
+import src.database  # import module so monkeypatch is resolved dynamically
+
+
+def _create_asset(filename: str) -> None:
+    """Create a minimal AssetRecord so FK constraints are satisfied."""
+    with src.database.SessionLocal() as db:
+        existing = db.query(src.database.AssetRecord).filter(
+            src.database.AssetRecord.id == filename
+        ).first()
+        if existing is None:
+            db.add(src.database.AssetRecord(id=filename, asset_family="unit"))
+            db.commit()
 
 
 class TestGenerateUnitId:
@@ -22,6 +34,7 @@ class TestUnitRegistry:
     """Tests for UnitRegistry CRUD."""
 
     def test_register_and_get(self, test_db):
+        _create_asset("archer.png")
         UnitRegistry.register(
             unit_id="unit_test_abc123",
             unit_type="archer",
@@ -36,6 +49,7 @@ class TestUnitRegistry:
         assert record.unit_type == "archer"
 
     def test_list_all(self, test_db):
+        _create_asset("warrior.png")
         UnitRegistry.register(
             unit_id="unit_list_abc123",
             unit_type="warrior",
@@ -49,6 +63,7 @@ class TestUnitRegistry:
         assert len(records) >= 1
 
     def test_delete(self, test_db):
+        _create_asset("scout.png")
         UnitRegistry.register(
             unit_id="unit_del_abc123",
             unit_type="scout",

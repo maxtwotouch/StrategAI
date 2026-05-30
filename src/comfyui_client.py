@@ -143,17 +143,16 @@ class ComfyUIClient:
         *,
         positive_prompt: str | None = None,
         seed: int | None = None,
-        width: int | None = None,
-        height: int | None = None,
-        cfg_guidance: float | None = None,
-        steps: int | None = None,
-        denoise: float | None = None,
-        sampler: str | None = None,
         input_images: dict[str, Image.Image] | None = None,
         extra_overrides: dict[str, Any] | None = None,
         ref_image_filename: str | None = None,
     ) -> Image.Image:
         """Load a workflow JSON, patch it, run it, return the first output image.
+
+        Workflows are treated as the single source of truth — only
+        prompt text, seed, and input images are injected.  All other
+        parameters (guidance, steps, denoise, sampler, resolution) are
+        baked into the workflow JSONs and NOT overridden at runtime.
 
         Flux2 Klein does not use negative prompts — only positive_prompt is
         injected into ``CLIPTextEncode`` nodes.
@@ -167,17 +166,6 @@ class ComfyUIClient:
         seed:
             Injected into ``SamplerCustomAdvanced.noise_seed`` and
             ``RandomNoise.noise_seed``.  Random if None.
-        width / height:
-            Injected into ``EmptyFlux2LatentImage`` if present.
-        cfg_guidance:
-            Injected into ``CFGGuider.cfg``.  Default 3.5 if None.
-        steps:
-            Injected into ``Flux2Scheduler.steps``.  Default 4 if None.
-        denoise:
-            Injected into ``Flux2Scheduler.denoise``.  Default 1.0 (txt2img)
-            if None; use 0.30 for profile, 0.60 for action.
-        sampler:
-            Injected into ``KSamplerSelect.sampler_name``.  Default "euler".
         input_images:
             Mapping of node_id → PIL Image to upload before queueing.
         extra_overrides:
@@ -205,69 +193,60 @@ class ComfyUIClient:
                 fname = f"{uuid.uuid4()}.png"
                 uploaded[node_id] = await self.upload_image(img, fname)
 
-        # 3. Patch common parameters into the workflow
+        # 3. Patch only prompt, seed, and input images into the workflow.
+        #    All other parameters (guidance, steps, denoise, sampler,
+        #    resolution) are baked into the workflow JSONs.
         workflow = _patch_workflow(
             workflow,
             positive_prompt=positive_prompt,
             seed=seed,
-            width=width,
-            height=height,
-            cfg_guidance=cfg_guidance,
-            steps=steps,
-            denoise=denoise,
-            sampler=sampler,
             uploaded_filenames=uploaded,
             extra_overrides=extra_overrides,
             ref_image_filename=ref_image_filename,
         )
 
-        # 4. Queue — uploaded images are cleaned up on failure
         try:
+            # 4. Queue
             prompt_id = await self.queue_workflow(workflow)
-        except Exception:
-            # Best-effort cleanup of uploaded images so ComfyUI's input/
-            # folder doesn't fill up with orphaned files.
-            await _cleanup_uploaded_images(self, uploaded.values())
-            raise
-        logger.info("ComfyUI prompt queued: %s", prompt_id)
+            logger.info("ComfyUI prompt queued: %s", prompt_id)
 
-        # 5. Wait for completion — clean up uploaded images on failure
-        ok = await self.wait_for_completion(prompt_id)
-        if not ok:
-            await _cleanup_uploaded_images(self, uploaded.values())
-            raise RuntimeError(
-                f"ComfyUI prompt {prompt_id} did not complete successfully"
-            )
+            # 5. Wait for completion — raises RuntimeError with details on failure
+            await self._wait_for_completion_checked(prompt_id)
 
-        # 6. Retrieve output filenames
-        result = await self.get_result(prompt_id)
-        outputs = result.get(prompt_id, {}).get("outputs", {})
+            # 6. Retrieve output filenames
+            result = await self.get_result(prompt_id)
+            outputs = result.get(prompt_id, {}).get("outputs", {})
 
-        # 7. Download the first image we find (with retry and validation)
-        for _node_id, node_output in outputs.items():
-            images = node_output.get("images", [])
-            for img_info in images:
-                if not isinstance(img_info, dict) or "filename" not in img_info:
-                    logger.warning(
-                        "Skipping unexpected output entry: %s", img_info
+            # 7. Download the first image we find (with retry and validation)
+            for _node_id, node_output in outputs.items():
+                images = node_output.get("images", [])
+                for img_info in images:
+                    if not isinstance(img_info, dict) or "filename" not in img_info:
+                        logger.warning(
+                            "Skipping unexpected output entry: %s", img_info
+                        )
+                        continue
+                    data = await _download_with_retry(
+                        self,
+                        filename=img_info["filename"],
+                        subfolder=img_info.get("subfolder", ""),
+                        folder_type=img_info.get("type", "output"),
                     )
-                    continue
-                data = await _download_with_retry(
-                    self,
-                    filename=img_info["filename"],
-                    subfolder=img_info.get("subfolder", ""),
-                    folder_type=img_info.get("type", "output"),
-                )
-                img = Image.open(io.BytesIO(data)).convert("RGBA")
-                _validate_downloaded_image(img, img_info["filename"])
-                elapsed = time.monotonic() - _start_time
-                logger.info(
-                    "Generation completed: prompt_id=%s filename=%s elapsed=%.1fs size=%dx%d",
-                    prompt_id, img_info["filename"], elapsed, img.width, img.height,
-                )
-                return img
+                    img = Image.open(io.BytesIO(data)).convert("RGBA")
+                    _validate_downloaded_image(img, img_info["filename"])
+                    elapsed = time.monotonic() - _start_time
+                    logger.info(
+                        "Generation completed: prompt_id=%s filename=%s elapsed=%.1fs size=%dx%d",
+                        prompt_id, img_info["filename"], elapsed, img.width, img.height,
+                    )
+                    return img
 
-        raise RuntimeError("Workflow completed but produced no output images")
+            raise RuntimeError("Workflow completed but produced no output images")
+        finally:
+            # Always clean up uploaded images — success or failure — so
+            # ComfyUI's input/ folder doesn't fill up with orphaned files.
+            if uploaded:
+                await _cleanup_uploaded_images(self, uploaded.values())
 
     # ------------------------------------------------------------------
     #  Low-level ComfyUI endpoints
@@ -336,17 +315,26 @@ class ComfyUIClient:
             )
         return body["prompt_id"]
 
-    async def wait_for_completion(self, prompt_id: str) -> bool:
-        """Block until the prompt finishes (WebSocket preferred; falls back to polling)."""
+    async def _wait_for_completion_checked(self, prompt_id: str) -> None:
+        """Block until the prompt finishes.  Raises RuntimeError with details on failure.
+
+        WebSocket is preferred; falls back to polling on connection errors.
+        """
         try:
-            return await self._wait_via_ws(prompt_id)
+            await self._wait_via_ws(prompt_id)
         except (
             websockets.exceptions.WebSocketException,
             ConnectionError,
-            OSError,
+            ConnectionRefusedError,
+            ConnectionResetError,
+            BrokenPipeError,
         ) as exc:
             logger.warning("WebSocket error, falling back to polling: %s", exc)
-            return await self._wait_via_polling(prompt_id)
+            ok = await self._wait_via_polling(prompt_id)
+            if not ok:
+                raise RuntimeError(
+                    f"ComfyUI prompt {prompt_id} did not complete within timeout"
+                )
 
     async def get_result(self, prompt_id: str) -> dict:
         """``GET /history/{prompt_id}`` → parsed output dict."""
@@ -415,8 +403,12 @@ class ComfyUIClient:
     #  Private: waiting strategies
     # ------------------------------------------------------------------
 
-    async def _wait_via_ws(self, prompt_id: str) -> bool:
-        """Use async WebSocket to track execution progress."""
+    async def _wait_via_ws(self, prompt_id: str) -> None:
+        """Use async WebSocket to track execution progress.
+
+        Returns normally on success.  Raises RuntimeError with details
+        from ComfyUI's ``execution_error`` message on failure.
+        """
         ws_url = self.base_url.replace("http", "ws", 1)
         async with websockets.connect(
             f"{ws_url}/ws?clientId={uuid.uuid4()}",
@@ -434,16 +426,22 @@ class ComfyUIClient:
                         and msg_data.get("prompt_id") == prompt_id
                     ):
                         if msg_data.get("node") is None:
-                            return True  # execution complete
+                            return  # execution complete — success
 
                     if (
                         msg_type == "execution_error"
                         and msg_data.get("prompt_id") == prompt_id
                     ):
+                        err_detail = msg_data.get("exception_message", "")
+                        err_type = msg_data.get("exception_type", "unknown")
                         logger.error(
-                            "ComfyUI execution error: %s", msg_data
+                            "ComfyUI execution error for %s: %s — %s",
+                            prompt_id, err_type, err_detail,
                         )
-                        return False
+                        raise RuntimeError(
+                            f"ComfyUI execution error for {prompt_id}: "
+                            f"{err_type}: {err_detail}"
+                        )
             except websockets.exceptions.ConnectionClosed as exc:
                 logger.warning(
                     "WebSocket closed prematurely (code=%s): %s — "
@@ -451,13 +449,14 @@ class ComfyUIClient:
                     exc.code,
                     exc,
                 )
-                # Do NOT assume completion — the WS may have closed before
-                # execution_complete was received.  Fall back to polling to
-                # verify the prompt actually finished.
 
         # If the loop exited naturally OR WS closed prematurely,
         # fall back to polling to verify completion.
-        return await self._wait_via_polling(prompt_id)
+        ok = await self._wait_via_polling(prompt_id)
+        if not ok:
+            raise RuntimeError(
+                f"ComfyUI prompt {prompt_id} did not complete within timeout"
+            )
 
     async def _wait_via_polling(self, prompt_id: str) -> bool:
         """Poll ``GET /history`` every 2 seconds until the prompt appears."""
@@ -488,7 +487,12 @@ class ComfyUIClient:
 async def _cleanup_uploaded_images(
     client: ComfyUIClient, filenames: "Iterable[str]"
 ) -> None:
-    """Best-effort deletion of uploaded images from ComfyUI's input/ folder."""
+    """Best-effort deletion of uploaded images from ComfyUI's input/ folder.
+
+    Uses ``POST /api/delete/image`` if the ComfyUI server supports it
+    (custom endpoint — not in vanilla ComfyUI).  Failures are logged but
+    never raised — cleanup is always best-effort.
+    """
     for fname in filenames:
         try:
             http = await client.get_http()
@@ -497,8 +501,14 @@ async def _cleanup_uploaded_images(
                 json={"filename": fname},
                 timeout=10,
             )
-        except Exception:
-            pass
+            logger.debug("Cleaned up uploaded image from ComfyUI: %s", fname)
+        except Exception as exc:
+            logger.warning(
+                "Failed to clean up uploaded image '%s' from ComfyUI "
+                "(the /api/delete/image endpoint may not exist on this "
+                "server — manual cleanup may be needed): %s",
+                fname, exc,
+            )
 
 
 async def _download_with_retry(
@@ -587,31 +597,30 @@ def _patch_workflow(
     *,
     positive_prompt: str | None = None,
     seed: int | None = None,
-    width: int | None = None,
-    height: int | None = None,
-    cfg_guidance: float | None = None,
-    steps: int | None = None,
-    denoise: float | None = None,
-    sampler: str | None = None,
     uploaded_filenames: dict[str, str] | None = None,
     extra_overrides: dict[str, Any] | None = None,
     ref_image_filename: str | None = None,
 ) -> dict:
-    """Walk every node and replace common input parameters.
+    """Walk every node and replace ONLY prompt, seed, and input images.
 
-    Supports Flux2 Klein workflows (SamplerCustomAdvanced).
+    Workflow JSONs are the single source of truth for all other
+    parameters (guidance, steps, denoise, sampler, resolution).
+    Those values are NEVER patched at runtime.
+
     Node identification is by ``class_type``:
 
     - ``CLIPTextEncode`` → positive prompt
-    - ``SamplerCustomAdvanced`` → noise_seed (Flux2 Klein workflows)
-    - ``EmptyFlux2LatentImage`` / ``EmptyLatentImage`` → width / height
-    - ``LoadImage`` → uploaded image or reference filename
-    - ``FluxGuidance`` → guidance (user-facing Flux2 Klein guidance control)
-    - ``CFGGuider`` → cfg (internal Flux2 parameter, usually 1.0)
-    - ``Flux2Scheduler`` / ``BasicScheduler`` → steps, denoise
-    - ``KSamplerSelect`` → sampler_name
+    - ``SamplerCustomAdvanced`` → noise_seed
     - ``RandomNoise`` → noise_seed (img2img workflows)
+    - ``LoadImage`` → uploaded image (keyed by node_id) or reference filename
+    - Arbitrary node overrides via ``extra_overrides``
+
+    Returns a **deep copy** of the workflow — the original dict is never
+    mutated so callers can safely reuse cached workflow templates.
     """
+    import copy
+    workflow = copy.deepcopy(workflow)
+
     if seed is None:
         seed = secrets.randbits(32)  # cryptographically secure, 0..2^32-1
 
@@ -631,61 +640,24 @@ def _patch_workflow(
             if "noise_seed" in inputs:
                 inputs["noise_seed"] = seed
 
-        # --- Latent dimensions — Flux2 Klein (supports both node type names) ---
-        if ct in ("EmptyFlux2LatentImage", "EmptyLatentImage"):
-            if width is not None:
-                inputs["width"] = width
-            if height is not None:
-                inputs["height"] = height
-
-        # --- LoadImage (uploaded) ---
+        # --- LoadImage (uploaded by node_id) ---
         if ct == "LoadImage" and node_id in uploaded:
             inputs["image"] = uploaded[node_id]
 
         # --- LoadImage reference filename ---
-        # ComfyUI defaults LoadImage titles to "Load Image"; we also support
-        # explicit "Reference Image" / "Load Reference Image" renames.
+        # Only matches nodes whose _meta.title explicitly contains
+        # "reference" (NOT the default "Load Image" title which every
+        # LoadImage node gets from ComfyUI).
         if ct == "LoadImage" and ref_image_filename is not None:
             meta = node.get("_meta", {})
             title = meta.get("title", "").lower()
-            if "load image" in title or "reference image" in title:
+            if "reference" in title:
                 # Sanitize to prevent path traversal
                 inputs["image"] = os.path.basename(ref_image_filename)
 
         # --- Arbitrary overrides ---
         if extra_overrides and node_id in extra_overrides:
             inputs.update(extra_overrides[node_id])
-
-    # --- FluxGuidance (user-facing guidance control in Flux2 Klein workflows) ---
-    for node in workflow.values():
-        if node.get("class_type") == "FluxGuidance":
-            if cfg_guidance is not None:
-                node["inputs"]["guidance"] = cfg_guidance
-            break
-
-    # --- CFG Guider (Flux2 Klein internal — cfg is usually 1.0) ---
-    for node in workflow.values():
-        if node.get("class_type") == "CFGGuider":
-            if cfg_guidance is not None:
-                node["inputs"]["cfg"] = cfg_guidance
-            break  # only one CFGGuider per workflow
-
-    # --- Flux2 / Basic Scheduler (steps + denoise) ---
-    for node in workflow.values():
-        if node.get("class_type") in ("Flux2Scheduler", "BasicScheduler"):
-            if steps is not None:
-                node["inputs"]["steps"] = steps
-            if denoise is not None:
-                node["inputs"]["denoise"] = denoise
-            # No break — patch all matching nodes (real workflows have one,
-            # but tests may have both for backward-compat coverage).
-
-    # --- KSamplerSelect (sampler name) ---
-    for node in workflow.values():
-        if node.get("class_type") == "KSamplerSelect":
-            if sampler is not None:
-                node["inputs"]["sampler_name"] = sampler
-            break
 
     # --- RandomNoise (seed for img2img workflows) ---
     for node in workflow.values():

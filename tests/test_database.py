@@ -8,6 +8,14 @@ from src.database import (
 )
 
 
+def _create_asset(db_session, filename: str, family: str = "structure") -> None:
+    """Create a minimal AssetRecord so FK constraints are satisfied."""
+    existing = db_session.query(AssetRecord).filter(AssetRecord.id == filename).first()
+    if existing is None:
+        db_session.add(AssetRecord(id=filename, asset_family=family))
+        db_session.flush()
+
+
 class TestAllTablesCreated:
     """Verify all tables exist after Base.metadata.create_all."""
 
@@ -54,6 +62,7 @@ class TestLeaderRecord:
 
     def test_full_insert(self, db_session):
         """Full insert with all columns."""
+        _create_asset(db_session, "splash.png", "leader_splash")
         record = LeaderRecord(
             leader_id="leader_test_a1b2c3",
             leader_name="Test Leader",
@@ -78,6 +87,7 @@ class TestLeaderRecord:
 
     def test_action_ids_json(self, db_session):
         """action_image_ids stored/retrieved as list."""
+        _create_asset(db_session, "splash2.png", "leader_splash")
         record = LeaderRecord(
             leader_id="leader_action_test",
             leader_name="Action Leader",
@@ -104,6 +114,7 @@ class TestStructureRecord:
     """Tests for the StructureRecord model."""
 
     def test_insert_and_query(self, db_session):
+        _create_asset(db_session, "img.png", "structure")
         record = StructureRecord(
             structure_id="struct_fort_a1b2c3",
             category="fortification",
@@ -143,10 +154,8 @@ class TestStructureRecord:
         db_session.rollback()
 
 
-class TestObjectRecord:
-    """Tests for the ObjectRecord model."""
-
     def test_insert_and_query(self, db_session):
+        _create_asset(db_session, "img.png", "nature_object")
         record = ObjectRecord(
             object_id="object_veg_a1b2c3",
             category="vegetation",
@@ -167,10 +176,8 @@ class TestObjectRecord:
         assert result.biome == "temperate_forest"
 
 
-class TestTerrainRecord:
-    """Tests for the TerrainRecord model."""
-
     def test_insert_and_query(self, db_session):
+        _create_asset(db_session, "img.png", "terrain")
         record = TerrainRecord(
             terrain_id="terrain_hill_a1b2c3",
             category="hill",
@@ -191,10 +198,8 @@ class TestTerrainRecord:
         assert result.material == "earthen"
 
 
-class TestUnitRecord:
-    """Tests for the UnitRecord model."""
-
     def test_insert_and_query(self, db_session):
+        _create_asset(db_session, "sprite.png", "unit")
         record = UnitRecord(
             unit_id="unit_archer_a1b2c3",
             unit_type="archer",

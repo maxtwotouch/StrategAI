@@ -110,9 +110,10 @@ def test_db(monkeypatch):
         poolclass=StaticPool,
     )
 
-    # Disable FK enforcement in tests — tests work on individual tables
+    # Enable FK enforcement in tests — matches production behavior.
+    # Tests must create parent AssetRecords before child records.
     with engine.connect() as conn:
-        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text("PRAGMA foreign_keys=ON"))
         conn.commit()
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

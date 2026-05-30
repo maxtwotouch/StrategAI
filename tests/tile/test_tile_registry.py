@@ -5,6 +5,18 @@ from src.tile.registry import (
     StructureRegistry, ObjectRegistry, TerrainRegistry,
     generate_structure_id, generate_object_id, generate_terrain_id,
 )
+import src.database  # import module so monkeypatch is resolved dynamically
+
+
+def _create_asset(filename: str, family: str = "structure") -> None:
+    """Create a minimal AssetRecord so FK constraints are satisfied."""
+    with src.database.SessionLocal() as db:
+        existing = db.query(src.database.AssetRecord).filter(
+            src.database.AssetRecord.id == filename
+        ).first()
+        if existing is None:
+            db.add(src.database.AssetRecord(id=filename, asset_family=family))
+            db.commit()
 
 
 class TestGenerateIds:
@@ -28,6 +40,7 @@ class TestStructureRegistry:
     """Tests for StructureRegistry CRUD."""
 
     def test_register_and_get(self, test_db):
+        _create_asset("test.png")
         StructureRegistry.register(
             structure_id="struct_test_abc123",
             category="fortification",
@@ -44,6 +57,7 @@ class TestStructureRegistry:
         assert record.category == "fortification"
 
     def test_list_all(self, test_db):
+        _create_asset("test2.png")
         StructureRegistry.register(
             structure_id="struct_list_abc123",
             category="production",
@@ -59,6 +73,7 @@ class TestStructureRegistry:
         assert len(records) >= 1
 
     def test_delete(self, test_db):
+        _create_asset("test3.png")
         StructureRegistry.register(
             structure_id="struct_del_abc123",
             category="housing",
@@ -79,6 +94,7 @@ class TestObjectRegistry:
     """Tests for ObjectRegistry CRUD."""
 
     def test_register_and_get(self, test_db):
+        _create_asset("tree.png", "nature_object")
         ObjectRegistry.register(
             object_id="object_test_abc123",
             category="vegetation",
@@ -98,6 +114,7 @@ class TestTerrainRegistry:
     """Tests for TerrainRegistry CRUD."""
 
     def test_register_and_get(self, test_db):
+        _create_asset("hill.png", "terrain")
         TerrainRegistry.register(
             terrain_id="terrain_test_abc123",
             category="hill",

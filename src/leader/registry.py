@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from src.config import settings, BASE_DIR
-from src.database import SessionLocal, LeaderRecord
+from src.database import SessionLocal, AssetRecord, LeaderRecord
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -248,6 +248,11 @@ class LeaderRegistry:
                             "Failed to delete image file %s for leader %s: %s",
                             image_id, leader_id, exc,
                         )
+                # Note: AssetRecords are NOT deleted here because
+                # splash_image_id is NOT NULL with ondelete=SET NULL —
+                # deleting the parent AssetRecord would violate the
+                # constraint.  Profile/action AssetRecords are cleaned up
+                # via ON DELETE CASCADE when the leader row is removed.
                 logger.info("Leader deleted: %s", leader_id)
                 return True
         return False

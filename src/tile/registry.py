@@ -11,7 +11,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.database import SessionLocal, StructureRecord, ObjectRecord, TerrainRecord
+from src.database import SessionLocal, AssetRecord, StructureRecord, ObjectRecord, TerrainRecord
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,8 @@ class StructureRegistry:
             if record:
                 image_id = record.image_id
                 db.delete(record)
+                # Also delete the parent AssetRecord to prevent orphan leaks
+                db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
                 db.commit()
                 # Best-effort cleanup of the image file on disk
                 try:
@@ -198,6 +200,8 @@ class ObjectRegistry:
             if record:
                 image_id = record.image_id
                 db.delete(record)
+                # Also delete the parent AssetRecord to prevent orphan leaks
+                db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
                 db.commit()
                 try:
                     store.delete(image_id)
@@ -280,6 +284,8 @@ class TerrainRegistry:
             if record:
                 image_id = record.image_id
                 db.delete(record)
+                # Also delete the parent AssetRecord to prevent orphan leaks
+                db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
                 db.commit()
                 try:
                     store.delete(image_id)

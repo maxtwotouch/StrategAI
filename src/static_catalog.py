@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from src.config import settings, BASE_DIR
 
-_VALID_STRUCTURE_SUBTYPES = {"fortification", "production", "civilian", "religious"}
+_VALID_STRUCTURE_SUBTYPES = {"fortification", "production", "housing", "sacred"}
 
 
 class StaticCatalog:

@@ -44,7 +44,6 @@ from src.unit.models import (
     UnitType,
 )
 from src.unit.registry import UnitRegistry
-from src.prompt_templates import render as _render
 from src.prompt_templates import validate_all_templates
 
 # Setup production logging
@@ -64,6 +63,30 @@ class DeleteResponse(BaseModel):
     status: str = "deleted"
     id: str
     asset_type: str
+
+
+class HealthResponse(BaseModel):
+    """GET /health response."""
+    status: str
+    components: dict[str, str]
+    comfyui_nodes: int
+    modes: dict[str, str]
+    registered: dict[str, int]
+
+
+class ModesResponse(BaseModel):
+    """GET /modes response."""
+    modes: dict[str, str]
+    valid_modes: list[str]
+
+
+class CatalogResponse(BaseModel):
+    """GET /catalog response — available static asset families and types."""
+    background_tile: dict
+    structure: dict
+    nature_object: dict
+    character_sprite: dict
+    unit: dict
 
 
 # Leader engine (initialized in lifespan — comfyui or static mode)
@@ -365,8 +388,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: FastAPIRequest, call_next):
         api_key = settings.server.api_key
-        # Skip auth if no key configured or if the path is /health
-        if not api_key or request.url.path == "/health":
+        # Skip auth if no key configured, or if path is /health or /assets
+        if not api_key or request.url.path == "/health" or request.url.path.startswith("/assets/"):
             return await call_next(request)
         if request.headers.get("X-API-Key") != api_key:
             return StarletteJSONResponse(
@@ -539,7 +562,7 @@ async def get_asset(filename: str):
 # ---------------------------------------------------------------------------
 
 
-@app.get("/catalog")
+@app.get("/catalog", response_model=CatalogResponse)
 async def get_catalog():
     """Return available tile types, structure subtypes, and unit types from static_tiles/."""
     return {
@@ -566,7 +589,7 @@ async def get_catalog():
 # ---------------------------------------------------------------------------
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Report per-component service status — always returns 200.
 
@@ -622,7 +645,7 @@ async def health_check():
 # ---------------------------------------------------------------------------
 
 
-@app.get("/modes")
+@app.get("/modes", response_model=ModesResponse)
 async def get_modes():
     """Return the active generation mode for every asset family.
 
@@ -707,10 +730,10 @@ async def generate_leader(request: LeaderRequest):
         raise HTTPException(500, detail=str(e))
 
 
-@app.get("/leader", response_model=list[LeaderInfo])
+@app.get("/leader", responses={200: {"description": "List of registered leaders"}})
 async def list_leaders(
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000),
 ):
     """Return all registered leaders. Parallels GET /catalog."""
     _require_db()
@@ -793,10 +816,10 @@ async def generate_structure(request: StructureRequest):
         raise HTTPException(500, detail=str(e))
 
 
-@app.get("/structure", response_model=list[StructureResponse])
+@app.get("/structure", responses={200: {"description": "List of generated structures"}})
 async def list_structures(
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000),
 ):
     """Return all generated structures."""
     _require_db()
@@ -887,10 +910,10 @@ async def generate_object(request: ObjectRequest):
         raise HTTPException(500, detail=str(e))
 
 
-@app.get("/object", response_model=list[ObjectResponse])
+@app.get("/object", responses={200: {"description": "List of generated objects"}})
 async def list_objects(
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000),
 ):
     """Return all generated objects."""
     _require_db()
@@ -978,10 +1001,10 @@ async def generate_terrain(request: TerrainRequest):
         raise HTTPException(500, detail=str(e))
 
 
-@app.get("/terrain", response_model=list[TerrainResponse])
+@app.get("/terrain", responses={200: {"description": "List of generated terrain tiles"}})
 async def list_terrains(
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000),
 ):
     """Return all generated terrains."""
     _require_db()
@@ -1078,10 +1101,10 @@ async def generate_unit(request: UnitRequest):
         raise HTTPException(500, detail=str(e))
 
 
-@app.get("/unit", response_model=list[UnitResponse])
+@app.get("/unit", responses={200: {"description": "List of generated unit sprites"}})
 async def list_units(
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000),
 ):
     """Return all generated units."""
     _require_db()
@@ -1188,10 +1211,10 @@ async def generate_background_tile(request: BackgroundTileRequest):
         raise HTTPException(500, detail=str(e))
 
 
-@app.get("/background_tile", response_model=list[BackgroundTileResponse])
+@app.get("/background_tile", responses={200: {"description": "List of generated background tiles"}})
 async def list_background_tiles(
     limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=10000),
 ):
     """Return all generated background tiles (paginated)."""
     _require_db()

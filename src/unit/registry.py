@@ -12,7 +12,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from src.database import SessionLocal, UnitRecord
+from src.database import SessionLocal, AssetRecord, UnitRecord
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -118,6 +118,8 @@ class UnitRegistry:
                 return False
             image_id = record.image_id
             db.delete(record)
+            # Also delete the parent AssetRecord to prevent orphan leaks
+            db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
             db.commit()
             # Best-effort cleanup of the image file on disk
             try:

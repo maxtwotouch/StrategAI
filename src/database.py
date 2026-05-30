@@ -270,7 +270,7 @@ class BackgroundTileRecord(Base):
     seed: int = Column(Integer, nullable=False)  # type: ignore[assignment]
     image_id: str = Column(  # type: ignore[assignment]
         String, ForeignKey("asset_records.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=False, index=True,
     )
     created_at: DateTime = Column(DateTime, server_default=func.now())  # type: ignore[assignment]
     updated_at: DateTime = Column(DateTime, server_default=func.now(), onupdate=func.now())  # type: ignore[assignment]
@@ -385,7 +385,16 @@ def reset_database() -> None:
 
     **Destructive** — all data is lost.  Intended for development and as
     an escape hatch when the schema has diverged.
+
+    Refuses to run in PRODUCTION mode to prevent accidental data loss.
     """
+    from src.config import settings as _settings, DeploymentMode as _DeploymentMode
+    if _settings.mode == _DeploymentMode.PRODUCTION:
+        raise RuntimeError(
+            "reset_database() is blocked in PRODUCTION mode. "
+            "Set DEPLOYMENT_MODE=development to use this escape hatch."
+        )
+
     import os
     logger.warning("Resetting database — dropping all tables and recreating.")
     Base.metadata.drop_all(bind=engine)
@@ -405,4 +414,11 @@ def reset_database() -> None:
         except Exception as exc:
             logger.warning("Alembic migration failed (%s), falling back to create_all.", exc)
             Base.metadata.create_all(bind=engine)
+            # Stamp the Alembic version head so subsequent migrations
+            # know the schema is current and won't attempt duplicate DDL.
+            try:
+                alembic_command.stamp(alembic_cfg, "head")
+                logger.info("Alembic version stamped after create_all fallback.")
+            except Exception as stamp_exc:
+                logger.warning("Failed to stamp Alembic version: %s", stamp_exc)
             logger.info("Database reset complete — all tables recreated via create_all.")
