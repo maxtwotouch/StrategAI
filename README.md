@@ -115,9 +115,42 @@ python3 -m src.training.sync_validation_prompts
 bash scripts/train_experiments.sh
 ```
 
+## Setup
+
+### 1. Create a virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install dependencies
+
+**Option A — pip + requirements.txt (simpler):**
+```bash
+pip install -r requirements.txt
+```
+
+**Option B — pip + pyproject.toml (includes dev tools):**
+```bash
+pip install -e ".[dev]"
+```
+
+> **Note:** `pyproject.toml` declares the same core dependencies as `requirements.txt`.
+> Use `requirements.txt` for a quick start; use `pip install -e .` if you want an
+> editable install with `src.*` modules importable anywhere.
+
+### 3. Validate the installation
+
+```bash
+python -m pytest tests/ -v
+```
+
+All 34 tests should pass.
+
 ## Prerequisites
 
-- Python 3.10+ with dependencies from `requirements.txt`
+- Python 3.10+
 - **Generation**: ComfyUI server with [required custom nodes](docs/generation.md#prerequisites)
 - **Training**: [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit) + HuggingFace CLI authentication
 

@@ -238,6 +238,27 @@ def main():
         if args.guidance_min > args.guidance_max:
             raise ValueError("Invalid global guidance range")
 
+    # ── Connectivity check ──────────────────────────────────────────
+    comfy_url = args.comfy_url.rstrip("/")
+    print(f"Checking ComfyUI connectivity at {comfy_url} ...")
+    try:
+        r = requests.get(f"{comfy_url}/system_stats", timeout=10)
+        r.raise_for_status()
+        print(f"  [OK] ComfyUI server reachable")
+    except requests.ConnectionError:
+        raise SystemExit(
+            f"[ERROR] Cannot reach ComfyUI at {comfy_url}\n"
+            f"        Make sure ComfyUI is running and the URL is correct.\n"
+            f"        Launch ComfyUI first, then retry."
+        )
+    except requests.Timeout:
+        raise SystemExit(
+            f"[ERROR] ComfyUI at {comfy_url} did not respond within 10 seconds.\n"
+            f"        Check that the server is running and not blocked by a firewall."
+        )
+    except requests.HTTPError as exc:
+        print(f"  [WARN] ComfyUI returned HTTP {exc.response.status_code} — continuing anyway")
+
     base_dir = Path(args.base_dir)
     primary_workflow = load_json(Path(args.workflow_api_json))
     rows = load_jsonl(Path(args.prompt_data))

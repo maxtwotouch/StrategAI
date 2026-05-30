@@ -159,9 +159,19 @@ def _resolve_image(dataset_root: Path, file_name: str) -> Path:
     return candidate  # doesn't exist anyway, caller handles
 
 
+ANGLE_PHRASE = "top-down view."
+
+
 def _format_caption(text: str, trigger_word: str, trigger_mode: str) -> str:
-    """Format a caption with trigger token injection."""
+    """Format a caption with trigger token and angle phrase injection.
+
+    Always injects the angle phrase 'top-down view.' if not already present,
+    ensuring the model binds the overhead perspective to the trigger token.
+    """
     text = text.strip()
+    # Ensure angle phrase is present (idempotent)
+    if ANGLE_PHRASE not in text.lower():
+        text = f"{ANGLE_PHRASE} {text}"
     if trigger_mode == "none":
         return text
     if trigger_mode == "placeholder":
@@ -226,6 +236,17 @@ def main() -> int:
     print("Loading metadata...")
     records = load_metadata(metadata_path)
     print(f"  {len(records)} total records")
+
+    # ── Data quality: check angle phrase presence ──────────────────
+    ANGLE = "top-down view."
+    missing_angle = sum(1 for r in records if ANGLE not in str(r.get("text", "")).lower())
+    if missing_angle > 0:
+        print(
+            f"  [WARN] {missing_angle}/{len(records)} captions do NOT contain "
+            f"the angle phrase '{ANGLE}'.\n"
+            f"         The angle phrase will be auto-injected, but for best results "
+            f"ensure your metadata.jsonl captions include 'top-down view.' explicitly."
+        )
 
     groups = group_by_type(records, args.type_column)
     print(f"  Types: {sorted(groups.keys())}")

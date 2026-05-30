@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+#
+# generate_images.sh — Batch-generate images via ComfyUI using preset arguments.
+#
+# Usage:
+#     bash scripts/generate_images.sh
+#
+# Requirements:
+#     - ComfyUI server running at http://127.0.0.1:8188
+#     - Prompt data already generated (see: python -m src.generation.prompt_generator)
+#     - Workflow JSON at config/comfyui/structure_workflow.json
+#
+set -euo pipefail
+
 python3 -m src.generation.dataset_generator \
   --comfy-url http://127.0.0.1:8188 \
   --base-dir ./dataset \
@@ -13,4 +26,4 @@ python3 -m src.generation.dataset_generator \
   --prompt-data ./dataset/prompts/generated_prompts.jsonl \
   --guidance-key guidance \
   --override-seed-mode random \
-  --ksampler-node 70 \
+  --ksampler-node 70

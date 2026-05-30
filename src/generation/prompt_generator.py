@@ -249,7 +249,7 @@ PALETTES_TERRAIN = [
 # ------------------------------------------------------------
 def structure_caption(structure, theme, motif, personality, detail, complexity, material, condition, palette):
     return (
-        f"Front view overhead elevated medium shot. "
+        f"top-down view. "
         f"a medieval {structure} in a {theme} setting, "
         f"featuring {motif}, {personality} character, "
         f"{detail}, {complexity}, {material}, {condition}, {palette}"
@@ -257,14 +257,14 @@ def structure_caption(structure, theme, motif, personality, detail, complexity, 
 
 def object_caption(obj, drama, complexity, material, condition, palette):
     return (
-        f"Front view overhead elevated medium shot. "
+        f"top-down view. "
         f"a dramatic medieval world asset of a {obj} with {drama}, "
         f"{complexity}, {material}, {condition}, {palette}"
     )
 
 def terrain_caption(terrain_type, side_smoothness, seam_integrity, complexity, material, condition, palette):
     return (
-        f"Front view overhead elevated medium shot. "
+        f"top-down view. "
         f"a {terrain_type} with wide flat top, {side_smoothness}, "
         f"{complexity}, {seam_integrity}, "
         f"{material}, {condition}, {palette}"
@@ -289,7 +289,20 @@ def background_positive_prompt(material, texture_details, template):
 # Template loader
 # ------------------------------------------------------------
 def load_prompt_templates(path: Path) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    """Load and validate prompt templates JSON.
+
+    Provides a friendly error message if the JSON is malformed (e.g. trailing
+    commas, missing quotes) so users can fix it without decoding a traceback.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(
+            f"[ERROR] Failed to parse {path}: {exc}\n"
+            f"        JSON does not allow trailing commas — check the last entry "
+            f"in each object block and remove any trailing ',' before the closing '}}' or ']'."
+        ) from exc
+
     templates = data.get("templates", {})
     if not isinstance(templates, dict):
         raise ValueError("Invalid templates JSON: `templates` must be an object")
@@ -306,6 +319,23 @@ def load_prompt_templates(path: Path) -> dict:
         raise ValueError("`templates.object` must contain {PROMPT_HERE}")
     if "{PROMPT_HERE}" not in templates["terrain"]:
         raise ValueError("`templates.terrain` must contain {PROMPT_HERE}")
+
+    # Warn if templates still use deprecated trigger / angle phrase
+    for key, tmpl in templates.items():
+        if "<sks>" in tmpl:
+            import warnings
+            warnings.warn(
+                f"Template '{key}' contains deprecated trigger '<sks>'. "
+                f"The current trigger is '<tdp>'. Update config/prompt_templates.json.",
+                UserWarning,
+            )
+        if "front view overhead" in tmpl.lower():
+            import warnings
+            warnings.warn(
+                f"Template '{key}' contains deprecated angle phrase 'front view overhead...'. "
+                f"The current angle phrase is 'top-down view.'. Update config/prompt_templates.json.",
+                UserWarning,
+            )
 
     return templates
 

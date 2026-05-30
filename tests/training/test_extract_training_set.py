@@ -95,24 +95,32 @@ def test_resolve_image_falls_back_to_basename(tmp_path):
 
 # ── _format_caption ─────────────────────────────────────────────────────
 
-def test_format_caption_none_mode_returns_bare():
-    assert _format_caption("a caption", "<tdp>", "none") == "a caption"
+def test_format_caption_none_mode_injects_angle_phrase():
+    """Bare captions get angle phrase prepended."""
+    assert _format_caption("a caption", "<tdp>", "none") == "top-down view. a caption"
 
 
-def test_format_caption_manual_mode_prepends_trigger():
-    assert _format_caption("a caption", "<tdp>", "manual") == "<tdp> a caption"
+def test_format_caption_manual_mode_prepends_trigger_and_angle():
+    assert _format_caption("a caption", "<tdp>", "manual") == "<tdp> top-down view. a caption"
 
 
-def test_format_caption_placeholder_mode_uses_brackets():
-    assert _format_caption("a caption", "<tdp>", "placeholder") == "[trigger] a caption"
+def test_format_caption_placeholder_mode_uses_brackets_and_angle():
+    assert _format_caption("a caption", "<tdp>", "placeholder") == "[trigger] top-down view. a caption"
 
 
 def test_format_caption_strips_whitespace():
-    assert _format_caption("  padded caption  ", "<tdp>", "manual") == "<tdp> padded caption"
+    assert _format_caption("  padded caption  ", "<tdp>", "manual") == "<tdp> top-down view. padded caption"
 
 
 def test_format_caption_none_strips_whitespace():
-    assert _format_caption("  padded caption  ", "<tdp>", "none") == "padded caption"
+    assert _format_caption("  padded caption  ", "<tdp>", "none") == "top-down view. padded caption"
+
+
+def test_format_caption_angle_phrase_is_idempotent():
+    """Angle phrase is NOT duplicated if already present."""
+    assert _format_caption("top-down view. a caption", "<tdp>", "none") == "top-down view. a caption"
+    assert _format_caption("top-down view. a caption", "<tdp>", "manual") == "<tdp> top-down view. a caption"
+    assert _format_caption("TOP-DOWN VIEW. a caption", "<tdp>", "placeholder") == "[trigger] TOP-DOWN VIEW. a caption"
 
 
 # ── write_output ─────────────────────────────────────────────────────────
@@ -134,7 +142,7 @@ def test_write_output_sidecar_mode(tmp_path):
                      sidecar=True)
     assert n == 1
     # Sidecar .txt written next to source image
-    assert (img_dir / "a.txt").read_text() == "[trigger] test caption"
+    assert (img_dir / "a.txt").read_text() == "[trigger] top-down view. test caption"
     # Output dir NOT created (sidecar mode)
     assert not out.exists()
 
@@ -158,4 +166,4 @@ def test_write_output_extract_mode(tmp_path):
     # Image copied to output dir
     assert (out / "a.png").exists()
     # .txt written in output dir with trigger
-    assert (out / "a.txt").read_text() == "<tdp> test caption"
+    assert (out / "a.txt").read_text() == "<tdp> top-down view. test caption"
