@@ -306,9 +306,17 @@ class ComfyUIClient:
         body = resp.json()
         if "node_errors" in body:
             errors = body["node_errors"]
-            raise ValueError(
-                f"Workflow validation errors: {json.dumps(errors)}"
-            )
+            if errors:
+                detail = f"Workflow validation errors: {json.dumps(errors)}"
+            else:
+                # ComfyUI returned empty node_errors — include the top-level
+                # error field (if any) for debuggability.
+                top_error = body.get("error", "no details provided")
+                detail = (
+                    f"ComfyUI rejected workflow but returned empty node_errors. "
+                    f"Top-level error: {top_error}"
+                )
+            raise ValueError(detail)
         if "prompt_id" not in body:
             raise ValueError(
                 f"ComfyUI did not return a prompt_id. Response: {body}"
@@ -645,13 +653,15 @@ def _patch_workflow(
             inputs["image"] = uploaded[node_id]
 
         # --- LoadImage reference filename ---
-        # Only matches nodes whose _meta.title explicitly contains
-        # "reference" (NOT the default "Load Image" title which every
-        # LoadImage node gets from ComfyUI).
+        # Matches nodes whose _meta.title contains "reference" (explicit
+        # rename) OR the ComfyUI default "Load Image" title.  Our workflow
+        # JSONs use the default title for all LoadImage nodes.  If multiple
+        # LoadImage nodes need different images, use input_images dict
+        # (keyed by node_id) instead of ref_image_filename.
         if ct == "LoadImage" and ref_image_filename is not None:
             meta = node.get("_meta", {})
             title = meta.get("title", "").lower()
-            if "reference" in title:
+            if "load image" in title or "reference" in title:
                 # Sanitize to prevent path traversal
                 inputs["image"] = os.path.basename(ref_image_filename)
 

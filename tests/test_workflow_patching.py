@@ -127,10 +127,11 @@ class TestPatchLoadImage:
         result = _patch_workflow(wf, ref_image_filename="ref_leader.png")
         # Node 6 has title "Reference Image" → should be patched
         assert result["6"]["inputs"]["image"] == "ref_leader.png"
-        # Node 5 has default "Load Image" title → should NOT be patched
-        assert result["5"]["inputs"]["image"] == "default_comfy.png"
+        # Node 5 has default "Load Image" title → should ALSO be patched
+        # (our workflows use the default ComfyUI title)
+        assert result["5"]["inputs"]["image"] == "ref_leader.png"
 
-    def test_ref_not_set_without_filename(self):
+    def test_ref_only_applied_when_filename_provided(self):
         """No ref_image_filename → LoadImage nodes unchanged."""
         wf = _make_workflow()
         result = _patch_workflow(wf, ref_image_filename=None)
