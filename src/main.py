@@ -139,6 +139,58 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning(msg + " — generation will fail for these families.")
 
+    # Verify each workflow JSON contains required node class_types
+    _workflow_required_nodes: dict[str, list[str]] = {
+        "txt2img": [
+            "CLIPTextEncode", "SamplerCustomAdvanced", "EmptyLatentImage",
+            "BasicScheduler", "FluxGuidance", "SaveImage",
+            "ImageResizeKJv2", "Image Remove Background (rembg)",
+        ],
+        "background_tile": [
+            "CLIPTextEncode", "SamplerCustomAdvanced", "EmptyLatentImage",
+            "BasicScheduler", "FluxGuidance", "SaveImage", "ImageResizeKJv2",
+        ],
+        "leader_splash": [
+            "CLIPTextEncode", "SamplerCustomAdvanced", "EmptyLatentImage",
+            "BasicScheduler", "FluxGuidance", "SaveImage",
+        ],
+        "leader_profile": [
+            "CLIPTextEncode", "SamplerCustomAdvanced",
+            "BasicScheduler", "FluxGuidance", "SaveImage", "LoadImage",
+            "ImageResizeKJv2", "VAEEncode",
+        ],
+        "leader_action": [
+            "CLIPTextEncode", "SamplerCustomAdvanced",
+            "BasicScheduler", "FluxGuidance", "SaveImage", "LoadImage",
+            "ImageResizeKJv2", "ImageStitch", "VAEEncode",
+        ],
+    }
+    _missing_nodes: list[str] = []
+    for wf_name, wf_path in _workflow_files.items():
+        required = _workflow_required_nodes.get(wf_name, [])
+        if not required:
+            continue
+        try:
+            with open(wf_path, "r") as fh:
+                import json as _json  # local import — not needed elsewhere at module level
+                wf = _json.load(fh)
+            present = {node.get("class_type", "") for node in wf.values()}
+            missing = [n for n in required if n not in present]
+            if missing:
+                _missing_nodes.append(f"{wf_name}: {', '.join(missing)}")
+        except Exception as exc:
+            _missing_nodes.append(f"{wf_name}: failed to parse JSON ({exc})")
+
+    if _missing_nodes:
+        msg = (
+            f"Workflow JSONs missing required node types: {'; '.join(_missing_nodes)}"
+        )
+        if settings.mode == DeploymentMode.PRODUCTION:
+            logger.critical(msg + " — refusing to start in PRODUCTION mode.")
+            raise RuntimeError(msg)
+        else:
+            logger.warning(msg + " — generation may fail for these workflows.")
+
     # --- Database initialisation ---
     global _db_schema_ok
 

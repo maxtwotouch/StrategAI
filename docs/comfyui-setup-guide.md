@@ -264,18 +264,55 @@ ComfyUI ≥ 0.9.2):
 | `CLIPLoader` | Loads the Qwen 3 4B text encoder (type=flux2) | ✅ |
 | `VAELoader` | Loads the Flux2 VAE | ✅ |
 | `CLIPTextEncode` | Encodes the positive prompt | ✅ |
-| `EmptyFlux2LatentImage` | Creates latent tensor (txt2img) | ✅ |
+| `EmptyLatentImage` | Creates latent tensor (txt2img) | ✅ |
 | `LoadImage` | Loads reference image (img2img) | ✅ |
 | `VAEEncode` | Encodes reference image to latent | ✅ |
 | `SamplerCustomAdvanced` | Flux2-native sampler | ✅ |
-| `CFGGuider` | Flux2 guidance (cfg 3.5) | ✅ |
-| `Flux2Scheduler` | Noise schedule (4 steps) | ✅ |
+| `FluxGuidance` | Flux2 user-facing guidance control | ✅ |
+| `CFGGuider` | Flux2 internal guidance wiring (cfg=1.0) | ✅ |
+| `BasicScheduler` | Noise schedule (steps, denoise) | ✅ |
 | `KSamplerSelect` | Sampler selector (euler) | ✅ |
 | `RandomNoise` | Seeded noise generator | ✅ |
 | `VAEDecode` | Decodes latent to image | ✅ |
 | `SaveImage` | Saves output PNG | ✅ |
+| **`ImageResizeKJv2`** | High-quality resize with Lanczos | ❌ **Custom** — see below |
+| **`Image Remove Background (rembg)`** | AI background removal → RGBA | ❌ **Custom** — see below |
+| **`ImageStitch`** | Stitches two images side-by-side (leader_action) | ✅ |
 
-All are built into ComfyUI ≥ 0.9.2 — no custom node installation required.
+### 4.4 Required Custom Nodes
+
+Two custom node packages are required — they are **not** bundled with ComfyUI.
+
+#### Custom Node 1: KJNodes (`ImageResizeKJv2`)
+
+- **Repository:** https://github.com/kijai/ComfyUI-KJNodes
+- **Install:**
+  ```bash
+  cd "$COMFYUI_DIR/custom_nodes"
+  git clone https://github.com/kijai/ComfyUI-KJNodes.git
+  ```
+- **Used by:** All workflows except `leader_splash.json`
+- **Purpose:** High-quality image resize with Lanczos interpolation, keep-proportion
+  options (`stretch` / `resize`), and device selection (`cpu` / `gpu`).
+
+#### Custom Node 2: rembg (Background Removal)
+
+- **Repository:** https://github.com/Loewen-Hob/rembg-comfyui-node-better
+- **Install:**
+  ```bash
+  cd "$COMFYUI_DIR/custom_nodes"
+  git clone https://github.com/Loewen-Hob/rembg-comfyui-node-better.git
+  cd "$COMFYUI_DIR"
+  venv/bin/pip install rembg[gpu]
+  ```
+- **Used by:** `txt2img.json` only
+- **Purpose:** AI-powered background removal producing clean RGBA output.
+  Uses the `u2net` model (~176 MB, downloaded automatically on first use).
+- **VRAM:** ~500 MB additional during inference.
+
+> **Note:** The `PixelArtDetector` node referenced in earlier documentation
+> is **not present** in the current workflow JSONs.  It is documented in
+> `workflow-design-justification.md` for informational purposes only.
 
 ---
 

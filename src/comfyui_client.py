@@ -604,10 +604,11 @@ def _patch_workflow(
 
     - ``CLIPTextEncode`` → positive prompt
     - ``SamplerCustomAdvanced`` → noise_seed (Flux2 Klein workflows)
-    - ``EmptyFlux2LatentImage`` → width / height
+    - ``EmptyFlux2LatentImage`` / ``EmptyLatentImage`` → width / height
     - ``LoadImage`` → uploaded image or reference filename
-    - ``CFGGuider`` → cfg
-    - ``Flux2Scheduler`` → steps, denoise
+    - ``FluxGuidance`` → guidance (user-facing Flux2 Klein guidance control)
+    - ``CFGGuider`` → cfg (internal Flux2 parameter, usually 1.0)
+    - ``Flux2Scheduler`` / ``BasicScheduler`` → steps, denoise
     - ``KSamplerSelect`` → sampler_name
     - ``RandomNoise`` → noise_seed (img2img workflows)
     """
@@ -630,8 +631,8 @@ def _patch_workflow(
             if "noise_seed" in inputs:
                 inputs["noise_seed"] = seed
 
-        # --- Latent dimensions — Flux2 Klein ---
-        if ct == "EmptyFlux2LatentImage":
+        # --- Latent dimensions — Flux2 Klein (supports both node type names) ---
+        if ct in ("EmptyFlux2LatentImage", "EmptyLatentImage"):
             if width is not None:
                 inputs["width"] = width
             if height is not None:
@@ -642,10 +643,12 @@ def _patch_workflow(
             inputs["image"] = uploaded[node_id]
 
         # --- LoadImage reference filename ---
+        # ComfyUI defaults LoadImage titles to "Load Image"; we also support
+        # explicit "Reference Image" / "Load Reference Image" renames.
         if ct == "LoadImage" and ref_image_filename is not None:
             meta = node.get("_meta", {})
             title = meta.get("title", "").lower()
-            if title == "load reference image" or title == "reference image":
+            if "load image" in title or "reference image" in title:
                 # Sanitize to prevent path traversal
                 inputs["image"] = os.path.basename(ref_image_filename)
 
@@ -653,21 +656,29 @@ def _patch_workflow(
         if extra_overrides and node_id in extra_overrides:
             inputs.update(extra_overrides[node_id])
 
-    # --- CFG Guider (Flux2 Klein) ---
+    # --- FluxGuidance (user-facing guidance control in Flux2 Klein workflows) ---
+    for node in workflow.values():
+        if node.get("class_type") == "FluxGuidance":
+            if cfg_guidance is not None:
+                node["inputs"]["guidance"] = cfg_guidance
+            break
+
+    # --- CFG Guider (Flux2 Klein internal — cfg is usually 1.0) ---
     for node in workflow.values():
         if node.get("class_type") == "CFGGuider":
             if cfg_guidance is not None:
                 node["inputs"]["cfg"] = cfg_guidance
             break  # only one CFGGuider per workflow
 
-    # --- Flux2 Scheduler (steps + denoise) ---
+    # --- Flux2 / Basic Scheduler (steps + denoise) ---
     for node in workflow.values():
-        if node.get("class_type") == "Flux2Scheduler":
+        if node.get("class_type") in ("Flux2Scheduler", "BasicScheduler"):
             if steps is not None:
                 node["inputs"]["steps"] = steps
             if denoise is not None:
                 node["inputs"]["denoise"] = denoise
-            break
+            # No break — patch all matching nodes (real workflows have one,
+            # but tests may have both for backward-compat coverage).
 
     # --- KSamplerSelect (sampler name) ---
     for node in workflow.values():

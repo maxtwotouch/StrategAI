@@ -232,7 +232,7 @@ class LeaderEngine:
         # 2. Seed
         seed = req.seed if req.seed is not None else leader.splash_seed
 
-        # 3. Upload reference image — with path traversal protection
+        # 3. Load reference image — with path traversal protection
         ref_base = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)).resolve()
         ref_filename = os.path.basename(leader.reference_filename)
         ref_path = (ref_base / ref_filename).resolve()
@@ -248,7 +248,12 @@ class LeaderEngine:
             raise RuntimeError(
                 f"Failed to open reference image at {ref_path}: {exc}"
             ) from exc
-        await self._client.upload_reference_image(ref_img, leader.reference_filename)
+
+        # 3b. The leader_action workflow uses ImageStitch which requires TWO
+        #     input images (nodes 35 and 36).  For single-leader action we
+        #     supply a transparent placeholder as the second input so the
+        #     stitch node produces a valid canvas.
+        empty_img = Image.new("RGBA", ref_img.size, (0, 0, 0, 0))
 
         # 4. Build prompt
         prompt = build_prompt(req)
@@ -256,13 +261,13 @@ class LeaderEngine:
         # 5. Workflow path
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_action.json")
 
-        # 6. Run
+        # 6. Run — upload both images via input_images (node_id → PIL Image)
         start = time.time()
         img = await self._client.generate(
             wf_path,
             positive_prompt=prompt,
             seed=seed,
-            ref_image_filename=leader.reference_filename,
+            input_images={"35": ref_img, "36": empty_img},
         )
 
         # 7. Save

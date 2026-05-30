@@ -6,7 +6,7 @@
 > **VAE:** `flux2-vae.safetensors`  
 > **VRAM Budget:** ~8.4 GB  
 > **Inference:** ~1.2s on RTX 5090, ~3–5s on consumer GPUs  
-> **ComfyUI Version:** ≥ 0.9.2 (requires Flux2Scheduler, EmptyFlux2LatentImage, SamplerCustomAdvanced, CFGGuider)
+> **ComfyUI Version:** ≥ 0.9.2 (requires BasicScheduler, EmptyLatentImage, SamplerCustomAdvanced, FluxGuidance, CFGGuider)
 
 ---
 
@@ -18,11 +18,12 @@
 4. [Workflow 2: `leader_splash.json` — Leader Splash Art](#4-workflow-2-leader_splashjson)
 5. [Workflow 3: `leader_profile.json` — Leader Profile Portrait](#5-workflow-3-leader_profilejson)
 6. [Workflow 4: `leader_action.json` — Leader Action Scene](#6-workflow-4-leader_actionjson)
-7. [Parameter Reference Table](#7-parameter-reference-table)
-8. [Resolution Justification](#8-resolution-justification)
-9. [Downscale Strategy: Why ComfyUI Image Resize](#9-downscale-strategy)
-10. [Prompting Principles](#10-prompting-principles)
-11. [Sources](#11-sources)
+7. [Workflow 5: `background_tile.json` — Seamless Ground Textures](#7-workflow-5-background_tilejson)
+8. [Parameter Reference Table](#8-parameter-reference-table)
+9. [Resolution Justification](#9-resolution-justification)
+10. [Downscale Strategy: Why ComfyUI Image Resize](#10-downscale-strategy)
+11. [Prompting Principles](#11-prompting-principles)
+12. [Sources](#12-sources)
 
 ---
 
@@ -62,15 +63,16 @@ All 4 workflows share the same Flux2-native node architecture. This is fundament
 graph TD
     A[UNETLoader<br/>flux-2-klein-4b-fp8] --> D[SamplerCustomAdvanced]
     B[CLIPLoader<br/>qwen_3_4b, type:flux2] --> C[CLIPTextEncode<br/>Positive Prompt]
-    C --> E[CFGGuider<br/>cfg: 3.5]
+    C --> F[FluxGuidance<br/>guidance: 2.5-8]
+    F --> E[CFGGuider<br/>cfg: 1.0]
     A --> E
     E --> D
-    F[VAELoader<br/>flux2-vae] --> G[VAEDecode]
-    H[EmptyFlux2LatentImage<br/>or VAEEncode from ref] --> D
-    I[Flux2Scheduler<br/>steps:4] --> D
-    J[KSamplerSelect<br/>euler] --> D
-    D --> G
-    G --> K[Image Resize<br/>if needed] --> L[SaveImage]
+    G[VAELoader<br/>flux2-vae] --> H[VAEDecode]
+    I[EmptyLatentImage<br/>or VAEEncode from ref] --> D
+    J[BasicScheduler<br/>steps: 4, simple] --> D
+    K[KSamplerSelect<br/>euler] --> D
+    D --> H
+    H --> L[ImageResizeKJv2<br/>if needed] --> M[SaveImage]
 ```
 
 ### Why Split Model Loading?
@@ -81,21 +83,36 @@ Flux2 Klein uses **split model loading** (`UNETLoader` + `CLIPLoader` + `VAELoad
 2. **Different quantization formats** — the UNet can use FP8, GGUF, or BF16 without affecting the text encoder or VAE
 3. **Selective offloading** — ComfyUI can offload the UNet while keeping the lighter text encoder in VRAM, reducing memory pressure between generations
 
-### Why Flux2Scheduler Instead of KSampler?
+### Why BasicScheduler Instead of KSampler?
 
-The `Flux2Scheduler` node is purpose-built for rectified flow models (Flux2 family). It manages the noise schedule and timestep distribution that Flux2 was trained on. Using a generic KSampler with Flux2 produces suboptimal results because:
+The `BasicScheduler` node manages the noise schedule and timestep distribution
+for rectified flow models (Flux2 family).  Using a generic KSampler with Flux2
+produces suboptimal results because:
 
 - Flux2 uses a **rectified flow** formulation, not standard diffusion
 - The noise schedule is non-linear and model-specific
-- The `Flux2Scheduler` node applies the correct sigma distribution for the 4-step distilled inference
+- The `BasicScheduler` node applies the correct sigma distribution for the 4-step distilled inference
+- **Scheduler type `simple`** is the Flux2 default and matches the model's training distribution
 
-### Why CFGGuider Instead of KSampler cfg?
+### Why FluxGuidance + CFGGuider?
 
-In traditional SDXL, the CFG scale was a parameter on the KSampler node. In Flux2, guidance is applied through a dedicated `CFGGuider` node that sits between the text conditioning and the sampler. This separation allows:
+In traditional SDXL, the CFG scale was a parameter on the KSampler node. Flux2
+separates guidance into two nodes:
 
-- **Classifier-free guidance** applied at the conditioning level, not the sampling level
-- **Independent tuning** of guidance without affecting the sampler configuration
-- **Guidance value of 3.5** is the Flux2 distilled default, approximating what CFG 7 would do in older models
+- **`FluxGuidance`**: The **user-facing** guidance control.  Sets the guidance
+  strength applied to the positive conditioning.  Values range from 2.5
+  (background tiles, organic textures) to 8 (leader profiles, strong identity
+  preservation).  This is the parameter you adjust to control creative freedom
+  vs prompt adherence.
+
+- **`CFGGuider`**: An **internal wiring node** that connects the model,
+  positive conditioning (from FluxGuidance), and zeroed-out negative
+  conditioning.  Its `cfg` parameter is always **1.0** — this is a Flux2
+  architectural requirement, not a tuning knob.  Changing it from 1.0
+  produces incorrect results.
+
+This separation allows independent tuning of guidance without affecting the
+sampler configuration.
 
 ### Why No Negative Prompt Node?
 
@@ -259,33 +276,33 @@ Downscaling would discard detail needed for character consistency in downstream 
 |------|-----------|-------|---------------|
 | `LoadImage` | `image` | `PLACEHOLDER_REF` | Injected by engine (splash art) |
 | `VAEEncode` | — | (from LoadImage) | Encode reference into latent space |
-| `CFGGuider` | `cfg` | `3.5` | Standard |
-| `Flux2Scheduler` | `steps` | `4` | Distilled |
-| `Flux2Scheduler` | `denoise` | **`0.30`** | Critical — see below |
+| `CFGGuider` | `cfg` | `3.5` | Flux2 distilled default |
+| `BasicScheduler` | `steps` | `4` | Distilled 4-step inference |
+| `BasicScheduler` | `denoise` | **`0.9`** | Critical — see below |
 | `KSamplerSelect` | `sampler_name` | `euler` | |
 | `Image Resize` | `width` | `512` | Profile icon resolution |
 | `Image Resize` | `height` | `512` | Square 1:1 format |
 | `Image Resize` | `method` | `lanczos` | |
 | `SaveImage` | `filename_prefix` | `leader_profile` | |
 
-### Why Denoise 0.30?
+### Why Denoise 0.9?
 
 The denoise parameter controls how much the reference image influences the output:
 
 | Denoise | Effect | Use Case |
 |---------|--------|----------|
 | 0.0 | Exact copy of reference | Not useful |
-| **0.30** | Preserves identity, allows framing changes | **Profile portraits** — same face, closer crop |
-| 0.60 | Significant changes, same character | Action scenes — new context, same person |
+| **0.9** | Minimal reference influence, allows major framing/composition changes | **Profile portraits** — close-up crop, new lighting, different expression |
+| 0.85 | Significant changes, same character | Action scenes — new context, same person |
 | 1.0 | Complete regeneration | Full txt2img |
 
-At **0.30**, the model:
-- Preserves the leader's facial features, skin tone, hair, and distinguishing marks (scar, jewelry)
-- Allows the composition to shift from wide cinematic to close-up portrait framing
-- Maintains enough flexibility for Rembrandt-style lighting and shallow depth of field
-- Prevents "identity drift" where the leader starts looking like a different person
+At **0.9**, the model:
+- Preserves the leader's core facial identity (structure, key features)
+- Allows the composition to shift dramatically from wide cinematic to close-up portrait framing
+- Enables Rembrandt-style lighting and shallow depth of field
+- Provides enough creative freedom for the portrait to feel like a distinct asset
 
-This value was validated in the existing SDXL pipeline and carries forward to Flux2.
+This is the highest denoise that reliably preserves character identity.
 
 ### Why 512×512 Downscale?
 
@@ -304,15 +321,15 @@ The profile image is used as a **UI icon** (leader selection screen, diplomacy p
 | `LoadImage` | `image` | `PLACEHOLDER_REF` | Injected by engine (splash art) |
 | `VAEEncode` | — | (from LoadImage) | Encode reference into latent space |
 | `CFGGuider` | `cfg` | `3.5` | Standard |
-| `Flux2Scheduler` | `steps` | `4` | Distilled |
-| `Flux2Scheduler` | `denoise` | **`0.60`** | Critical — see below |
+| `BasicScheduler` | `steps` | `4` | Distilled |
+| `BasicScheduler` | `denoise` | **`0.85`** | Critical — see below |
 | `KSamplerSelect` | `sampler_name` | `euler` | |
 | `SaveImage` | `filename_prefix` | `leader_action` | |
 | **No Image Resize** | — | — | Cinematic resolution preserved |
 
-### Why Denoise 0.60?
+### Why Denoise 0.85?
 
-At **0.60**, the model:
+At **0.85**, the model:
 - Preserves the leader's core identity (facial structure, key features)
 - Allows significant scene changes — new location, new pose, new lighting, new action context
 - Provides enough creative freedom for the action scene to feel distinct from the splash
@@ -320,32 +337,96 @@ At **0.60**, the model:
 
 This is the highest denoise that reliably preserves character consistency across the Flux2 Klein architecture.
 
+The leader_action workflow uses `ImageStitch` to combine two reference images
+side-by-side (single-leader actions supply a transparent placeholder for the
+second slot).  The stitched reference is resized via `ImageResizeKJv2` to
+1920×1088 before VAE encoding.
+
 ### Why No Downscale?
 
 Same rationale as leader splash — action scenes are cinematic showcase assets, not in-game sprites. They are displayed at full resolution in UI contexts (event screens, diplomacy scenes).
 
 ---
 
-## 7. Parameter Reference Table
+## 7. Workflow 5: `background_tile.json` — Seamless Ground Textures
 
-| Parameter | txt2img.json | leader_splash.json | leader_profile.json | leader_action.json |
-|-----------|-------------|-------------------|--------------------|--------------------|
-| **Model** | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 |
-| **Text Encoder** | qwen_3_4b | qwen_3_4b | qwen_3_4b | qwen_3_4b |
-| **VAE** | flux2-vae | flux2-vae | flux2-vae | flux2-vae |
-| **Steps** | 4 | 4 | 4 | 4 |
-| **CFG (Guider)** | 3.5 | 3.5 | 3.5 | 3.5 |
-| **Sampler** | euler | euler | euler | euler |
-| **Denoise** | 1.0 | 1.0 | 0.30 | 0.60 |
-| **Gen Resolution** | 1024×1024 | 1920×1088 | from ref | from ref |
-| **Output Resolution** | 128×128 | 1920×1088 | 512×512 | 1920×1088 |
-| **Image Resize** | Yes (Lanczos) | No | Yes (Lanczos) | No |
-| **Reference Image** | No | No | Yes (splash) | Yes (splash) |
-| **Negative Prompt** | No | No | No | No |
+**Purpose:** Generate seamless tiling ground textures at 256×256 for game maps.
+
+Unlike the tile asset workflow, background tiles have no LoRA (`<tdp>` trigger
+is absent), no background removal (textures fill the frame), and use a lower
+guidance value to allow organic variation.
+
+### Node Configuration
+
+| Node | Parameter | Value | Justification |
+|------|-----------|-------|---------------|
+| `UNETLoader` | `unet_name` | `flux-2-klein-4b-fp8.safetensors` | Same model |
+| `CLIPLoader` | `clip_name` | `qwen_3_4b.safetensors` | Same text encoder |
+| `VAELoader` | `vae_name` | `flux2-vae.safetensors` | Same VAE |
+| `FluxGuidance` | `guidance` | **`2.5`** | Lower than assets — see below |
+| `BasicScheduler` | `steps` | `4` | Distilled 4-step |
+| `BasicScheduler` | `denoise` | `1.0` | Full txt2img |
+| `KSamplerSelect` | `sampler_name` | `euler` | Stable, fast |
+| `EmptyLatentImage` | `width` | `1024` | Native gen resolution |
+| `EmptyLatentImage` | `height` | `1024` | Native gen resolution |
+| `ImageResizeKJv2` | `width` | `256` | Target tile size |
+| `ImageResizeKJv2` | `height` | `256` | Target tile size |
+| `ImageResizeKJv2` | `keep_proportion` | `stretch` | Force exact 256×256 |
+| `ImageResizeKJv2` | `upscale_method` | `lanczos` | Best downscale quality |
+| `SaveImage` | `filename_prefix` | `background_tile` | |
+| **No LoRA** | — | — | No `<tdp>` LoRA applied |
+| **No rembg** | — | — | Textures fill the frame |
+
+### Why Guidance 2.5 Instead of 3.5?
+
+Background tile textures need **organic variation** — grass, dirt, stone
+patterns that look natural when tiled.  At guidance 3.5 (the txt2img default),
+the model over-adheres to "pixel art" constraints, producing overly rigid,
+repetitive patterns that create visible grid lines when tiled.
+
+At **2.5**:
+- The model relaxes pixel-art rigidity, allowing natural texture flow
+- Seamless tiling is preserved (the prompt enforces this, not guidance)
+- Grass/dirt/stone textures look organic rather than manufactured
+- The 256×256 downscale (from 1024×1024) ensures crispness despite lower guidance
+
+Guidance was tested at 2.0 (too loose, lost coherence), 3.5 (visible tile
+grid), and 2.5 (best balance of organic texture + coherent tiling).
+
+### Why `keep_proportion: stretch`?
+
+Background tiles must be **exactly 256×256** for the game engine.  The
+`stretch` mode forces the output to exactly 256×256 regardless of the
+generated image's aspect ratio, preventing off-by-one dimension errors that
+would break tiling.  Since we generate at 1024×1024 (square), the stretch is a
+no-op in practice but serves as a safety guarantee.
 
 ---
 
-## 8. Resolution Justification
+## 8. Parameter Reference Table
+
+| Parameter | txt2img.json | background_tile.json | leader_splash.json | leader_profile.json | leader_action.json |
+|-----------|-------------|---------------------|--------------------|--------------------|--------------------|
+| **Model** | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 | flux-2-klein-4b-fp8 |
+| **Text Encoder** | qwen_3_4b | qwen_3_4b | qwen_3_4b | qwen_3_4b | qwen_3_4b |
+| **VAE** | flux2-vae | flux2-vae | flux2-vae | flux2-vae | flux2-vae |
+| **Steps** | 4 | 4 | 4 | 4 | 4 |
+| **Guidance (FluxGuidance)** | 3.5 | 2.5 | 3.5 | 8 | 4.5 |
+| **CFG (CFGGuider)** | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| **Sampler** | euler | euler | euler | euler | euler |
+| **Scheduler** | simple | simple | simple | simple | simple |
+| **Denoise** | 1.0 | 1.0 | 1.0 | 0.9 | 0.85 |
+| **Gen Resolution** | 1024×1024 | 1024×1024 | 1920×1088 | from ref | from ref |
+| **Output Resolution** | 256×256 | 256×256 | 1920×1088 | 512×512 | 1920×1088 |
+| **Image Resize** | Yes (ImageResizeKJv2) | Yes (ImageResizeKJv2) | No | Yes (ImageResizeKJv2) | Yes (ImageResizeKJv2) |
+| **Reference Image** | No | No | No | Yes (splash) | Yes (2× splash via ImageStitch) |
+| **LoRA (`<tdp>`)** | Yes | No | No | No | No |
+| **rembg** | Yes | No | No | No | No |
+| **Negative Prompt** | No | No | No | No | No |
+
+---
+
+## 9. Resolution Justification
 
 ### The Multiples-of-64 Constraint
 
@@ -376,7 +457,7 @@ Three reasons:
 
 ---
 
-## 9. Downscale Strategy: Why ComfyUI Image Resize
+## 10. Downscale Strategy: Why ComfyUI Image Resize
 
 ### Why ComfyUI Instead of Python PIL?
 
@@ -407,7 +488,7 @@ Lanczos is the gold standard for downscaling because it uses a sinc-based kernel
 
 ---
 
-## 10. Prompting Principles
+## 11. Prompting Principles
 
 Based on Black Forest Labs' official documentation and community best practices:
 
@@ -493,7 +574,7 @@ exclusively from `config/prompt_templates.json`. No prompt prose is hardcoded in
 
 ---
 
-## 11. Sources
+## 12. Sources
 
 1. **Black Forest Labs — FLUX.2 Prompting Guide**: https://docs.bfl.ml/guides/prompting_guide_flux2
 2. **ComfyUI — Flux.2 Klein 4B Guide**: https://docs.comfy.org/tutorials/flux/flux-2-klein
