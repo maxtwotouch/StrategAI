@@ -65,7 +65,7 @@ Delegate to sub-agents for domain-specific work:
 
 ## Project Conventions
 
-- Trigger token: `<tdmp>` (training configs use `<tdp>`; the toolkit injects it)
+- Trigger token: `<tdp>` (the toolkit injects it at training time)
 - Caption format: natural language sentences, never structured tags
 - Angle phrase: `top-down view.` (replaced old `Front view overhead elevated medium shot.`)
 - Dataset root: `dataset/` with subdirs `hf/`, `derived/`, `merge_new/`, `old/`

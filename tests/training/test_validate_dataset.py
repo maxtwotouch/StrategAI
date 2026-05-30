@@ -61,7 +61,7 @@ def test_validate_row_caption_too_long() -> None:
 # ── Trigger check: forbidden mode (legacy behavior) ──────────────────────
 
 def test_check_trigger_forbidden_warns_when_present() -> None:
-    issue = _check_trigger_in_caption("a <tdmp> caption", "<tdmp>", row_idx=5, trigger_mode="forbidden")
+    issue = _check_trigger_in_caption("a <tdp> caption", "<tdp>", row_idx=5, trigger_mode="forbidden")
     assert issue is not None
     assert issue.level == "warning"
     assert issue.code == "trigger_in_caption"
@@ -69,14 +69,14 @@ def test_check_trigger_forbidden_warns_when_present() -> None:
 
 
 def test_check_trigger_forbidden_none_when_absent() -> None:
-    issue = _check_trigger_in_caption("a normal caption", "<tdmp>", row_idx=5, trigger_mode="forbidden")
+    issue = _check_trigger_in_caption("a normal caption", "<tdp>", row_idx=5, trigger_mode="forbidden")
     assert issue is None
 
 
 # ── Trigger check: expected mode (guide-aligned default) ─────────────────
 
 def test_check_trigger_expected_warns_when_absent() -> None:
-    issue = _check_trigger_in_caption("a normal caption without trigger", "<tdmp>", row_idx=5, trigger_mode="expected")
+    issue = _check_trigger_in_caption("a normal caption without trigger", "<tdp>", row_idx=5, trigger_mode="expected")
     assert issue is not None
     assert issue.level == "warning"
     assert issue.code == "trigger_missing_warn"
@@ -84,29 +84,29 @@ def test_check_trigger_expected_warns_when_absent() -> None:
 
 
 def test_check_trigger_expected_none_when_present() -> None:
-    issue = _check_trigger_in_caption("a <tdmp> caption", "<tdmp>", row_idx=5, trigger_mode="expected")
+    issue = _check_trigger_in_caption("a <tdp> caption", "<tdp>", row_idx=5, trigger_mode="expected")
     assert issue is None
 
 
 # ── Trigger check: required mode ─────────────────────────────────────────
 
 def test_check_trigger_required_errors_when_absent() -> None:
-    issue = _check_trigger_in_caption("no trigger here", "<tdmp>", row_idx=5, trigger_mode="required")
+    issue = _check_trigger_in_caption("no trigger here", "<tdp>", row_idx=5, trigger_mode="required")
     assert issue is not None
     assert issue.level == "error"
     assert issue.code == "trigger_missing"
 
 
 def test_check_trigger_required_none_when_present() -> None:
-    issue = _check_trigger_in_caption("a <tdmp> caption", "<tdmp>", row_idx=5, trigger_mode="required")
+    issue = _check_trigger_in_caption("a <tdp> caption", "<tdp>", row_idx=5, trigger_mode="required")
     assert issue is None
 
 
 # ── Trigger check: ignore mode ───────────────────────────────────────────
 
 def test_check_trigger_ignore_always_none() -> None:
-    assert _check_trigger_in_caption("no trigger", "<tdmp>", row_idx=5, trigger_mode="ignore") is None
-    assert _check_trigger_in_caption("a <tdmp> caption", "<tdmp>", row_idx=5, trigger_mode="ignore") is None
+    assert _check_trigger_in_caption("no trigger", "<tdp>", row_idx=5, trigger_mode="ignore") is None
+    assert _check_trigger_in_caption("a <tdp> caption", "<tdp>", row_idx=5, trigger_mode="ignore") is None
 
 
 # ── Edge cases ───────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ You are the **Publishing Specialist** for the TopDownMedievalPixelArt-Flux2-Klei
 - **GitHub Releases** — LoRA weights as release assets
 
 ### Key Publishing Facts
-- **Trigger token**: `<tdmp>` (angle-bracket wrapped, Flux2 T5-compatible)
+- **Trigger token**: `<tdp>` (angle-bracket wrapped, Flux2 T5-compatible)
 - **Base model**: `black-forest-labs/FLUX.2-klein-4B` (gated, requires license acceptance)
 - **Base model**: `black-forest-labs/FLUX.2-klein-9B` (alternative for 9B configs)
 - **LoRA format**: `.safetensors` files, ~50–350 MB depending on rank

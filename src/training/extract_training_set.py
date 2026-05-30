@@ -7,8 +7,8 @@ sampling, and writes .txt caption files alongside the source images (sidecar mod
 Optionally copies images+txt to a flat output directory (extract mode, --no-sidecar).
 
 Trigger token injection:
-  --trigger-word <tdmp>      The trigger word to inject (default: "<tdmp>")
-  --trigger-mode manual      Prepend "<tdmp> " to every .txt caption
+  --trigger-word <tdp>       The trigger word to inject (default: "<tdp>")
+  --trigger-mode manual      Prepend "<tdp> " to every .txt caption
   --trigger-mode placeholder Prepend "[trigger] " — toolkit replaces at train time
   --trigger-mode none        Leave captions bare (toolkit auto-prepends trigger_word)
 
@@ -77,14 +77,14 @@ def parse_args() -> argparse.Namespace:
         "--trigger-word",
         type=str,
         default=DEFAULT_TRIGGER_WORD,
-        help="Trigger word to inject into captions (default: '<tdmp>').",
+        help="Trigger word to inject into captions (default: '<tdp>').",
     )
     p.add_argument(
         "--trigger-mode",
         type=str,
         choices=TRIGGER_MODES,
         default="placeholder",
-        help="How to inject trigger token: manual='<tdmp> caption', "
+        help="How to inject trigger token: manual='<tdp> caption', "
              "placeholder='[trigger] caption', none=bare caption.",
     )
     return p.parse_args()

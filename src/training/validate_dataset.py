@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
         "--trigger-word-override",
         type=str,
         default=None,
-        help="Override trigger_word from training config (e.g. '<tdmp>' or '[trigger]'). "
+        help="Override trigger_word from training config (e.g. '<tdp>' or '[trigger]'). "
              "Use '[trigger]' when validating placeholder-based captions.",
     )
     return parser.parse_args()
