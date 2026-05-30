@@ -41,7 +41,7 @@ size limits, and 38 new tests (307 → 345).
 - [ ] **Celery + Redis task queue**: Non-blocking generation at scale
 - [ ] **S3 / R2 object storage**: Replace in-memory/disk AssetStore for multi-node deployments
 - [ ] **Separate GPU nodes**: Web server on CPU instances, ComfyUI on GPU instances
-- [ ] **PostgreSQL migration**: Replace SQLite for concurrent production workloads
+- [ ] **Database hardening**: Tune SQLite WAL settings and connection pool for load
 
 ---
 

@@ -310,9 +310,7 @@ DATABASE_RESET=true uvicorn src.main:app --host 0.0.0.0 --port 8000
 This drops and recreates all tables. **Warning: this deletes all data.**
 
 ### Production Notes
-- **SQLite** is used by default and works for single-worker deployments. For concurrent requests, switch to **PostgreSQL**.
-  - Set `DATABASE_URL` in `.env` to a PostgreSQL connection string.
-  - A startup warning is emitted if running in production mode with SQLite.
+- **SQLite** is used exclusively. WAL journal mode enables safe concurrent reads and writes. For deployments with multiple worker processes, use a reverse proxy with sticky sessions.
 - Multi-worker: run behind `gunicorn` with `uvicorn` workers (not yet configured — see [docs/next_steps.md](docs/next_steps.md)), or use a process manager.
 
 ### Common Issues

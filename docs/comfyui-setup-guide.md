@@ -451,5 +451,5 @@ organization specifically for ComfyUI compatibility.
   filename and source are confirmed.
 - **Multi-node**: See [architecture.md](architecture.md) §4 (ComfyUI Client)
   for load-balanced multi-GPU setup.
-- **Production**: See [architecture.md](architecture.md) §8 for PostgreSQL
-  migration and Celery task queues.
+- **Production**: See [architecture.md](architecture.md) §7 for known issues and
+  production guidance.

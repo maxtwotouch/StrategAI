@@ -1,5 +1,5 @@
 ---
-description: "Use when: designing database schema changes, creating Alembic migrations, modifying ORM models, adding new tables or columns, optimizing queries, fixing DB constraints, reviewing FK relationships, troubleshooting migration issues, or planning PostgreSQL migration. DO NOT USE for: application logic changes unrelated to persistence."
+description: "Use when: designing database schema changes, creating Alembic migrations, modifying ORM models, adding new tables or columns, optimizing queries, fixing DB constraints, reviewing FK relationships, or troubleshooting migration issues. DO NOT USE for: application logic changes unrelated to persistence."
 name: "Database Architect"
 tools: [read, search, edit, execute, agent]
 agents: [Research]

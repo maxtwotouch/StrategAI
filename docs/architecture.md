@@ -154,9 +154,7 @@ Controlled via `config.yaml` (version-controlled) with `.env` overrides using
    - Solution: `verify_schema_health()` checks at startup; reset via `DATABASE_RESET=true`.
    - Risk: Data loss if reset is triggered accidentally.
 
-2. **SQLite for Production**: Not safe for concurrent requests.
-   - Startup warning emitted if running in PRODUCTION mode with SQLite.
-   - Use PostgreSQL with `pool_pre_ping=True, pool_recycle=3600` for production.
+2. **SQLite for Production**: SQLite with WAL journal mode supports concurrent reads and writes safely for single-worker deployments.  For deployments with more than one worker process, run behind a reverse proxy that pins sessions to a single backend.
 
 3. **ComfyUI Client Initialization Race**: Non-async `.http` property can be double-initialized.
    - Solution: Use async `get_http()` instead; all engine code now uses this.

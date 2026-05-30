@@ -192,14 +192,13 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="",
         description="Database connection URL.  Leave empty to use the default "
-                    "SQLite database at the project root (tilemap.db).  For "
-                    "PostgreSQL: postgresql://user:pass@host:5432/dbname",
+                    "SQLite database at the project root (tilemap.db).",
     )
     mode: DeploymentMode = Field(
         default=DeploymentMode.DEVELOPMENT,
         description="Deployment environment. 'production' enables stricter "
-                    "safety checks (CORS must be explicit, database must be "
-                    "PostgreSQL, etc.).",
+                    "safety checks (CORS must be explicit, schema mismatches "
+                    "are fatal, etc.).",
     )
     comfyui: ComfyUISettings = Field(default_factory=ComfyUISettings)
     paths: PathSettings = Field(default_factory=PathSettings)

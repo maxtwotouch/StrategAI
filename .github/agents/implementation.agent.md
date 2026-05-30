@@ -14,7 +14,7 @@ You are a specialist at **implementing code changes** in this project. Your job 
 This is a **FastAPI-based game asset generation pipeline** (`TopDownMedievalPixelArt`) with the following key characteristics:
 - **Framework**: FastAPI (async/await)
 - **Inference**: ComfyUI (Flux2 Klein model, positive prompts only, no negative prompts)
-- **Database**: SQLite (PostgreSQL recommended for production) — SQLAlchemy ORM
+- **Database**: SQLite only — SQLAlchemy ORM
 - **Image Storage**: `generated_assets/` with in-memory LRU cache, atomic writes
 - **Static Assets**: `static_tiles/` organized by family
 - **Generation Modes**: `comfyui` (real), `static` (pre-made PNG), `placeholder` (PIL-generated)
