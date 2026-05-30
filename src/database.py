@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time as _time_module
 from typing import Generator
 
 from sqlalchemy import (
@@ -13,6 +14,7 @@ from sqlalchemy import (
     String,
     create_engine,
     event,
+    exc as sa_exc,
     func,
     text,
 )
@@ -32,35 +34,91 @@ try:
 except Exception:
     DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'tilemap.db')}"
 
-# Connection pool settings — conservative defaults for SQLite.
-# For PostgreSQL in production, increase pool_size (e.g. 20) and add
-# pool_pre_ping=True, pool_recycle=3600.
+# Connection pool settings tuned for SQLite under concurrent load.
+# SQLite serializes all writes, so more pooled connections just increase
+# lock contention.  pool_size=2 keeps one connection for reads and one
+# for writes.  max_overflow=5 provides headroom for load spikes without
+# overwhelming the single-writer lock.
+#
+# If migrating to PostgreSQL, increase pool_size (e.g. 20) and add
+# pool_pre_ping=True, pool_recycle=3600, pool_size=20.
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
-    pool_size=5,
-    max_overflow=10,
+    pool_size=2,
+    max_overflow=5,
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
 
 
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, connection_record):
-    """Enable foreign key enforcement on every new SQLite connection.
+    """Enable SQLite PRAGMAs for production safety and concurrency.
 
-    SQLite disables foreign keys by default.  Without this pragma ALL
-    ``ondelete=CASCADE`` / ``ondelete=SET NULL`` clauses are silently
-    ignored, leading to orphaned child rows and data integrity violations.
+    Applied on every new SQLite connection.  All are no-ops on PostgreSQL
+    and other non-SQLite backends.
 
-    This is a no-op on PostgreSQL and other non-SQLite backends.
+    PRAGMAs set:
+    - ``foreign_keys=ON`` — enforce FK constraints (off by default).
+    - ``journal_mode=WAL`` — Write-Ahead Logging.  Readers and writers
+      run concurrently instead of blocking each other.  Critical for any
+      multi-user workload.
+    - ``busy_timeout=5000`` — wait up to 5 s instead of failing immediately
+      with SQLITE_BUSY when another connection holds the write lock.
+    - ``synchronous=NORMAL`` — still crash-safe with WAL, but avoids the
+      per-transaction fsync penalty of FULL mode for greatly improved
+      write throughput.
     """
     try:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
     except Exception:
-        pass  # Not SQLite — pragma not supported
+        pass  # Not SQLite — pragmas not supported
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# ---------------------------------------------------------------------------
+#  SQLite busy-retry helper
+# ---------------------------------------------------------------------------
+
+_SQLITE_BUSY_RETRIES = 3
+_SQLITE_BUSY_BACKOFF_MS = [50, 100, 200]
+
+
+def _execute_with_busy_retry(session: Session, operation, *args, **kwargs):
+    """Execute a database operation with retry on SQLITE_BUSY.
+
+    Even with ``busy_timeout=5000``, extreme write contention can exceed
+    the timeout.  This wrapper catches ``OperationalError: database is
+    locked`` and retries with exponential backoff (50ms → 100ms → 200ms).
+
+    Usage::
+
+        with SessionLocal() as db:
+            _execute_with_busy_retry(db, db.commit)
+    """
+    last_exc = None
+    for attempt in range(_SQLITE_BUSY_RETRIES):
+        try:
+            return operation(*args, **kwargs)
+        except sa_exc.OperationalError as exc:
+            msg = str(exc).lower()
+            if "database is locked" not in msg and "database is busy" not in msg:
+                raise
+            last_exc = exc
+            if attempt < _SQLITE_BUSY_RETRIES - 1:
+                backoff = _SQLITE_BUSY_BACKOFF_MS[attempt] / 1000.0
+                logger.warning(
+                    "SQLite busy (attempt %d/%d), retrying in %.0fms…",
+                    attempt + 1, _SQLITE_BUSY_RETRIES, backoff * 1000,
+                )
+                _time_module.sleep(backoff)
+    raise last_exc  # type: ignore[misc]
 
 
 class AssetRecord(Base):

@@ -65,6 +65,12 @@ class BackgroundTileRegistry:
             )
 
     @staticmethod
+    def count_all() -> int:
+        """Return the total number of background tile records."""
+        with SessionLocal() as db:
+            return db.query(BackgroundTileRecord).count()
+
+    @staticmethod
     def delete(background_tile_id: str) -> bool:
         """Delete a background tile record and its generated image file. Returns True if deleted."""
         with SessionLocal() as db:

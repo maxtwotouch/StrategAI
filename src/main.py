@@ -104,6 +104,8 @@ async def lifespan(app: FastAPI):
 
     # --- Startup validation ---
     # Validate prompt templates
+    from src.database import BASE_DIR as _project_root
+
     template_errors = validate_all_templates()
     if template_errors:
         logger.critical(
@@ -113,6 +115,29 @@ async def lifespan(app: FastAPI):
         )
         for err in template_errors:
             logger.critical("  • %s", err)
+        if settings.mode == DeploymentMode.PRODUCTION:
+            raise RuntimeError(
+                f"Prompt template validation failed with {len(template_errors)} "
+                f"error(s).  Refusing to start in PRODUCTION mode.  Fix the "
+                f"templates in config/prompt_templates.json and restart."
+            )
+
+    # Verify all workflow JSON files exist (fail fast in production)
+    _workflow_files = {
+        "txt2img": os.path.join(_project_root, "workflows", "txt2img.json"),
+        "background_tile": os.path.join(_project_root, "workflows", "background_tile.json"),
+        "leader_splash": os.path.join(_project_root, "workflows", "leader", "leader_splash.json"),
+        "leader_profile": os.path.join(_project_root, "workflows", "leader", "leader_profile.json"),
+        "leader_action": os.path.join(_project_root, "workflows", "leader", "leader_action.json"),
+    }
+    _missing_wf = [name for name, path in _workflow_files.items() if not os.path.isfile(path)]
+    if _missing_wf:
+        msg = f"Missing workflow JSON files: {', '.join(_missing_wf)}"
+        if settings.mode == DeploymentMode.PRODUCTION:
+            logger.critical(msg + " — refusing to start in PRODUCTION mode.")
+            raise RuntimeError(msg)
+        else:
+            logger.warning(msg + " — generation will fail for these families.")
 
     # --- Database initialisation ---
     global _db_schema_ok
@@ -133,9 +158,17 @@ async def lifespan(app: FastAPI):
         raise
 
     # Optional full reset (escape hatch when schema has diverged)
+    # Refuse to reset in production — a misconfigured .env could destroy
+    # all data on the next deployment.
     if os.environ.get("DATABASE_RESET", "").lower() in ("1", "true", "yes"):
-        logger.info("DATABASE_RESET=true — dropping and recreating all tables.")
-        reset_database()
+        if settings.mode == DeploymentMode.PRODUCTION:
+            logger.critical(
+                "DATABASE_RESET=true is NOT allowed in PRODUCTION mode. "
+                "Remove DATABASE_RESET from the environment and restart."
+            )
+        else:
+            logger.info("DATABASE_RESET=true — dropping and recreating all tables.")
+            reset_database()
 
     # Verify database connectivity
     db_ok = verify_db_connectivity()
@@ -234,6 +267,65 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ---------------------------------------------------------------------------
+#  Request ID middleware — injects a correlation ID for production tracing
+# ---------------------------------------------------------------------------
+
+from fastapi import Request as FastAPIRequest
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse as StarletteJSONResponse
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Inject a unique request ID into every request for log correlation.
+
+    Reads the ``X-Request-ID`` header if the client provides one;
+    otherwise generates a UUID4.  The ID is stored in
+    ``request.state.request_id`` and echoed in the ``X-Request-ID``
+    response header.
+    """
+
+    async def dispatch(self, request: FastAPIRequest, call_next):
+        import uuid as _uuid
+        request_id = request.headers.get("X-Request-ID", str(_uuid.uuid4()))
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
+app.add_middleware(RequestIDMiddleware)
+
+
+# ---------------------------------------------------------------------------
+#  API key authentication middleware (optional — disabled when api_key is "")
+# ---------------------------------------------------------------------------
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """Validate the ``X-API-Key`` header against the configured key.
+
+    When ``server.api_key`` is empty (the default), authentication is
+    **disabled** and all requests pass through.  Set a non-empty key to
+    require every request to include ``X-API-Key: <your-key>``.
+
+    The ``/health`` endpoint is always exempt from authentication.
+    """
+
+    async def dispatch(self, request: FastAPIRequest, call_next):
+        api_key = settings.server.api_key
+        # Skip auth if no key configured or if the path is /health
+        if not api_key or request.url.path == "/health":
+            return await call_next(request)
+        if request.headers.get("X-API-Key") != api_key:
+            return StarletteJSONResponse(
+                {"detail": "Invalid or missing API key"},
+                status_code=401,
+            )
+        return await call_next(request)
+
+
+app.add_middleware(APIKeyMiddleware)
+
 # CORS middleware — configure origins via config.yaml → server.cors_origins
 # or env var SERVER__CORS_ORIGINS (JSON array).
 app.add_middleware(
@@ -246,9 +338,6 @@ app.add_middleware(
 )
 
 # Request body size limit to prevent DOS
-from fastapi import Request as FastAPIRequest
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse as StarletteJSONResponse
 
 
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
@@ -361,6 +450,25 @@ def _require_db() -> None:
         )
 
 
+def _paginated_response(items: list, *, total_count: int, limit: int, offset: int) -> JSONResponse:
+    """Wrap a list with pagination headers (additive — does not change JSON body).
+
+    Adds ``X-Total-Count`` and ``X-Has-More`` response headers so clients
+    can discover pagination state without changing the response shape.
+    """
+    has_more = (offset + limit) < total_count
+    return JSONResponse(
+        content=jsonable_encoder(items),
+        headers={
+            "X-Total-Count": str(total_count),
+            "X-Has-More": "true" if has_more else "false",
+        },
+    )
+
+
+from fastapi.encoders import jsonable_encoder
+
+
 # ---------------------------------------------------------------------------
 #  Assets
 # ---------------------------------------------------------------------------
@@ -408,15 +516,36 @@ async def get_catalog():
 
 @app.get("/health")
 async def health_check():
-    """Report service status including ComfyUI connectivity and registered assets."""
-    _require_db()
+    """Report per-component service status — always returns 200.
+
+    Returns component-level health so monitoring tools can set alert
+    thresholds without the endpoint itself being taken out of rotation.
+    """
+    # Database status (don't use _require_db() — that would 503 the endpoint)
+    db_status = "ok" if _db_schema_ok else "unhealthy"
+
+    # ComfyUI status
     lb = get_comfyui_loadbalancer()
     comfyui_ok = False
+    comfyui_status = "unreachable"
     if lb is not None:
-        comfyui_ok = await lb.health_check()
+        try:
+            comfyui_ok = await lb.health_check()
+            comfyui_status = "ok" if comfyui_ok else "unhealthy"
+        except Exception:
+            comfyui_status = "unreachable"
+
+    # Template status
+    template_errors = validate_all_templates()
+    template_status = "ok" if not template_errors else "error"
+
     return {
-        "status": "ok",
-        "comfyui_connected": comfyui_ok,
+        "status": "ok" if (db_status == "ok" and comfyui_ok) else "degraded",
+        "components": {
+            "database": db_status,
+            "comfyui": comfyui_status,
+            "templates": template_status,
+        },
         "comfyui_nodes": len(lb._nodes) if lb else 0,
         "modes": {
             "structure": settings.get_mode("structure"),
@@ -534,7 +663,8 @@ async def list_leaders(
     """Return all registered leaders. Parallels GET /catalog."""
     _require_db()
     records = LeaderRegistry.list_all(limit=limit, offset=offset)
-    return [
+    total = LeaderRegistry.count_all()
+    items = [
         LeaderInfo(
             leader_id=r.leader_id,
             leader_name=r.leader_name,
@@ -548,6 +678,7 @@ async def list_leaders(
         )
         for r in records
     ]
+    return _paginated_response(items, total_count=total, limit=limit, offset=offset)
 
 
 @app.get("/leader/{leader_id}", response_model=LeaderInfo)
@@ -618,7 +749,8 @@ async def list_structures(
     """Return all generated structures."""
     _require_db()
     records = StructureRegistry.list_all(limit=limit, offset=offset)
-    return [
+    total = StructureRegistry.count_all()
+    items = [
         StructureResponse(
             url=f"/assets/{r.image_id}",
             asset_id=r.structure_id,
@@ -633,6 +765,7 @@ async def list_structures(
         )
         for r in records
     ]
+    return _paginated_response(items, total_count=total, limit=limit, offset=offset)
 
 
 @app.get("/structure/catalog", response_model=StructureCatalog)
@@ -710,7 +843,8 @@ async def list_objects(
     """Return all generated objects."""
     _require_db()
     records = ObjectRegistry.list_all(limit=limit, offset=offset)
-    return [
+    total = ObjectRegistry.count_all()
+    items = [
         ObjectResponse(
             url=f"/assets/{r.image_id}",
             asset_id=r.object_id,
@@ -724,6 +858,7 @@ async def list_objects(
         )
         for r in records
     ]
+    return _paginated_response(items, total_count=total, limit=limit, offset=offset)
 
 
 @app.get("/object/catalog", response_model=ObjectCatalog)
@@ -799,7 +934,8 @@ async def list_terrains(
     """Return all generated terrains."""
     _require_db()
     records = TerrainRegistry.list_all(limit=limit, offset=offset)
-    return [
+    total = TerrainRegistry.count_all()
+    items = [
         TerrainResponse(
             url=f"/assets/{r.image_id}",
             asset_id=r.terrain_id,
@@ -813,6 +949,7 @@ async def list_terrains(
         )
         for r in records
     ]
+    return _paginated_response(items, total_count=total, limit=limit, offset=offset)
 
 
 @app.get("/terrain/catalog", response_model=TerrainCatalog)
@@ -897,7 +1034,8 @@ async def list_units(
     """Return all generated units."""
     _require_db()
     records = UnitRegistry.list_all(limit=limit, offset=offset)
-    return [
+    total = UnitRegistry.count_all()
+    items = [
         UnitResponse(
             url=f"/assets/{r.image_id}",
             unit_id=r.unit_id,
@@ -909,6 +1047,7 @@ async def list_units(
         )
         for r in records
     ]
+    return _paginated_response(items, total_count=total, limit=limit, offset=offset)
 
 
 @app.get("/unit/catalog", response_model=UnitCatalog)
@@ -1005,6 +1144,7 @@ async def list_background_tiles(
     """Return all generated background tiles (paginated)."""
     _require_db()
     records = BackgroundTileRegistry.list_all(limit=limit, offset=offset)
+    total = BackgroundTileRegistry.count_all()
     results = []
     for r in records:
         results.append(BackgroundTileResponse(
@@ -1012,15 +1152,16 @@ async def list_background_tiles(
             background_tile_id=r.background_tile_id,
             tile_type=r.tile_type,
             seed=r.seed,
-            generation_mode="unknown",  # populated from AssetRecord if needed
+            generation_mode=r.generation_mode if hasattr(r, "generation_mode") and r.generation_mode else "unknown",
         ))
-    # Enrich with generation_mode from AssetRecord
+    # Enrich with generation_mode from AssetRecord as fallback
     with SessionLocal() as db:
         for i, r in enumerate(records):
-            asset = db.query(AssetRecord).filter(AssetRecord.id == r.image_id).first()
-            if asset:
-                results[i].generation_mode = asset.generation_mode or "unknown"
-    return results
+            if results[i].generation_mode == "unknown":
+                asset = db.query(AssetRecord).filter(AssetRecord.id == r.image_id).first()
+                if asset and asset.generation_mode:
+                    results[i].generation_mode = asset.generation_mode
+    return _paginated_response(results, total_count=total, limit=limit, offset=offset)
 
 
 @app.get("/background_tile/catalog", response_model=BackgroundTileCatalog)

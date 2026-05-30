@@ -90,6 +90,12 @@ class UnitRegistry:
             )
 
     @staticmethod
+    def count_all() -> int:
+        """Return the total number of unit records."""
+        with SessionLocal() as db:
+            return db.query(UnitRecord).count()
+
+    @staticmethod
     def has_static(unit_type: str) -> bool:
         """Return True if a static sprite exists for this unit type.
 

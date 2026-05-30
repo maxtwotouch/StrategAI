@@ -7,26 +7,26 @@ name = "topdown-medieval-pixelart"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.20.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings[yaml]>=2.0.0",
-    "Pillow>=10.0.0",
-    "pyyaml>=6.0",
-    "sqlalchemy>=2.0.0",
-    "httpx>=0.24.0",
-    "websockets>=12.0",
-    "python-dotenv>=1.0.0",
-    "alembic>=1.13.0",
+    "fastapi>=0.100.0,<0.137.0",
+    "uvicorn[standard]>=0.20.0,<0.49.0",
+    "pydantic>=2.0.0,<2.14.0",
+    "pydantic-settings[yaml]>=2.0.0,<2.15.0",
+    "Pillow>=10.0.0,<13.0.0",
+    "pyyaml>=6.0,<7.0",
+    "sqlalchemy>=2.0.0,<2.1.0",
+    "httpx>=0.24.0,<0.29.0",
+    "websockets>=12.0,<17.0",
+    "python-dotenv>=1.0.0,<2.0",
+    "alembic>=1.13.0,<2.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
-    "pytest-cov>=4.0",
-    "pytest-mock>=3.10",
-    "aiosqlite>=0.19",
+    "pytest>=7.0,<10.0",
+    "pytest-asyncio>=0.21,<2.0",
+    "pytest-cov>=4.0,<8.0",
+    "pytest-mock>=3.10,<4.0",
+    "aiosqlite>=0.19,<1.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -334,9 +334,12 @@ def validate_background_tile_response(data: dict, details: list[str]) -> int:
 def validate_health_response(data: dict, details: list[str]) -> int:
     """Validate GET /health response."""
     passed = 0
-    passed += _check(data.get("status") == "ok", "status is 'ok'", details)
-    passed += _check(isinstance(data.get("comfyui_connected"), bool),
-                     "comfyui_connected is bool", details)
+    passed += _check(data.get("status") in ("ok", "degraded"), "status is 'ok' or 'degraded'", details)
+    passed += _check(isinstance(data.get("components"), dict), "components is dict", details)
+    passed += _check(data.get("components", {}).get("database") in ("ok", "unhealthy"),
+                     "components.database is 'ok' or 'unhealthy'", details)
+    passed += _check(data.get("components", {}).get("comfyui") in ("ok", "unhealthy", "unreachable"),
+                     "components.comfyui is valid status", details)
     passed += _check(isinstance(data.get("comfyui_nodes"), int) and data["comfyui_nodes"] >= 0,
                      "comfyui_nodes is non-negative int", details)
     passed += _check(isinstance(data.get("modes"), dict), "modes is dict", details)

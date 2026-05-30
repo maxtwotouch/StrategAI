@@ -122,6 +122,12 @@ class ServerSettings(BaseModel):
         description="Maximum memory (MB) for the in-memory image cache. "
                     "Images are evicted when either this limit or cache_max_entries is exceeded.",
     )
+    api_key: str = Field(
+        default="",
+        description="Optional static API key for authentication.  When set, "
+                    "all requests must include the header ``X-API-Key: <key>``. "
+                    "Leave empty to disable authentication (development default).",
+    )
 
 
 class DeploymentMode(str, Enum):

@@ -29,6 +29,7 @@ reports/
 *.db.*
 *.db
 *.db-journal
+*.db-*
 
 # OS
 .DS_Store

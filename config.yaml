@@ -44,6 +44,7 @@ server:
   max_request_body_mb: 10
   cache_max_entries: 200
   cache_max_mb: 500
+  api_key: ""
 
 # ---- Rate limiting (token-bucket, global) -----------------------------
 rate_limit:

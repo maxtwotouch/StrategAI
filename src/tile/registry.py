@@ -102,6 +102,11 @@ class StructureRegistry:
             ).offset(offset).limit(limit).all()
 
     @staticmethod
+    def count_all() -> int:
+        with SessionLocal() as db:
+            return db.query(StructureRecord).count()
+
+    @staticmethod
     def delete(structure_id: str) -> bool:
         with SessionLocal() as db:
             record = db.query(StructureRecord).filter(
@@ -180,6 +185,11 @@ class ObjectRegistry:
             ).offset(offset).limit(limit).all()
 
     @staticmethod
+    def count_all() -> int:
+        with SessionLocal() as db:
+            return db.query(ObjectRecord).count()
+
+    @staticmethod
     def delete(object_id: str) -> bool:
         with SessionLocal() as db:
             record = db.query(ObjectRecord).filter(
@@ -255,6 +265,11 @@ class TerrainRegistry:
             return db.query(TerrainRecord).order_by(
                 TerrainRecord.created_at.desc()
             ).offset(offset).limit(limit).all()
+
+    @staticmethod
+    def count_all() -> int:
+        with SessionLocal() as db:
+            return db.query(TerrainRecord).count()
 
     @staticmethod
     def delete(terrain_id: str) -> bool:

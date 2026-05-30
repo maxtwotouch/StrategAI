@@ -136,6 +136,12 @@ class LeaderRegistry:
             ).offset(offset).limit(limit).all()
 
     @staticmethod
+    def count_all() -> int:
+        """Return the total number of registered leaders."""
+        with SessionLocal() as db:
+            return db.query(LeaderRecord).count()
+
+    @staticmethod
     def get_reference_filename(leader_id: str) -> Optional[str]:
         """Return the reference image filename or None."""
         leader = LeaderRegistry.get(leader_id)
@@ -173,13 +179,21 @@ class LeaderRegistry:
         image_filename: str,
         session: Session | None = None,
     ) -> None:
-        """Append an action image to the leader's action_image_ids list."""
+        """Append an action image to the leader's action_image_ids list.
+
+        Uses ``SELECT ... FOR UPDATE`` to acquire a row-level lock,
+        preventing lost updates when two concurrent requests append to
+        the same leader's action list.
+        """
         _close = session is None
         db = session or SessionLocal()
         try:
-            leader = db.query(LeaderRecord).filter(
-                LeaderRecord.leader_id == leader_id
-            ).first()
+            leader = (
+                db.query(LeaderRecord)
+                .with_for_update()
+                .filter(LeaderRecord.leader_id == leader_id)
+                .first()
+            )
             if leader:
                 ids = list(leader.action_image_ids or [])
                 ids.append(image_filename)
