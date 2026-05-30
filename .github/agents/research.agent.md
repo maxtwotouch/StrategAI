@@ -2,7 +2,7 @@
 description: "Use when: exploring the codebase, researching architecture, investigating patterns, analyzing project structure, finding code references, understanding how something works, auditing dependencies, reading documentation, searching for implementations, tracing call chains, or answering questions about the codebase. DO NOT USE for: making code changes, editing files, running commands, or implementing features — this agent is read-only."
 name: "Research"
 tools: [read, search, web]
-model: "DeepSeek V4 Pro"
+agents: []
 user-invocable: false
 argument-hint: "Describe what you're looking for and desired thoroughness (quick, medium, or thorough)"
 ---
