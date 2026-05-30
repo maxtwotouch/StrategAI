@@ -1,108 +1,303 @@
 {
-  "_comment": "Flux2 Klein img2img workflow for leader action scenes. Uses LoadImage for reference, VAEEncode, denoise=0.60 for action variety.",
   "1": {
     "inputs": {
-      "unet_name": "flux-2-klein-4b-fp8.safetensors"
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
+      "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
-    "_meta": {"title": "Load UNET"}
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
   },
-  "2": {
+  "3": {
     "inputs": {
-      "text": "PLACEHOLDER_POSITIVE",
-      "clip": ["8", 0]
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "flux2",
+      "device": "default"
     },
-    "class_type": "CLIPTextEncode",
-    "_meta": {"title": "CLIP Text Encode (Positive)"}
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
   },
   "4": {
     "inputs": {
-      "image": "ref_placeholder.png",
-      "upload": "image"
+      "text": [
+        "5",
+        0
+      ],
+      "clip": [
+        "3",
+        0
+      ]
     },
-    "class_type": "LoadImage",
-    "_meta": {"title": "Load Reference Image"}
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
   },
   "5": {
     "inputs": {
-      "pixels": ["4", 0],
-      "vae": ["9", 2]
+      "value": "epic cinematic scene depicting two leaders interacting: Cleopatra VII, A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress., and Marcus Aurelius, A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations., Two leaders meeting at a marble negotiating table in a grand hall, exchanging treaty scrolls while advisors look on, in a vast sandstone temple with towering hieroglyph-carved pillars, gold and lapis lazuli accents, bronze braziers burning incense, desert beyond colonnades, low golden sunlight casting long dramatic shadows, warm amber glow suffusing everything, dust motes dancing in light beams, expression of hard-won victory, proud celebratory atmosphere, head held high, formal court or neutral meeting ground, treaty documents on the table, multiple parties present, ceremonial exchange unfolding, the character has correct human anatomy with five fingers on each hand, proportional limbs, two arms and two legs, anatomically correct pose, dramatic civilization event scene, painterly oil style with dynamic composition, consistent character rendering, widescreen 16:9 cinematic format, professional cinematic quality, dynamic action"
     },
-    "class_type": "VAEEncode",
-    "_meta": {"title": "VAE Encode"}
-  },
-  "6": {
-    "inputs": {
-      "noise": ["14", 0],
-      "guider": ["11", 0],
-      "sampler": ["13", 0],
-      "sigmas": ["12", 0],
-      "latent_image": ["5", 0]
-    },
-    "class_type": "SamplerCustomAdvanced",
-    "_meta": {"title": "Sampler Custom Advanced"}
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "String (Multiline)"
+    }
   },
   "7": {
     "inputs": {
-      "samples": ["6", 0],
-      "vae": ["9", 2]
+      "guidance": 4.5,
+      "conditioning": [
+        "4",
+        0
+      ]
     },
-    "class_type": "VAEDecode",
-    "_meta": {"title": "VAE Decode"}
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FluxGuidance"
+    }
   },
   "8": {
-    "inputs": {
-      "filename_prefix": "leader_action",
-      "images": ["7", 0]
-    },
-    "class_type": "SaveImage",
-    "_meta": {"title": "Save Image"}
-  },
-  "9": {
-    "inputs": {
-      "clip_name": "qwen_3_4b.safetensors",
-      "type": "flux2"
-    },
-    "class_type": "CLIPLoader",
-    "_meta": {"title": "Load CLIP"}
-  },
-  "10": {
-    "inputs": {
-      "vae_name": "flux2-vae.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {"title": "Load VAE"}
-  },
-  "11": {
-    "inputs": {
-      "model": ["1", 0],
-      "conditioning": ["2", 0],
-      "cfg": 3.5
-    },
-    "class_type": "CFGGuider",
-    "_meta": {"title": "CFG Guider"}
-  },
-  "12": {
-    "inputs": {
-      "model": ["1", 0],
-      "steps": 4,
-      "denoise": 0.60
-    },
-    "class_type": "Flux2Scheduler",
-    "_meta": {"title": "Flux2 Scheduler"}
-  },
-  "13": {
     "inputs": {
       "sampler_name": "euler"
     },
     "class_type": "KSamplerSelect",
-    "_meta": {"title": "KSampler Select"}
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
   },
-  "14": {
+  "10": {
     "inputs": {
-      "noise_seed": 0
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "18",
+        0
+      ],
+      "sampler": [
+        "8",
+        0
+      ],
+      "sigmas": [
+        "32",
+        0
+      ],
+      "latent_image": [
+        "38",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "11": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "15": {
+    "inputs": {
+      "noise_seed": 160270581989742
     },
     "class_type": "RandomNoise",
-    "_meta": {"title": "Random Noise"}
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "16": {
+    "inputs": {
+      "samples": [
+        "10",
+        0
+      ],
+      "vae": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "17": {
+    "inputs": {
+      "conditioning": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "18": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "7",
+        0
+      ],
+      "negative": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFGGuider"
+    }
+  },
+  "24": {
+    "inputs": {
+      "value": 1920
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "GenerationWidth"
+    }
+  },
+  "25": {
+    "inputs": {
+      "value": 1088
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "GenerationHeight"
+    }
+  },
+  "32": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 4,
+      "denoise": 0.85,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "33": {
+    "inputs": {
+      "filename_prefix": "leader_action",
+      "images": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "34": {
+    "inputs": {
+      "direction": "right",
+      "match_image_size": true,
+      "spacing_width": 0,
+      "spacing_color": "white",
+      "image1": [
+        "35",
+        0
+      ],
+      "image2": [
+        "36",
+        0
+      ]
+    },
+    "class_type": "ImageStitch",
+    "_meta": {
+      "title": "Image Stitch"
+    }
+  },
+  "35": {
+    "inputs": {
+      "image": "leader_splash_00001_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "36": {
+    "inputs": {
+      "image": "leader_splash_00002_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "37": {
+    "inputs": {
+      "width": [
+        "24",
+        0
+      ],
+      "height": [
+        "25",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "keep_proportion": "stretch",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "38": {
+    "inputs": {
+      "pixels": [
+        "37",
+        0
+      ],
+      "vae": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "39": {
+    "inputs": {
+      "images": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
   }
 }
