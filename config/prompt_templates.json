@@ -21,7 +21,7 @@
       "template": "epic cinematic wide composition of {leader_description}, {archetype}, in {culture}, {time_of_day}, {mood}, epic civilization leader splash screen, cinematic composition with dramatic chiaroscuro lighting, painterly oil style, widescreen 16:9 format, professional cinematic quality, ultra-detailed"
     },
     "leader_profile": {
-      "template": "professional close-up portrait of {leader_description}, {mood}, face filling the frame, headpiece and collar visible at the edges of the frame, professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format, professional cinematic quality, close-up portrait"
+      "template": "An extremely close-up professional portrait of {leader_description}, {mood}, face filling the frame, headpiece and collar visible at the edges of the frame, professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format, professional cinematic quality, close-up portrait"
     },
     "leader_action": {
       "template": "epic cinematic scene depicting {leader_description}, {action_description}, in {culture}, {time_of_day}, {mood}, {action_category}, dramatic civilization event scene, painterly oil style with dynamic composition, consistent character rendering, widescreen 16:9 cinematic format, professional cinematic quality, dynamic action"

@@ -126,7 +126,7 @@ epic cinematic wide composition of A regal Egyptian queen with dark hair, gold j
 **Seed:** `42` · **Resolution:** (workflow default) · **Denoise:** 0.30 · **Workflow:** `workflows/leader/leader_profile.json`
 
 ```
-professional close-up portrait of A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress., expression of hard-won victory, proud celebratory atmosphere, head held high, face filling the frame, headpiece and collar visible at the edges of the frame, professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format, professional cinematic quality, close-up portrait
+An extremely close-up professional portrait of A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress., expression of hard-won victory, proud celebratory atmosphere, head held high, face filling the frame, headpiece and collar visible at the edges of the frame, professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format, professional cinematic quality, close-up portrait
 ```
 
 ---
