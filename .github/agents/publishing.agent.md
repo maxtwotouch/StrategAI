@@ -1,7 +1,6 @@
 ---
 description: "Use when: preparing model cards, publishing to HuggingFace or Civitai, generating READMEs, writing dataset cards, checking license compliance, or preparing release artifacts"
 name: "Publishing Specialist"
-model: "DeepSeek V4 Pro"
 tools: [read, edit, search, web]
 user-invocable: false
 ---

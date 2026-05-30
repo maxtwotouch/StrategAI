@@ -1,7 +1,6 @@
 ---
 description: "Use when: running tests, fixing lint issues, refactoring Python code, reviewing code quality, adding type annotations, fixing import errors, or improving code organization"
 name: "Code Quality Specialist"
-model: "DeepSeek V4 Pro"
 tools: [read, edit, execute, search]
 user-invocable: false
 ---

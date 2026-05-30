@@ -1,7 +1,6 @@
 ---
 description: "Use when: planning project work, coordinating multi-step tasks across dataset/training/publishing pipelines, getting the project back on track, implementing complex features, or when you need structured implementation planning with delegation to specialists"
 name: "Orchestrator"
-model: "DeepSeek V4 Pro"
 tools: [read, search, edit, execute, agent, todo, web]
 agents: [dataset, training, publishing, code-quality]
 argument-hint: "What needs to get done?"

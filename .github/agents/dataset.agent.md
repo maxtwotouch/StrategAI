@@ -1,7 +1,6 @@
 ---
 description: "Use when: working with datasets — generation, validation, caption derivation, metadata.jsonl management, HF dataset preparation, image curation, or dataset statistics"
 name: "Dataset Specialist"
-model: "DeepSeek V4 Pro"
 tools: [read, edit, execute, search]
 user-invocable: false
 ---

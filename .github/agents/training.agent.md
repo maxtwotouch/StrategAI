@@ -1,7 +1,6 @@
 ---
 description: "Use when: managing LoRA training configs, launching experiments, monitoring training runs, debugging Ostris AI Toolkit issues, adjusting hyperparameters, or analyzing training outputs"
 name: "Training Specialist"
-model: "DeepSeek V4 Pro"
 tools: [read, edit, execute, search]
 user-invocable: false
 ---
