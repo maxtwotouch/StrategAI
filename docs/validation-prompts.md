@@ -15,9 +15,12 @@ builders (`src/*/prompts.py`) with the listed configuration.
 | 7 | `workflows/background_tile.json` | background_tile | sand |
 | 8 | `workflows/background_tile.json` | background_tile | stone |
 | 9 | `workflows/background_tile.json` | background_tile | dirt |
-| 10 | `workflows/leader/leader_splash.json` | leader_splash | warrior_queen, ancient_egyptian, golden_hour, triumphant |
-| 11 | `workflows/leader/leader_profile.json` | leader_profile | warrior_queen, triumphant |
-| 12 | `workflows/leader/leader_action.json` | leader_action | warrior_queen, ancient_egyptian, golden_hour, triumphant, military |
+| 10 | `workflows/leader/leader_splash.json` | leader_splash | Cleopatra — warrior_queen, ancient_egyptian, golden_hour, triumphant |
+| 11 | `workflows/leader/leader_profile.json` | leader_profile | Cleopatra — warrior_queen, triumphant |
+| 12 | `workflows/leader/leader_action.json` | leader_action | Cleopatra — warrior_queen, ancient_egyptian, golden_hour, triumphant, military |
+| 13 | `workflows/leader/leader_splash.json` | leader_splash | Marcus Aurelius — philosopher_king, classical_greek, midday, contemplative |
+| 14 | `workflows/leader/leader_profile.json` | leader_profile | Marcus Aurelius — philosopher_king, contemplative |
+| 15 | `workflows/leader/leader_action.json` | leader_action | Multi-leader — Cleopatra + Marcus Aurelius, diplomatic (two leaders) |
 
 ---
 
@@ -141,6 +144,40 @@ epic cinematic scene depicting A regal Egyptian queen with dark hair, gold jewel
 
 ---
 
+### 13. Leader 2 Splash — Philosopher King / Classical Greek / Midday / Contemplative
+
+**Seed:** `42` · **Resolution:** 1920×1088 · **Denoise:** 1.0 · **Workflow:** `workflows/leader/leader_splash.json`
+
+```
+epic cinematic wide composition of A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations., seated or standing in contemplation, scrolls or scientific instruments nearby, learned wisdom, in a marble temple with corinthian columns, olive groves on the hillside, Aegean blue sea in the distance, white stone catching golden light, harsh clear sunlight from overhead, strong contrast with deep black shadows, bright cloudless sky, expression of deep thought, quiet introspective atmosphere, weighing profound decisions, epic civilization leader splash screen, cinematic composition with dramatic chiaroscuro lighting, painterly oil style, widescreen 16:9 format, professional cinematic quality, ultra-detailed
+```
+
+---
+
+### 14. Leader 2 Profile — Philosopher King / Contemplative
+
+**Seed:** `42` · **Resolution:** (workflow default) · **Denoise:** 0.30 · **Workflow:** `workflows/leader/leader_profile.json`
+
+```
+An extremely close-up professional portrait of A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations., expression of deep thought, quiet introspective atmosphere, weighing profound decisions, face filling the frame, headpiece and collar visible at the edges of the frame, professional character profile portrait, sharp eye focus with dramatic Rembrandt-style lighting, shallow depth of field with smooth bokeh background, detailed facial features, square 1:1 format, professional cinematic quality, close-up portrait
+```
+
+---
+
+### 15. Multi-Leader Action — Cleopatra VII + Marcus Aurelius / Diplomatic
+
+**Seed:** `42` · **Resolution:** (workflow default) · **Denoise:** 0.60 · **Workflow:** `workflows/leader/leader_action.json`
+
+Two leaders interacting in a single action scene. This validates the
+`generate_multi_action` pipeline — generate both leaders' splash images first,
+then run this prompt with `LoadImage` referencing both reference images.
+
+```
+epic cinematic scene depicting two leaders interacting: Cleopatra VII, A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress., and Marcus Aurelius, A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations., Two leaders meeting at a marble negotiating table in a grand hall, exchanging treaty scrolls while advisors look on, in a vast sandstone temple with towering hieroglyph-carved pillars, gold and lapis lazuli accents, bronze braziers burning incense, desert beyond colonnades, low golden sunlight casting long dramatic shadows, warm amber glow suffusing everything, dust motes dancing in light beams, expression of hard-won victory, proud celebratory atmosphere, head held high, formal court or neutral meeting ground, treaty documents on the table, multiple parties present, ceremonial exchange unfolding, dramatic civilization event scene, painterly oil style with dynamic composition, consistent character rendering, widescreen 16:9 cinematic format, professional cinematic quality, dynamic action
+```
+
+---
+
 ## Usage
 
 ### In ComfyUI
@@ -180,10 +217,21 @@ curl -X POST http://localhost:8000/background_tile \
   -H "Content-Type: application/json" \
   -d '{"tile_type":"water","seed":42}'
 
-# Leader Splash
+# Leader Splash — Cleopatra VII
 curl -X POST http://localhost:8000/leader \
   -H "Content-Type: application/json" \
   -d '{"leader_name":"Cleopatra VII","leader_description":"A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. She wears a white linen dress and a nemes headdress.","archetype":"warrior_queen","culture":"ancient_egyptian","time_of_day":"golden_hour","mood":"triumphant","asset_type":"splash","seed":42}'
+
+# Leader Splash — Marcus Aurelius
+curl -X POST http://localhost:8000/leader \
+  -H "Content-Type: application/json" \
+  -d '{"leader_name":"Marcus Aurelius","leader_description":"A stoic Roman emperor with a greying beard, deep-set contemplative eyes, wearing a simple purple-trimmed toga. He holds an open scroll of Meditations.","archetype":"philosopher_king","culture":"classical_greek","time_of_day":"midday","mood":"contemplative","asset_type":"splash","seed":42}'
+
+# Multi-leader action — Cleopatra + Marcus Aurelius (diplomatic)
+# Requires both leaders to exist first (generate splash for each, capture their IDs)
+curl -X POST http://localhost:8000/leader \
+  -H "Content-Type: application/json" \
+  -d '{"leader_ids":["<cleopatra_id>","<marcus_id>"],"asset_type":"action","action_category":"diplomatic","action_description":"Two leaders meeting at a marble negotiating table in a grand hall, exchanging treaty scrolls while advisors look on","culture":"ancient_egyptian","time_of_day":"golden_hour","mood":"triumphant","seed":42}'
 ```
 
 ## Updating
