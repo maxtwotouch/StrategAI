@@ -73,7 +73,7 @@ Delegate to sub-agents for domain-specific work:
 - Config naming: `lora_4b_{variant}_{rank}.yaml` (e.g., `lora_4b_detailed_high.yaml`)
 - Python modules: generation tools under `src/generation/`, training tools under `src/training/`
 - Python modules run as: `python -m src.{generation|training}.{module_name}`
-- Training launched via Ostris toolkit: `python AI_TOOLKIT/run.py config/training/lora_4b_*.yaml`
+- Training launched via Ostris toolkit: set `OSTRIS_TOOLKIT` env var, then `bash scripts/train_experiments.sh` (see `docs/training.md` §5)
 
 ## Output Format
 

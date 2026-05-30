@@ -108,6 +108,7 @@ python run.py /path/to/this/repo/config/training/lora_4b_detailed_high.yaml
 
 Batch launch (all 6 experiments):
 ```bash
+export OSTRIS_TOOLKIT=/path/to/ai-toolkit
 bash scripts/train_experiments.sh
 ```
 

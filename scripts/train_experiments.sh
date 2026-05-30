@@ -6,7 +6,8 @@
 #     bash scripts/train_experiments.sh
 #
 # Requirements:
-#     - Ostris AI Toolkit at  AI_TOOLKIT/run.py  (relative to project root)
+#     - OSTRIS_TOOLKIT env var set to the ai-toolkit repo directory
+#       (e.g. export OSTRIS_TOOLKIT=/home/user/ai-toolkit)
 #     - HuggingFace CLI authenticated (huggingface-cli login)
 #     - All 6 configs present in config/
 #     - Derived datasets already generated (see: python -m src.derive_captions)
@@ -18,7 +19,16 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-TOOLKIT="$PROJECT_ROOT/AI_TOOLKIT/run.py"
+: "${OSTRIS_TOOLKIT:?Must set OSTRIS_TOOLKIT env var to the ai-toolkit repo path (e.g. export OSTRIS_TOOLKIT=/path/to/ai-toolkit)}"
+TOOLKIT="$OSTRIS_TOOLKIT/run.py"
+
+# Use the toolkit's own venv python if it exists, else fall back to current python
+if [ -f "$OSTRIS_TOOLKIT/venv/bin/python" ]; then
+    TOOLKIT_PYTHON="$OSTRIS_TOOLKIT/venv/bin/python"
+else
+    TOOLKIT_PYTHON="python"
+fi
+
 CONFIG_DIR="$PROJECT_ROOT/config/training"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="$PROJECT_ROOT/output/logs"
@@ -41,11 +51,13 @@ err()  { echo -e "${RED}[ERROR]${NC} $*"; }
 log "Project root : $PROJECT_ROOT"
 
 if [ ! -f "$TOOLKIT" ]; then
-    err "AI Toolkit not found at $TOOLKIT"
-    err "Expected: AI_TOOLKIT/run.py  relative to project root."
+    err "AI Toolkit run.py not found at $TOOLKIT"
+    err "Set OSTRIS_TOOLKIT to the ai-toolkit repo directory."
+    err "Example: export OSTRIS_TOOLKIT=/home/user/ai-toolkit"
     exit 1
 fi
-ok "AI Toolkit found: $TOOLKIT"
+ok "AI Toolkit : $TOOLKIT"
+ok "Python     : $TOOLKIT_PYTHON"
 
 # Gather experiment configs
 shopt -s nullglob
@@ -98,7 +110,7 @@ for config_path in "${CONFIGS[@]}"; do
     log_file="$LOG_DIR/${config_name}_${TIMESTAMP}.log"
 
     log "  Starting: $config_name"
-    python "$TOOLKIT" "$config_path" > "$log_file" 2>&1 &
+    $TOOLKIT_PYTHON "$TOOLKIT" "$config_path" > "$log_file" 2>&1 &
     pid=$!
     PIDS+=($pid)
     CONFIG_NAMES+=("$config_name")

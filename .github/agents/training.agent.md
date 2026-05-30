@@ -47,7 +47,7 @@ Each YAML config has these top-level keys:
 - DO NOT modify `trigger_word` — it must stay as `<tdp>` (the toolkit injects it)
 - DO NOT change `name_or_path` or `arch` — these are tied to the base model
 - DO NOT launch training without first validating the derived datasets exist
-- DO NOT launch training without orchestrator approval — report your plan and wait for explicit go-ahead before executing `python AI_TOOLKIT/run.py` or `bash scripts/train_experiments.sh`
+- DO NOT launch training without orchestrator approval — report your plan and wait for explicit go-ahead before executing `bash scripts/train_experiments.sh` or running the Ostris AI Toolkit directly
 - ALWAYS validate config YAML syntax after edits (the Ostris toolkit is strict about YAML)
 - NEVER change `noise_scheduler: flowmatch` or `timestep_type: weighted` — these are FLUX.2-specific
 
@@ -56,7 +56,7 @@ Each YAML config has these top-level keys:
 1. **Read** the relevant config file(s) and `docs/experiment-design.md` for context
 2. **Validate** that derived datasets exist for the config's caption type
 3. **Edit** config YAML carefully — preserve exact indentation (2-space), quote strings with special chars
-4. **Launch** training via `scripts/train_experiments.sh` or direct `python AI_TOOLKIT/run.py config/...yaml`
+4. **Launch** training via `scripts/train_experiments.sh` or directly with the Ostris AI Toolkit's `run.py` (see `docs/training.md` §5 for setup)
 5. **Monitor** — check `output/<name>/samples/` for sample images, `output/<name>/` for checkpoints
 
 ## Training Commands
@@ -65,8 +65,9 @@ Each YAML config has these top-level keys:
 # Validate all derived datasets before training
 bash scripts/train_experiments.sh  # includes pre-flight validation
 
-# Single experiment launch
-python AI_TOOLKIT/run.py config/training/lora_4b_detailed_high.yaml
+# Single experiment launch (see docs/training.md §5 for full setup)
+cd $OSTRIS_TOOLKIT && source venv/bin/activate
+python run.py /path/to/TopDownMedievalPixelArt-Flux2-Klein-LoRa/config/training/lora_4b_detailed_high.yaml
 
 # Check training progress (sample images)
 ls output/topdown_lora_detailed_high/samples/
