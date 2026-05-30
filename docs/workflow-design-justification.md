@@ -480,13 +480,16 @@ No hardcoded style directives, trigger phrases, or formatting strings in Python.
 - No divergence between "what the JSON says" and "what the code actually sends"
 - Easy A/B testing of prompt variations without code changes
 
-### Current Violations to Fix
+### Template Violations — Status: ALL RESOLVED (May 2026)
 
-| File | Violation | Fix |
+All violations listed below have been fixed. All prompts now source style directives
+exclusively from `config/prompt_templates.json`. No prompt prose is hardcoded in Python.
+
+| File | Original Violation | Resolution |
 |------|-----------|-----|
-| `src/unit/prompts.py` | Hardcoded style directives + wrong trigger | Move to JSON, use `PromptTemplateLoader` |
-| `src/leader/prompts.py` | `SPLASH_TAIL`, `PROFILE_TAIL`, `ACTION_TAIL` as Python constants | Move to JSON suffix fields |
-| `src/inpainting.py` | `get_inpaint_prompt()` dict | Move to JSON (for future v2 reference) |
+| `src/unit/prompts.py` | Hardcoded style directives + wrong trigger | ✅ Fixed — now uses `_render("unit", ...)` from JSON |
+| `src/leader/prompts.py` | `SPLASH_TAIL`, `PROFILE_TAIL`, `ACTION_TAIL` as Python constants | ✅ Fixed — all builders use `_render()` from JSON |
+| `src/inpainting.py` | `get_inpaint_prompt()` dict | ✅ Fixed — moved to JSON templates |
 
 ---
 

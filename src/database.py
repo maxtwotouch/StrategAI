@@ -255,6 +255,7 @@ def verify_schema_health() -> tuple[bool, list[str]]:
         "object_records": ObjectRecord,
         "terrain_records": TerrainRecord,
         "unit_records": UnitRecord,
+        "background_tile_records": BackgroundTileRecord,
     }
 
     for table_name, model in model_map.items():

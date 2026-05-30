@@ -174,6 +174,7 @@ A successful POST /unit returns:
     "asset_type": "unit",
     "unit_id": "unit_archer_a1b2c3",
     "unit_type": "archer",
+    "description": "a lean archer in a dark green hooded cloak...",
     "seed": 123456789012345,
     "generation_mode": "comfyui",
     "status": "completed",
@@ -211,14 +212,13 @@ other pipelines, controlled via ``config.yaml``:
 
   generation:
     modes:
-      unit: "comfyui"    # or "static" / "placeholder" / "random"
+      unit: "comfyui"    # or "static" / "placeholder"
 
 | Mode          | Behaviour |
 |---------------|-----------|
 | ``comfyui``   | Generates via ComfyUI txt2img. 503 if unreachable. |
 | ``static``    | Serves pre-made PNGs from ``static_tiles/unit/``. Falls back to placeholder. |
 | ``placeholder`` | Always returns procedural coloured rectangles with labels. |
-| ``random``    | Coin-flip between comfyui and static per request. |
 
 In static mode, sprites are resolved from:
 
@@ -241,7 +241,7 @@ A single PNG per unit type — simple flat naming.
 | ``description`` missing or blank | 422 | Pydantic validation |
 | ``description`` < 20 chars | 422 | Pydantic validation |
 | ``description`` > 400 chars | 422 | Pydantic validation |
-| Invalid ``unit_type`` (e.g. ``"dragon"``) | 200 | Accepted by server (enum is not enforced at schema level) |
+| Invalid ``unit_type`` (e.g. ``"dragon"``) | 400 | ``"Invalid unit_type: 'dragon'. Valid types: archer, scout, settler, warrior"`` |
 | ComfyUI unreachable | 503 | ``"Unit generation not available (ComfyUI unreachable)"`` |
 | Generation error | 500 | ``"Internal server error: ..."`` |
 

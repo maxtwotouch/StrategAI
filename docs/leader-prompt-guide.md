@@ -39,8 +39,8 @@ of a single `leader_id`. The server runs as txt2img with a composite
 prompt weaving together all leaders' descriptions — no reference
 image is used because multiple distinct faces must be depicted.
 
-See the authoritative reference at [`leader-pipeline-reference.md`](./leader-pipeline-reference.md)
-for the full API contract and design rationale.
+See [`architecture.md`](./architecture.md) for the full system architecture and
+[`workflow-design-justification.md`](./workflow-design-justification.md) for Flux2 Klein design rationale.
 
 
 ═══════════════════════════════════════════════════════════════════
@@ -188,7 +188,8 @@ contemplative
 
 | Scenario | HTTP Code | Message |
 |---|---|---|
-| `leader_id` missing for profile/action | 400 | `"leader_id is required for profile/action assets"` |
+| `leader_id` missing for profile | 400 | `"leader_id is required for profile assets"` |
+| `leader_id` or `leader_ids` missing for action | 400 | `"leader_id or leader_ids is required when asset_type='action'"` |
 | `leader_id` not found | 400 | `"Leader 'X' not found. Generate a splash first."` |
 | `leader_ids` empty for multi-leader action | 400 | `"leader_ids must contain at least one leader_id for multi-leader action scenes."` |
 | Any leader in `leader_ids` not found | 400 | `"Leader 'X' not found. Generate a splash first."` |

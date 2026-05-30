@@ -988,7 +988,7 @@ async def get_background_tile(background_tile_id: str):
     )
 
 
-@app.delete("/background_tile/{background_tile_id}")
+@app.delete("/background_tile/{background_tile_id}", response_model=DeleteResponse)
 async def delete_background_tile(background_tile_id: str):
     """Remove a background tile record. Generated asset remains on disk."""
     _require_db()

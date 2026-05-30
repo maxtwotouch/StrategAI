@@ -49,14 +49,15 @@ leader portraits use separate templates/workflows without this LoRA.
 ## 4. Component Architecture
 
 ### A. API Layer (`src/main.py` & per-pipeline `models.py`)
-- **FastAPI**: Async HTTP server with CORS middleware. Current endpoints:
-  `POST /leader`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`,
-  `POST /structure`, `GET /structure/{id}`, `DELETE /structure/{id}`,
-  `POST /object`, `GET /object/{id}`, `DELETE /object/{id}`,
-  `POST /terrain`, `GET /terrain/{id}`, `DELETE /terrain/{id}`,
-  `POST /unit`, `GET /unit/{unit_id}`, `DELETE /unit/{unit_id}`,
-  `GET /health`, `GET /catalog`, `GET /assets/{filename}`,
-  plus `/structure/catalog`, `/object/catalog`, `/terrain/catalog`, `/unit/catalog`.
+- **FastAPI**: Async HTTP server with CORS middleware. Endpoints (28 total):
+  **Leader**: `POST /leader`, `GET /leader`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`
+  **Structure**: `POST /structure`, `GET /structure`, `GET /structure/catalog`, `GET /structure/{structure_id}`, `DELETE /structure/{structure_id}`
+  **Object**: `POST /object`, `GET /object`, `GET /object/catalog`, `GET /object/{object_id}`, `DELETE /object/{object_id}`
+  **Terrain**: `POST /terrain`, `GET /terrain`, `GET /terrain/catalog`, `GET /terrain/{terrain_id}`, `DELETE /terrain/{terrain_id}`
+  **Unit**: `POST /unit`, `GET /unit`, `GET /unit/catalog`, `GET /unit/{unit_id}`, `DELETE /unit/{unit_id}`
+  **Background Tile**: `POST /background_tile`, `GET /background_tile`, `GET /background_tile/catalog`, `GET /background_tile/{background_tile_id}`, `DELETE /background_tile/{background_tile_id}`
+  **System**: `GET /health`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`
+  All GET list endpoints support pagination: `?limit=` (1–200, default 50) and `?offset=` (≥0).
 - **Pydantic**: Typed request/response schemas with enum validation.
 - **Fully async**: Generation runs on the asyncio event loop via `httpx` + `websockets`.
 
@@ -91,13 +92,18 @@ leader portraits use separate templates/workflows without this LoRA.
 - **Three families**: structures, objects, terrain. Each request generates one
   128×128 game tile (downscaled from 1024×1024 generation).
 - **Enum-driven prompt assembly**: `src/tile/prompts.py` with prose injection maps.
-- **Background tiles**: Separate engine (`src/tile/background_engine.py`) and
-  workflow (`background_tile.json`) for seamless ground textures — no LoRA,
-  no white background isolation.
 - **Static fallback**: `StaticTileEngine` resolves from `static_tiles/`.
 - **SQLite-backed**: `StructureRecord`, `ObjectRecord`, `TerrainRecord`.
 
-### G. Unit Pipeline (`src/unit/`)
+### G. Background Tile Pipeline (`src/tile/background_engine.py`)
+- **Independent pipeline**: Separate engine, registry, models, and endpoints
+  from the main tile pipeline.
+- **Seamless ground textures**: Water, grass, sand, stone, dirt. Uses
+  `background_tile.json` workflow — Flux2 Klein without `<tdp>` LoRA.
+- **Static fallback**: `StaticBackgroundTileEngine` resolves from `static_tiles/`.
+- **SQLite-backed**: `BackgroundTileRecord` with FK to `AssetRecord`.
+
+### H. Unit Pipeline (`src/unit/`)
 - **Single-sprite generation**: Each unit type (archer, scout, settler, warrior)
   produces one 128×128 south-facing sprite.
 - **Enum-driven prompt assembly**: `src/unit/prompts.py` with injection map.
@@ -105,12 +111,14 @@ leader portraits use separate templates/workflows without this LoRA.
 - **Static fallback**: `StaticUnitEngine` resolves from `static_tiles/`.
 - **SQLite-backed**: `UnitRecord`.
 
-### H. Persistence (`src/database.py`)
-- **SQLite** via SQLAlchemy. `Base.metadata.create_all()` at startup (dev
-  convenience — replace with Alembic for production migrations).
+### I. Persistence (`src/database.py`)
+- **SQLite** via SQLAlchemy with **Alembic** for schema migrations.
+  Migrations run automatically at startup (`alembic upgrade head`). For
+  schema recovery, restart with `DATABASE_RESET=true`.
 - **AssetRecord**: Tracks every generated asset: id, family, generation mode.
 - **LeaderRecord**: Canonical splash image, seed, prompt, profile/action image
   IDs, reference filename.
+- **BackgroundTileRecord**: Tile type, seed, FK to AssetRecord.
 
 ## 5. Workflow JSON Templates
 
@@ -137,7 +145,33 @@ injects prompt text and seed.
 Controlled via `config.yaml` (version-controlled) with `.env` overrides using
 `__` delimiter for nested keys — ops-level control with zero code changes.
 
-## 7. Path to Scaled Execution (Future)
+## 7. Known Issues & Fragile Areas
+
+1. **Database Schema Out of Sync**: SQLite can silently skip table creation if DB already exists.
+   - Solution: `verify_schema_health()` checks at startup; reset via `DATABASE_RESET=true`.
+   - Risk: Data loss if reset is triggered accidentally.
+
+2. **SQLite for Production**: Not safe for concurrent requests.
+   - Startup warning emitted if running in PRODUCTION mode with SQLite.
+   - Use PostgreSQL with `pool_pre_ping=True, pool_recycle=3600` for production.
+
+3. **ComfyUI Client Initialization Race**: Non-async `.http` property can be double-initialized.
+   - Solution: Use async `get_http()` instead; all engine code now uses this.
+
+4. **WebSocket Closure Ambiguity**: WS can close before execution_complete message arrives.
+   - Handled: Falls back to polling every 2s until timeout (default 300s).
+
+5. **Multi-Node Load Balancer**: Transparent retry on connectivity failure, but no way to cancel already-submitted jobs on dead nodes.
+
+6. **Reference Image Persistence**: Leader pipeline uploads reference image to ComfyUI's `input/` every time — no deduplication.
+
+7. **Error Handling in DB Transactions**: Orphaned asset files if DB persist fails.
+   - Best-effort cleanup via `try_remove_asset()` but not guaranteed.
+
+8. **Prompt Template Validation**: Happens at startup; broken templates won't block app start.
+   - Will fail later at generation time; check logs at startup.
+
+## 8. Path to Scaled Execution (Future)
 
 - **Task Queues**: Celery + Redis for non-blocking generation at scale.
 - **Object Storage**: S3 / Cloudflare R2 for multi-node asset sharing.

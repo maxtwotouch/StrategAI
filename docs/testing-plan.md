@@ -357,7 +357,7 @@ mode="static" → returns StaticTileGenerator
 test_get_generator_placeholder_mode
 mode="placeholder" → returns _PlaceholderGenerator
 test_get_generator_random_mode
-mode="random" → returns one of the two
+mode="static" → falls back to placeholder if no static PNG available
 test_get_generator_comfyui_unreachable_raises
 No client → RuntimeError
 test_static_generator_background_tile
@@ -742,7 +742,7 @@ While analyzing the codebase for test planning, I identified these potential iss
 UnitRequest.unit_type has no Pydantic validation — it's a plain str with just a description. A POST /unit with unit_type: "dragon" would pass Pydantic validation and only fail downstream in the prompt builder (which falls back silently). Consider adding a Literal or AfterValidator.
 /catalog endpoint missing unit info — The endpoint returns background_tile, structure, nature_object, and character_sprite but has no unit section with available unit types or directions.
 /health endpoint: leaders_registered and units_registered exist but no structures_registered — Inconsistency across families.
-GenerationRequest.tile_type is Optional — A POST /generate with asset_family: "background_tile" but no tile_type would pass validation but produce a prompt with "pixel art grass tile" (hardcoded fallback), which is surprising. Should enforce at the schema or engine level.
+GenerationRequest.tile_type is Optional — A POST /background_tile without a tile_type would pass validation but produce a prompt with "pixel art grass tile" (hardcoded fallback), which is surprising. Should enforce at the schema or engine level.
 UnitRegistry.has_static() always returns True — This method is a stub. It's never called by the engine (which checks the static catalog directly), so it's dead code.
 StaticUnitEngine.generate() S-fallback optimization has a subtle bug: When resolve_unit returns the S PNG for a non-S direction, it checks resolved_direction == "s" by parsing the filename. But if a non-S PNG happens to have _s in its filename (e.g., archer_s_variant.png → base="archer_s_variant" → split gives ("archer_s", "variant") → resolved_direction = "variant"), the optimization won't trigger. The path-based check is more reliable since resolve_unit already guarantees it returned the S path.
 Would you like me to begin implementing the test suite, or would you prefer to discuss/modify the plan first?

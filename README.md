@@ -35,6 +35,8 @@ curl http://localhost:8000/catalog
 
 Every family supports full CRUD: `POST` (generate), `GET` (list), `GET /{id}` (get one), `DELETE /{id}`.
 
+**Pagination:** All `GET` list endpoints support `?limit=` (1–200, default 50) and `?offset=` (≥0, default 0).
+
 ---
 
 ## API Reference
@@ -74,10 +76,10 @@ curl -X POST http://localhost:8000/leader \
     "asset_type": "splash",
     "leader_name": "Queen Isabella",
     "leader_description": "A tall woman in her thirties with sharp features, olive skin, dark braided hair, piercing green eyes. Wears a crimson velvet gown with gold embroidery and a silver crown.",
-    "archetype": "monarch",
+    "archetype": "warrior_king",
     "culture": "medieval_european",
     "time_of_day": "golden_hour",
-    "mood": "commanding"
+    "mood": "grim_determined"
   }'
 
 # Step 2: Generate profile (uses splash as reference)
@@ -88,10 +90,10 @@ curl -X POST http://localhost:8000/leader \
     "leader_id": "<leader_id_from_step_1>",
     "leader_name": "Queen Isabella",
     "leader_description": "...",
-    "archetype": "monarch",
+    "archetype": "warrior_king",
     "culture": "medieval_european",
     "time_of_day": "golden_hour",
-    "mood": "commanding"
+    "mood": "grim_determined"
   }'
 
 # Step 3: Generate action scene
@@ -102,11 +104,11 @@ curl -X POST http://localhost:8000/leader \
     "leader_id": "<leader_id_from_step_1>",
     "leader_name": "Queen Isabella",
     "leader_description": "...",
-    "archetype": "monarch",
+    "archetype": "warrior_king",
     "culture": "medieval_european",
     "time_of_day": "golden_hour",
-    "mood": "commanding",
-    "action_category": "leading_troops",
+    "mood": "grim_determined",
+    "action_category": "military",
     "action_description": "The queen stands on a hilltop addressing her army, sword raised high."
   }'
 
@@ -118,11 +120,11 @@ curl -X POST http://localhost:8000/leader \
     "leader_ids": ["<leader_id_1>", "<leader_id_2>"],
     "leader_name": "Alliance Scene",
     "leader_description": "...",
-    "archetype": "monarch",
+    "archetype": "warrior_king",
     "culture": "medieval_european",
     "time_of_day": "golden_hour",
-    "mood": "commanding",
-    "action_category": "diplomacy",
+    "mood": "grim_determined",
+    "action_category": "diplomatic",
     "action_description": "Two rulers meet at a grand oak table to sign a peace treaty."
   }'
 ```
@@ -149,7 +151,7 @@ curl -X POST http://localhost:8000/leader \
 | `GET` | `/object/{object_id}` | Get a specific object |
 | `DELETE` | `/object/{object_id}` | Remove an object record |
 
-**Request fields:** `category` (vegetation/geological/rural_prop/urban_prop/debris), `biome`, `season`, `description`, `seed` (optional)
+**Request fields:** `category` (vegetation/geological/rural_props/urban_props/debris), `biome`, `season`, `description`, `seed` (optional)
 
 ### Terrain Tiles
 
@@ -182,8 +184,8 @@ curl -X POST http://localhost:8000/leader \
 | `POST` | `/background_tile` | Generate a seamless background tile |
 | `GET` | `/background_tile` | List all generated background tiles |
 | `GET` | `/background_tile/catalog` | Available tile types |
-| `GET` | `/background_tile/{tile_id}` | Get a specific background tile |
-| `DELETE` | `/background_tile/{tile_id}` | Remove a background tile record |
+| `GET` | `/background_tile/{background_tile_id}` | Get a specific background tile |
+| `DELETE` | `/background_tile/{background_tile_id}` | Remove a background tile record |
 
 **Request fields:** `tile_type` (water/grass/sand/stone/dirt), `seed` (optional)
 
@@ -244,8 +246,9 @@ Leader responses use `leader_id` instead of `asset_id`. Unit responses use `unit
 │  In-memory LRU cache + disk persistence                  │
 ├─────────────────────────────────────────────────────────┤
 │  SQLite DB (database.py)                                │
-│  LeaderRecord, StructureRecord, ObjectRecord,           │
-│  TerrainRecord, UnitRecord, AssetRecord                 │
+│  AssetRecord, LeaderRecord, StructureRecord,            │
+│  ObjectRecord, TerrainRecord, UnitRecord,               │
+│  BackgroundTileRecord                                   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -282,7 +285,7 @@ generation:
 ├── src/
 │   ├── main.py                  # FastAPI app, endpoints, CORS, middleware, lifespan
 │   ├── config.py                # Pydantic Settings (modes, paths, ComfyUI URL)
-│   ├── database.py              # SQLAlchemy ORM + SQLite (6 record types)
+│   ├── database.py              # SQLAlchemy ORM + SQLite (7 record types)
 │   ├── storage.py               # AssetStore: in-memory LRU cache + disk I/O
 │   ├── comfyui_client.py        # Async HTTP+WebSocket client for ComfyUI
 │   ├── comfyui_loadbalancer.py  # Multi-node queue-depth routing + health checks
@@ -300,7 +303,8 @@ generation:
 │   │   ├── models.py            # Tile enums + Pydantic schemas
 │   │   ├── background_models.py # Background tile models
 │   │   ├── prompts.py           # Tile prompt builders
-│   │   └── registry.py          # Structure/Object/Terrain CRUD
+│   │   ├── registry.py          # Structure/Object/Terrain CRUD
+│   │   └── background_registry.py # Background tile CRUD
 │   └── unit/
 │       ├── engine.py            # Unit sprite generation
 │       ├── models.py            # Unit enums + Pydantic schemas
@@ -381,12 +385,38 @@ python -m pytest tests/ -v
 
 The service expects the following on your ComfyUI server:
 
-- **Base**: ComfyUI with standard nodes (KSampler, CLIPTextEncode, VAEDecode, SaveImage)
-- **Flux2 Klein workflows**: `SamplerCustomAdvanced`, `EmptyFlux2LatentImage` (if using Flux2)
-- **Models**: Flux2 Klein checkpoints, VAE, LoRAs as configured in workflow JSONs
-- **Custom nodes**: As specified in individual workflow files
+- **Flux2 Klein native nodes**: `UNETLoader`, `CLIPLoader`, `VAELoader`, `CFGGuider`, `Flux2Scheduler`, `KSamplerSelect`, `SamplerCustomAdvanced`, `EmptyFlux2LatentImage`, `SaveImage`
+- **Models**: `flux-2-klein-4b-fp8.safetensors` (UNET), `qwen_3_4b.safetensors` (CLIP), `flux2-vae.safetensors` (VAE)
+- **Custom nodes**: As specified in individual workflow JSONs
 
-The service validates workflow structure before queueing (checks for `SaveImage` nodes and prompt-injectable `CLIPTextEncode` nodes) and fails fast on missing requirements.
+The service validates workflow structure before queueing and fails fast on missing requirements.
+
+---
+
+## Deployment
+
+### Database Migrations
+
+The service runs **Alembic migrations automatically** at startup (`alembic upgrade head`). No manual migration steps are needed.
+
+If the database schema gets out of sync (e.g., after a rollback), restart with:
+```bash
+DATABASE_RESET=true uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+This drops and recreates all tables. **Warning: this deletes all data.**
+
+### Production Notes
+- **SQLite** is used by default and works for single-worker deployments. For concurrent requests, switch to **PostgreSQL**.
+  - Set `DATABASE_URL` in `.env` to a PostgreSQL connection string.
+  - A startup warning is emitted if running in production mode with SQLite.
+- Multi-worker: run behind `gunicorn` with `uvicorn` workers, or use a process manager.
+
+### Common Issues
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| 503 on all endpoints | ComfyUI unreachable | Check `COMFYUI__BASE_URL`, verify ComfyUI is running |
+| "Database schema mismatch" | DB created by older code version | Restart with `DATABASE_RESET=true` |
+| WebSocket closure warning | ComfyUI WS closed before completion | Automatic fallback to polling; harmless unless frequent |
 
 ---
 

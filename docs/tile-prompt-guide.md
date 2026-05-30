@@ -276,6 +276,8 @@ BIOME — pick one
   swamp               Murky water, reeds, twisted trees, mud
   mountain            Exposed rock, sparse vegetation, scree
   coastal             Sandy shore, driftwood, sea-worn stone
+  grassland           Open plains, tall grasses, wildflowers,
+                      scattered shrubs, gentle rolling hills
 
 
 ───────────────────────────────────────────────────────────────────
@@ -372,8 +374,8 @@ Debris — winter mountain wreckage:
 
 IMPORTANT: terrain features are elevation sprites (hills, slopes,
 cliffs) that sit ON TOP of background tiles — they are NOT ground
-textures. Background tiles (water, grass, sand, stone) remain on
-the existing POST /generate endpoint.
+textures. Background tiles (water, grass, sand, stone, dirt) are generated via
+the dedicated POST /background_tile endpoint.
 
 Endpoint:  POST /terrain
 
@@ -614,80 +616,5 @@ of truth for what's valid.
 
 
 ═════════════════════════════════════════════════���═════════════════
-  BACKGROUND TILES (existing POST /generate)
-═══════════════════════════════════════════════════════════════════
-
-Background tiles are the base ground layer — seamless repeating
-textures that form the floor of your game map. Unlike structure,
-object, and terrain pipelines, background tiles use the existing
-POST /generate endpoint with a simple tile_type parameter.
-
-Endpoint:  POST /generate
-
-FIELDS:
-
-  asset_family     (required) — must be "background_tile"
-  tile_type        (required) — one of: water, grass, sand, stone
-  base_image_id    (optional) — for copy-on-write inpainting
-  inpaints         (optional) — list of inpainting patches
-
-  {
-    "asset_family": "background_tile",
-    "tile_type": "grass"
-  }
-
-
-RANDOMIZATION — in static mode
-
-When the server runs in static mode, background tiles are served
-from the static_tiles/ folder. If multiple variants exist for a
-tile type, the server randomly picks one on every request:
-
-  static_tiles/background_tile/
-    grass_1.png      ─┐
-    grass_2.png       ├── POST /generate { tile_type: "grass" }
-    grass_3.png      ─┘   → randomly returns one of the three
-
-A single request can return different tiles each call — no need
-to change parameters. This is the static-mode equivalent of
-varying the seed in comfyui mode.
-
-In comfyui mode, variation comes from changing the seed (future
-addition) or from the inherent randomness of the diffusion model.
-
-
-RANDOMIZATION — in comfyui mode
-
-When the server runs in comfyui mode, the model generates a new
-tile each call from prompt text. Each call is independent — the
-same request produces a different result every time, just like
-the structure/object/terrain pipelines.
-
-
-DISCOVERING AVAILABLE TILE TYPES
-
-  GET /catalog
-
-Returns:
-
-  {
-    "background_tile": {
-      "tile_types": ["grass", "sand", "stone", "water"]
-    }
-  }
-
-Only tile types that have at least one static PNG (or are
-supported by comfyui generation) appear in this list.
-
-
-LAYERING MODEL (for game engine integration)
-
-  Layer 4:  Units (characters)        ← POST /unit
-  Layer 3:  Structures & Objects      ← POST /structure, POST /object
-  Layer 2:  Terrain features          ← POST /terrain
-  Layer 1:  Background tiles          ← generated via tile pipeline (bg mode)
-
-Generate bottom-up: background tile first, then terrain features
-for elevation, then structures and objects, then units on top.
-
+  BACKGROUND TILES
 See [`unit-prompt-guide.md`](./unit-prompt-guide.md) for the unit generation API.
