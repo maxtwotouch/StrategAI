@@ -10,14 +10,14 @@
 
 const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_API_URL ?? "").replace(/\/+$/, "");
 
-export type BackgroundTileType = "water" | "grass" | "sand" | "stone";
+export type BackgroundTileType = "water" | "grass" | "sand" | "stone" | "dirt";
 
-export interface GenerationResponse {
+interface BackgroundTileResponse {
   url: string;
-  asset_family: string;
-  tile_type?: string | null;
-  generation_mode?: string | null;
-  status?: string;
+  background_tile_id: string;
+  tile_type: string;
+  seed: number;
+  generation_mode: string;
 }
 
 export function assetApiConfigured(): boolean {
@@ -50,14 +50,14 @@ async function postJson<T>(
   return (await res.json()) as T;
 }
 
-// POST /generate for a background tile. Returns an absolute image URL.
+// POST /background_tile. Returns an absolute image URL.
 export async function generateBackgroundTile(
   tileType: BackgroundTileType,
   signal?: AbortSignal,
 ): Promise<string> {
-  const res = await postJson<GenerationResponse>(
-    "/generate",
-    { asset_family: "background_tile", tile_type: tileType },
+  const res = await postJson<BackgroundTileResponse>(
+    "/background_tile",
+    { tile_type: tileType },
     signal,
   );
   return absoluteAssetUrl(res.url);
@@ -115,6 +115,31 @@ export async function generateLeaderSplash(
   return { url: absoluteAssetUrl(res.url), leaderId: res.leader_id, seed: res.seed };
 }
 
+// GET /leader returns the catalog of leaders that have already been generated
+// on the server. Useful as a fallback when fresh POST generation isn't
+// available (e.g., upstream model errors) — we can still show real art.
+export interface ExistingLeader {
+  leader_id: string;
+  leader_name: string;
+  archetype: string;
+  culture: string;
+  splash_url: string | null;
+  profile_url: string | null;
+}
+
+export async function listLeaders(
+  signal?: AbortSignal,
+): Promise<ExistingLeader[]> {
+  if (!assetApiConfigured()) return [];
+  try {
+    const res = await fetch(`${ASSET_BASE_URL}/leader`, { signal });
+    if (!res.ok) return [];
+    return (await res.json()) as ExistingLeader[];
+  } catch {
+    return [];
+  }
+}
+
 // Stage 2: square portrait, img2img off the splash for face consistency.
 // Requires the leader_id returned by generateLeaderSplash.
 export async function generateLeaderProfile(
@@ -161,7 +186,9 @@ interface UnitResponse {
   unit_type: string;
 }
 
-// Generate only the south-facing (front) sprite — ~4x faster than all four.
+// All unit sprites are south-facing (front view) — the canonical direction
+// for top-down characters. The API dropped the `direction` field after every
+// sprite became single-facing by design.
 export async function generateUnit(
   unitType: ApiUnitType,
   description: string,
@@ -169,7 +196,7 @@ export async function generateUnit(
 ): Promise<string> {
   const res = await postJson<UnitResponse>(
     "/unit",
-    { unit_type: unitType, description, direction: "s" },
+    { unit_type: unitType, description },
     signal,
   );
   return absoluteAssetUrl(res.url);

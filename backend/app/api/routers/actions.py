@@ -7,6 +7,8 @@ from app.api.schemas import (
     AttackCityRequest,
     BuildImprovementRequest,
     BuildRequest,
+    CancelBuildRequest,
+    PurchaseStructureRequest,
     FoundCityRequest,
     GameStateOut,
     MessageRequest,
@@ -16,7 +18,13 @@ from app.api.schemas import (
 )
 from app.api.store import store
 from app.engine.diplomacy import DiplomacyError, MessageKind, SendMessage, apply_diplomatic_action
-from app.engine.directives import DirectiveError, QueueProduction, apply_directive
+from app.engine.directives import (
+    CancelProduction,
+    DirectiveError,
+    PurchaseStructure,
+    QueueProduction,
+    apply_directive,
+)
 from app.engine.city_founding import FoundError, found_city
 from app.engine.combat import CombatError, attack, attack_city
 from app.engine.hex import Hex
@@ -110,6 +118,38 @@ def action_build(game_id: int, req: BuildRequest) -> GameStateOut:
             state,
             req.civ_id,
             QueueProduction(city_id=req.city_id, item=item),
+        )
+    except (DirectiveError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    store.put(game_id, new_state)
+    return state_to_out(game_id, new_state)
+
+
+@router.post("/cancel-build", response_model=GameStateOut)
+def action_cancel_build(game_id: int, req: CancelBuildRequest) -> GameStateOut:
+    state = _load(game_id)
+    try:
+        new_state = apply_directive(
+            state,
+            req.civ_id,
+            CancelProduction(city_id=req.city_id, index=req.index),
+        )
+    except (DirectiveError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    store.put(game_id, new_state)
+    return state_to_out(game_id, new_state)
+
+
+@router.post("/purchase-structure", response_model=GameStateOut)
+def action_purchase_structure(
+    game_id: int, req: PurchaseStructureRequest
+) -> GameStateOut:
+    state = _load(game_id)
+    try:
+        new_state = apply_directive(
+            state,
+            req.civ_id,
+            PurchaseStructure(city_id=req.city_id, category=req.category),
         )
     except (DirectiveError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))

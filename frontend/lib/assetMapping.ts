@@ -4,6 +4,35 @@
 
 import { ApiUnitType, StructureParams, TerrainParams } from "@/lib/assetApi";
 
+// Display-label / enum-value pairs surfaced in the start-screen dropdowns
+// so the player can compose their own leader. Values match the asset
+// service's enum vocabularies in leader/models.py.
+export const ARCHETYPE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "warrior_king", label: "Warrior King" },
+  { value: "warrior_queen", label: "Warrior Queen" },
+  { value: "philosopher_king", label: "Philosopher King" },
+  { value: "merchant_prince", label: "Merchant Prince" },
+  { value: "spiritual_leader", label: "Spiritual Leader" },
+  { value: "diplomat", label: "Diplomat" },
+  { value: "tyrant", label: "Tyrant" },
+  { value: "visionary", label: "Visionary" },
+];
+
+export const CULTURE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "medieval_european", label: "Medieval European" },
+  { value: "classical_greek", label: "Classical Greek" },
+  { value: "roman_imperial", label: "Roman Imperial" },
+  { value: "ancient_egyptian", label: "Ancient Egyptian" },
+  { value: "east_asian_imperial", label: "East Asian Imperial" },
+  { value: "south_asian", label: "South Asian" },
+  { value: "nordic_viking", label: "Nordic Viking" },
+  { value: "persian", label: "Persian" },
+  { value: "mesopotamian", label: "Mesopotamian" },
+  { value: "mesoamerican", label: "Mesoamerican" },
+  { value: "sub_saharan_african", label: "Sub-Saharan African" },
+  { value: "islamic_golden_age", label: "Islamic Golden Age" },
+];
+
 // --- Units: 7 game unit types collapse onto the 4 the service offers ---
 export const UNIT_TYPE_MAP: Record<string, ApiUnitType> = {
   warrior: "warrior",

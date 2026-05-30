@@ -44,6 +44,7 @@ export type CityDTO = {
   border_radius: number;
   culture_stored: number;
   worked_tiles: WorkedTileDTO[];
+  purchased_structures: string[];
 };
 export type CivDTO = {
   id: number;
@@ -163,6 +164,21 @@ export const api = {
     req<GameStateDTO>(`/games/${id}/actions/build`, {
       method: "POST",
       body: JSON.stringify({ civ_id, city_id, unit_type }),
+    }),
+  cancelBuild: (id: number, civ_id: number, city_id: number, index: number) =>
+    req<GameStateDTO>(`/games/${id}/actions/cancel-build`, {
+      method: "POST",
+      body: JSON.stringify({ civ_id, city_id, index }),
+    }),
+  purchaseStructure: (
+    id: number,
+    civ_id: number,
+    city_id: number,
+    category: string,
+  ) =>
+    req<GameStateDTO>(`/games/${id}/actions/purchase-structure`, {
+      method: "POST",
+      body: JSON.stringify({ civ_id, city_id, category }),
     }),
   improve: (id: number, unit_id: number, improvement: string) =>
     req<GameStateDTO>(`/games/${id}/actions/improve`, {

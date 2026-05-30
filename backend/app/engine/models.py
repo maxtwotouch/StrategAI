@@ -153,6 +153,9 @@ class City:
     max_health: int = 20
     is_capital: bool = False
     buildings: frozenset[BuildingType] = field(default_factory=frozenset)
+    # Gold-purchased structure categories from the asset API
+    # (fortification | production | housing | sacred). One of each per city.
+    purchased_structures: frozenset[str] = field(default_factory=frozenset)
     production_queue: tuple[BuildItem, ...] = ()
     border_radius: int = 1
     culture_stored: int = 0

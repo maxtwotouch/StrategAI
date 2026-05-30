@@ -12,10 +12,21 @@ import {
   tileKey,
 } from "@/lib/hex";
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
-import { AssetManifest, resolveManifest } from "@/lib/assetManifest";
+import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
+import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS } from "@/lib/assetMapping";
+import { buildCustomLeaderParams } from "@/lib/leaderMapping";
+import { useAudio } from "@/lib/useAudio";
 
 type PendingAction = { kind: "found"; unit: UnitDTO } | null;
-type Setup = { radius: number; seed: number; humanName: string };
+type Setup = {
+  radius: number;
+  seed: number;
+  humanName: string;
+  leaderName: string;
+  archetype: string;
+  culture: string;
+  leaderDescription: string;
+};
 type MapViewMode = "global" | "local";
 
 type TechDef = {
@@ -69,6 +80,22 @@ const BUILDABLE_UNITS: BuildableUnit[] = [
   { id: "swordsman", label: "Swordsman", cost: 30, requires: "iron_working" },
 ];
 
+// Asset-API structure categories the player can place in their cities by
+// spending gold. Each grants STRUCTURE_PRODUCTION_BONUS production for that
+// city (the backend is the source of truth — these mirror it for display).
+const STRUCTURE_CATEGORIES: ReadonlyArray<{
+  id: string;
+  label: string;
+  hint: string;
+}> = [
+  { id: "production", label: "Production Hall", hint: "Workshop, forge, mill" },
+  { id: "fortification", label: "Fortification", hint: "Walls, keep, gatehouse" },
+  { id: "housing", label: "Housing District", hint: "Townhouse, longhouse, manor" },
+  { id: "sacred", label: "Sacred Site", hint: "Temple, shrine, cathedral" },
+];
+const STRUCTURE_GOLD_COST = 80;
+const STRUCTURE_PRODUCTION_BONUS = 2;
+
 const IMPROVEMENT_OPTIONS = [
   { id: "farm", label: "Farm", desc: "+1 food on plains / grassland" },
   { id: "mine", label: "Mine", desc: "+1 production on hills" },
@@ -98,11 +125,16 @@ export default function HomePage() {
     radius: 20,
     seed: randomSeed(),
     humanName: "Athens",
+    leaderName: "",
+    archetype: "philosopher_king",
+    culture: "medieval_european",
+    leaderDescription: "",
   }));
   const [messageTargetId, setMessageTargetId] = useState<number | null>(null);
   const [messageKind, setMessageKind] = useState("chat");
   const [messageText, setMessageText] = useState("");
   const [activeConversationCivId, setActiveConversationCivId] = useState<number | null>(null);
+  const [activeCityId, setActiveCityId] = useState<number | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [chronicleCollapsed, setChronicleCollapsed] = useState(false);
   const [mapViewMode, setMapViewMode] = useState<MapViewMode>("local");
@@ -110,6 +142,14 @@ export default function HomePage() {
   const [eventLog, setEventLog] = useState<TurnEvent[]>([]);
   const [assets, setAssets] = useState<AssetManifest | null>(null);
   const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
+  const [introDismissed, setIntroDismissed] = useState(false);
+  const [showSovereign, setShowSovereign] = useState(false);
+  const { muted, toggleMute, startIntro, startAmbient } = useAudio();
+
+  const dismissIntro = () => {
+    setIntroDismissed(true);
+    startAmbient();
+  };
   const prevStateRef = useRef<GameStateDTO | null>(null);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -120,6 +160,7 @@ export default function HomePage() {
     setState(null);
     setAssets(null);
     setAssetProgress(null);
+    setIntroDismissed(false);
     setSelectedUnit(null);
     setHoveredTile(null);
     setPending(null);
@@ -139,10 +180,20 @@ export default function HomePage() {
       );
       // Resolve generated assets while the load screen is up. No-op (null) when
       // NEXT_PUBLIC_ASSET_API_URL is unset, so the game still renders normally.
-      const civs = next.civs.map((c) => ({
+      const humanCustomParams = buildCustomLeaderParams({
+        leaderName: nextSetup.leaderName || nextSetup.humanName,
+        archetype: nextSetup.archetype,
+        culture: nextSetup.culture,
+        description: nextSetup.leaderDescription,
+      });
+      const civs: CivInput[] = next.civs.map((c) => ({
         civId: c.id,
         leaderName: c.leader_name,
       }));
+      const leaders: CivInput[] = next.civs.map((c) => {
+        const base: CivInput = { civId: c.id, leaderName: c.leader_name };
+        return c.is_human ? { ...base, customLeaderParams: humanCustomParams } : base;
+      });
       let manifest: AssetManifest | null = null;
       try {
         manifest = await resolveManifest(
@@ -150,7 +201,7 @@ export default function HomePage() {
             gameId: next.id,
             terrains: next.tiles.map((t) => t.terrain),
             civs,
-            leaders: civs.filter((_, i) => !next.civs[i].is_human),
+            leaders,
           },
           { onProgress: (done, total) => setAssetProgress({ done, total }) },
         );
@@ -170,6 +221,8 @@ export default function HomePage() {
   };
 
   const beginGame = () => {
+    // The button click is the user gesture that unlocks audio playback.
+    startIntro();
     const nextSetup = { ...setup, seed: randomSeed() };
     setSetup(nextSetup);
     void loadGame(nextSetup);
@@ -186,6 +239,18 @@ export default function HomePage() {
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!state || introDismissed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        dismissIntro();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [introDismissed, state]);
 
   const humanCiv = useMemo(
     () => state?.civs.find((c) => c.is_human) ?? null,
@@ -247,6 +312,33 @@ export default function HomePage() {
     if (activeConversationCivId === null) return;
     setMessageTargetId(activeConversationCivId);
   }, [activeConversationCivId]);
+
+  // City drawer is closed by default — opens when a city is clicked (map or rail).
+  useEffect(() => {
+    if (activeCityId === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveCityId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeCityId]);
+
+  useEffect(() => {
+    if (!showSovereign) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSovereign(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSovereign]);
+
+  const activeCity = useMemo(
+    () =>
+      activeCityId !== null
+        ? state?.cities.find((c) => c.id === activeCityId) ?? null
+        : null,
+    [activeCityId, state],
+  );
 
   const selectedCity = useMemo(() => {
     if (!state || !selectedUnit) return null;
@@ -449,6 +541,16 @@ export default function HomePage() {
     await run(() => api.build(state.id, humanCiv.id, cityId, unitType));
   };
 
+  const cancelProduction = async (cityId: number, index: number) => {
+    if (!state || !humanCiv || !isHumanTurn) return;
+    await run(() => api.cancelBuild(state.id, humanCiv.id, cityId, index));
+  };
+
+  const purchaseStructure = async (cityId: number, category: string) => {
+    if (!state || !humanCiv || !isHumanTurn) return;
+    await run(() => api.purchaseStructure(state.id, humanCiv.id, cityId, category));
+  };
+
   const startImprovement = async (unitId: number, improvement: string) => {
     if (!state || !humanCiv || !isHumanTurn) return;
     await run(() => api.improve(state.id, unitId, improvement));
@@ -473,27 +575,41 @@ export default function HomePage() {
   };
 
   const onTileClick = (q: number, r: number) => {
-    if (!state || !selectedUnit || !isHumanTurn) return;
-    const here = { q: selectedUnit.q, r: selectedUnit.r };
-    if (hexDistance(here, { q, r }) !== 1) return;
-    const occupant = state.units.find((u) => u.q === q && u.r === r);
-    if (occupant && occupant.owner !== selectedUnit.owner) {
-      if (!canAttackOwner(state, selectedUnit.owner, occupant.owner)) {
-        setError("You must declare war before attacking this civilization.");
+    if (!state) return;
+    // Movement / attack only happens when you have one of your units selected,
+    // it's your turn, and the clicked tile is adjacent.
+    if (selectedUnit && isHumanTurn && selectedUnit.owner === humanCiv?.id) {
+      const here = { q: selectedUnit.q, r: selectedUnit.r };
+      if (hexDistance(here, { q, r }) === 1) {
+        const occupant = state.units.find((u) => u.q === q && u.r === r);
+        if (occupant && occupant.owner !== selectedUnit.owner) {
+          if (!canAttackOwner(state, selectedUnit.owner, occupant.owner)) {
+            setError("You must declare war before attacking this civilization.");
+            return;
+          }
+          run(() => api.attack(state.id, selectedUnit.id, occupant.id));
+          return;
+        }
+        run(() => api.move(state.id, selectedUnit.id, q, r));
         return;
       }
-      run(() => api.attack(state.id, selectedUnit.id, occupant.id));
-      return;
     }
-    run(() => api.move(state.id, selectedUnit.id, q, r));
+    // Otherwise, if the click landed on one of your cities, open its drawer.
+    const city = state.cities.find(
+      (c) => c.q === q && c.r === r && c.owner === humanCiv?.id,
+    );
+    if (city) setActiveCityId(city.id);
   };
 
   const onUnitClick = (u: UnitDTO) => {
     if (!state) return;
+    // Clicking your own unit during the AI turn just previews it.
     if (!isHumanTurn && u.owner === humanCiv?.id) {
       setSelectedUnit(u);
       return;
     }
+    // Clicking a rival unit while you have one of yours selected attempts an
+    // attack (requires being adjacent and at war).
     if (selectedUnit && u.id !== selectedUnit.id && u.owner !== selectedUnit.owner) {
       const here = { q: selectedUnit.q, r: selectedUnit.r };
       if (hexDistance(here, { q: u.q, r: u.r }) === 1) {
@@ -505,6 +621,8 @@ export default function HomePage() {
         return;
       }
     }
+    // Selection is restricted to your own units — never take control of a rival's.
+    if (u.owner !== humanCiv?.id) return;
     setSelectedUnit(u);
   };
 
@@ -534,7 +652,7 @@ export default function HomePage() {
       <main className="start-screen">
         <div className="start-screen__veil" />
         <section className="start-screen__panel">
-          <div className="plate-label">Inf-3600 Strategy Sandbox</div>
+          <div className="plate-label">Strategic World Builder</div>
           <h1>Forge a Civilization.</h1>
           <p className="start-screen__copy">
             Command a modern 4X campaign with a map-first interface built for fast tactical
@@ -558,6 +676,48 @@ export default function HomePage() {
               />
             </label>
             <label className="field">
+              <span className="field-label">Leader Name</span>
+              <input
+                type="text"
+                maxLength={100}
+                value={setup.leaderName}
+                onChange={(e) =>
+                  setSetup((prev) => ({ ...prev, leaderName: e.target.value }))
+                }
+                placeholder="e.g. Aurelius the Wise"
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Archetype</span>
+              <select
+                value={setup.archetype}
+                onChange={(e) =>
+                  setSetup((prev) => ({ ...prev, archetype: e.target.value }))
+                }
+              >
+                {ARCHETYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Culture</span>
+              <select
+                value={setup.culture}
+                onChange={(e) =>
+                  setSetup((prev) => ({ ...prev, culture: e.target.value }))
+                }
+              >
+                {CULTURE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
               <span className="field-label">Map Radius</span>
               <input
                 type="number"
@@ -574,10 +734,28 @@ export default function HomePage() {
             </label>
           </div>
 
+          <label className="field field--full">
+            <span className="field-label">
+              Leader Appearance{" "}
+              <small style={{ color: "var(--ink-muted)" }}>
+                ({setup.leaderDescription.length} / 800 · 50 min for custom)
+              </small>
+            </span>
+            <textarea
+              rows={3}
+              maxLength={800}
+              value={setup.leaderDescription}
+              onChange={(e) =>
+                setSetup((prev) => ({ ...prev, leaderDescription: e.target.value }))
+              }
+              placeholder="Age, build, skin tone, hair, distinctive features, clothing, weapon. Leave blank for a neutral default."
+            />
+          </label>
+
           <div className="start-screen__meta">
-            <span>Fresh seed each session</span>
-            <span>Single-screen command table</span>
-            <span>Mouse-first tactical play</span>
+            <span>Settle your first capital</span>
+            <span>Scout the unknown frontier</span>
+            <span>Negotiate with rival leaders</span>
           </div>
 
           <div className="start-screen__actions">
@@ -611,23 +789,77 @@ export default function HomePage() {
     );
   }
 
+  if (!introDismissed) {
+    const humanSplash = humanCiv ? assets?.leaders[humanCiv.id]?.splashUrl : null;
+    const civName = humanCiv?.name ?? setup.humanName;
+    const leaderName =
+      setup.leaderName.trim() || humanCiv?.leader_name || civName;
+    return (
+      <main className="intro-screen" aria-label={`${civName} campaign introduction`}>
+        <div
+          className="intro-screen__bg"
+          style={
+            humanSplash ? { backgroundImage: `url(${humanSplash})` } : undefined
+          }
+          onClick={dismissIntro}
+        />
+        <section className="intro-screen__panel">
+          <div className="plate-label intro-screen__chapter">Chapter I</div>
+          <h1 className="intro-screen__civ">{civName}</h1>
+          <div className="intro-screen__leader">Under the reign of {leaderName}</div>
+          <p className="intro-screen__epitaph">
+            The age stands quiet, waiting for an empire bold enough to carve its
+            name across the world.
+            <br />
+            History will remember what is forged here.
+          </p>
+          <button
+            type="button"
+            className="button-primary intro-screen__cta"
+            onClick={(e) => {
+              e.stopPropagation();
+              dismissIntro();
+            }}
+          >
+            Begin the Age
+          </button>
+          <div className="intro-screen__hint">click backdrop · esc · enter · space</div>
+        </section>
+        {error && <div className="toast">{error}</div>}
+      </main>
+    );
+  }
+
   return (
     <main className="war-room">
       <header className="war-room__topbar">
-        <div className="empire-badge">
+        <button
+          type="button"
+          className="empire-badge empire-badge--button"
+          onClick={() => setShowSovereign(true)}
+          title="View sovereign portrait"
+        >
           <div className="empire-badge__seal" style={{ background: humanColor }}>
-            {humanCiv?.name?.slice(0, 1) ?? "A"}
+            {humanCiv && assets?.leaders[humanCiv.id]?.profileUrl ? (
+              <img
+                className="leader-portrait__img"
+                src={assets.leaders[humanCiv.id].profileUrl}
+                alt={setup.leaderName || humanCiv.leader_name}
+              />
+            ) : (
+              humanCiv?.name?.slice(0, 1) ?? "A"
+            )}
           </div>
           <div className="empire-badge__copy">
             <div className="empire-badge__name">{humanCiv?.name ?? "Civilization"}</div>
             <div className="empire-badge__sub">
-              {humanCiv?.leader_name ?? "Unknown Leader"}
+              {setup.leaderName.trim() || humanCiv?.leader_name || "Unknown Leader"}
             </div>
             <div className="empire-badge__sub empire-badge__objective">
               {nextObjective}
             </div>
           </div>
-        </div>
+        </button>
 
         <div className="war-room__metrics">
           <TopMetric label="Science" value={humanCiv?.science ?? 0} />
@@ -648,6 +880,16 @@ export default function HomePage() {
         </div>
 
         <div className="war-room__turnbox">
+          <button
+            type="button"
+            className="audio-toggle"
+            onClick={toggleMute}
+            title={muted ? "Unmute music" : "Mute music"}
+            aria-label={muted ? "Unmute music" : "Mute music"}
+            aria-pressed={muted}
+          >
+            {muted ? "🔇" : "🔊"}
+          </button>
           <div className="map-mode-toggle" role="tablist" aria-label="Map view mode">
             <button
               type="button"
@@ -862,46 +1104,35 @@ export default function HomePage() {
           </Panel>
 
           <Panel
-            label={`City · ${selectedProductionCity?.name ?? "No City"}`}
-            title={
-              selectedProductionCity
-                ? `${selectedProductionCity.production_stored} stored production`
-                : "Found a city first"
-            }
+            label="Cities"
+            title={`${humanCities.length} settlement${humanCities.length === 1 ? "" : "s"}`}
           >
-            {selectedProductionCity ? (
-              <>
-                <div className="city-brief">
-                  <MetricStat label="Population" value={selectedProductionCity.population} />
-                  <MetricStat label="Queue" value={selectedProductionCity.production_queue[0] ?? "Idle"} />
-                  <MetricStat label="Border" value={`R${selectedProductionCity.border_radius ?? 1}`} />
-                  <MetricStat
-                    label="Culture"
-                    value={
-                      selectedProductionCity.border_radius >= 3
-                        ? `${selectedProductionCity.culture_stored ?? 0} / max`
-                        : `${selectedProductionCity.culture_stored ?? 0} / ${
-                            selectedProductionCity.border_radius >= 2 ? 30 : 10
-                          }`
-                    }
-                  />
-                </div>
-                <div className="list-stack scroll-list">
-                  {buildableUnits.map((unit) => (
-                    <button
-                      key={unit.id}
-                      className="list-row"
-                      onClick={() => queueProduction(selectedProductionCity.id, unit.id)}
-                      disabled={busy || !isHumanTurn}
-                    >
-                      <span>{unit.label}</span>
-                      <span>{unit.cost} prod</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
+            {humanCities.length === 0 ? (
               <EmptyCopy>Your first settlement unlocks production orders and population growth.</EmptyCopy>
+            ) : (
+              <div className="list-stack">
+                {humanCities.map((city) => (
+                  <button
+                    key={city.id}
+                    type="button"
+                    className={`list-row${activeCityId === city.id ? " is-active" : ""}`}
+                    onClick={() => setActiveCityId(city.id)}
+                  >
+                    <span>
+                      <strong>
+                        {city.name}
+                        {city.is_capital && (
+                          <span style={{ color: "var(--accent)" }}> ★</span>
+                        )}
+                      </strong>
+                      <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem" }}>
+                        pop {city.population} · {city.production_queue[0] ?? "idle"}
+                      </div>
+                    </span>
+                    <span style={{ color: "var(--ink-muted)" }}>›</span>
+                  </button>
+                ))}
+              </div>
             )}
           </Panel>
 
@@ -1064,137 +1295,324 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Diplomacy drawer — slides in from the right when a leader is selected. */}
-      <aside
-        className={`diplomacy-drawer${activeConversationCivId !== null ? " is-open" : ""}`}
+      {/* Diplomatic audience — full-screen overlay; the rival's splash art
+          backs the conversation, their profile portrait anchors the hero. */}
+      <div
+        className={`diplomacy-audience${activeConversationCivId !== null ? " is-open" : ""}`}
         aria-hidden={activeConversationCivId === null}
+        onClick={() => setActiveConversationCivId(null)}
       >
         {activeConversationCiv && (
           <>
-            {activeLeaderSplash && (
-              <img
-                className="diplomacy-drawer__splash"
-                src={activeLeaderSplash}
-                alt={`${activeConversationCiv.name} splash art`}
-              />
-            )}
-            <header className="diplomacy-drawer__header">
-              <div className="diplomacy-drawer__heading">
+            <div
+              className="diplomacy-audience__bg"
+              style={
+                activeLeaderSplash
+                  ? { backgroundImage: `url(${activeLeaderSplash})` }
+                  : undefined
+              }
+            />
+            <div
+              className="diplomacy-audience__panel"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="diplomacy-audience__close"
+                onClick={() => setActiveConversationCivId(null)}
+                aria-label="Close diplomacy"
+              >
+                × Return
+              </button>
+
+              <header className="diplomacy-audience__hero">
                 <LeaderPortrait
-                  className="leader-row__portrait diplomacy-drawer__portrait"
+                  className="leader-row__portrait diplomacy-audience__portrait"
                   name={activeConversationCiv.name}
                   color={CIV_COLORS[activeConversationCiv.id % CIV_COLORS.length]}
                   url={assets?.leaders[activeConversationCiv.id]?.profileUrl}
                 />
-                <div>
-                  <div className="plate-label">Open Channel</div>
-                  <strong>{activeConversationCiv.name}</strong>
-                  <div className="diplomacy-drawer__leader">
+                <div className="diplomacy-audience__heading">
+                  <div className="plate-label">Diplomatic Audience</div>
+                  <h2>{activeConversationCiv.name}</h2>
+                  <div className="diplomacy-audience__leader">
                     {activeConversationCiv.leader_name}
                   </div>
+                  {activeStance && (
+                    <div className="thread-pills">
+                      <span className="thread-pill">
+                        <span className="thread-pill__label">Status</span>
+                        {capitalize(activeStance.stance)}
+                      </span>
+                      <span
+                        className="thread-pill"
+                        style={{ color: relationshipColor(activeStance.relationship) }}
+                      >
+                        <span className="thread-pill__label">Rel</span>
+                        {activeStance.relationship >= 0 ? "+" : ""}
+                        {activeStance.relationship} {relationshipLabel(activeStance.relationship)}
+                      </span>
+                      {activeStance.truce_active && (
+                        <span className="thread-pill">
+                          <span className="thread-pill__label">Truce</span>
+                          until T{activeStance.truce_until}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </header>
+
+              <div className="diplomacy-audience__messages">
+                {activeConversation.length === 0 ? (
+                  <EmptyCopy>No messages exchanged. Send the first diplomatic signal.</EmptyCopy>
+                ) : (
+                  [...activeConversation].reverse().map((message, index) => (
+                    <MessageCard
+                      key={`${message.turn}-${message.from_civ_id}-${message.to_civ_id}-${index}`}
+                      message={message}
+                      civs={state?.civs ?? []}
+                      humanCivId={humanCiv?.id ?? null}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="diplomacy-audience__composer">
+                <label className="field">
+                  <span className="field-label">Tone</span>
+                  <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
+                    {availableMessageKinds.map((kind) => (
+                      <option key={kind.id} value={kind.id}>
+                        {kind.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span className="field-label">Message</span>
+                  <input
+                    type="text"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder={`Reply to ${activeConversationCiv.name}`}
+                  />
+                </label>
+                {activeStance?.truce_active && (
+                  <div className="empty-copy">
+                    Truce until turn {activeStance.truce_until}. Threats and war declarations are disabled.
+                  </div>
+                )}
+                <button
+                  className="button-primary"
+                  onClick={sendMessage}
+                  disabled={busy || !isHumanTurn || !messageText.trim()}
+                >
+                  Send
+                </button>
+              </div>
+
+              {activeDiplomaticEvents.length > 0 && (
+                <details className="incidents-details">
+                  <summary>Recent Incidents ({activeDiplomaticEvents.length})</summary>
+                  <div className="list-stack">
+                    {[...activeDiplomaticEvents].reverse().slice(0, 8).map((event, index) => (
+                      <div
+                        key={`${event.turn}-${event.kind}-${index}`}
+                        className="list-row"
+                        style={{ cursor: "default" }}
+                      >
+                        <span>T{event.turn} · {capitalize(event.kind)}</span>
+                        <span>
+                          {event.relationship_delta >= 0 ? "+" : ""}
+                          {event.relationship_delta}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* City drawer — slides in from the right when a city is clicked. */}
+      <aside
+        className={`city-drawer${activeCityId !== null ? " is-open" : ""}`}
+        aria-hidden={activeCityId === null}
+      >
+        {activeCity && (
+          <>
+            <header className="city-drawer__header">
+              <div>
+                <div className="plate-label">
+                  {activeCity.is_capital ? "Capital City" : "Settlement"}
+                </div>
+                <strong className="city-drawer__name">{activeCity.name}</strong>
+                <div className="city-drawer__sub">
+                  Tile {activeCity.q}, {activeCity.r}
                 </div>
               </div>
               <button
                 type="button"
-                className="diplomacy-drawer__close"
-                onClick={() => setActiveConversationCivId(null)}
-                aria-label="Close diplomacy"
+                className="city-drawer__close"
+                onClick={() => setActiveCityId(null)}
+                aria-label="Close city panel"
               >
                 ×
               </button>
             </header>
 
-            {activeStance && (
-              <div className="thread-pills">
-                <span className="thread-pill">
-                  <span className="thread-pill__label">Status</span>
-                  {capitalize(activeStance.stance)}
-                </span>
-                <span
-                  className="thread-pill"
-                  style={{ color: relationshipColor(activeStance.relationship) }}
-                >
-                  <span className="thread-pill__label">Rel</span>
-                  {activeStance.relationship >= 0 ? "+" : ""}
-                  {activeStance.relationship} {relationshipLabel(activeStance.relationship)}
-                </span>
-                {activeStance.truce_active && (
-                  <span className="thread-pill">
-                    <span className="thread-pill__label">Truce</span>
-                    until T{activeStance.truce_until}
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="city-brief">
+              <MetricStat label="Population" value={activeCity.population} />
+              <MetricStat
+                label="Health"
+                value={`${activeCity.health}/${activeCity.max_health}`}
+              />
+              <MetricStat label="Food" value={activeCity.food_stored} />
+              <MetricStat label="Production" value={activeCity.production_stored} />
+              <MetricStat label="Border" value={`R${activeCity.border_radius ?? 1}`} />
+              <MetricStat
+                label="Culture"
+                value={
+                  activeCity.border_radius >= 3
+                    ? `${activeCity.culture_stored ?? 0} / max`
+                    : `${activeCity.culture_stored ?? 0} / ${
+                        activeCity.border_radius >= 2 ? 30 : 10
+                      }`
+                }
+              />
+            </div>
 
-            <div className="diplomacy-drawer__messages">
-              {activeConversation.length === 0 ? (
-                <EmptyCopy>No messages exchanged. Send the first diplomatic signal.</EmptyCopy>
+            <div className="city-drawer__section">
+              <div className="plate-label">Production Queue</div>
+              {activeCity.production_queue.length === 0 ? (
+                <EmptyCopy>Queue is empty. Pick a unit below to start building.</EmptyCopy>
               ) : (
-                [...activeConversation].reverse().map((message, index) => (
-                  <MessageCard
-                    key={`${message.turn}-${message.from_civ_id}-${message.to_civ_id}-${index}`}
-                    message={message}
-                    civs={state?.civs ?? []}
-                    humanCivId={humanCiv?.id ?? null}
-                  />
-                ))
-              )}
-            </div>
-
-            <div className="diplomacy-drawer__composer">
-              <label className="field">
-                <span className="field-label">Tone</span>
-                <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
-                  {availableMessageKinds.map((kind) => (
-                    <option key={kind.id} value={kind.id}>
-                      {kind.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span className="field-label">Message</span>
-                <input
-                  type="text"
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  placeholder={`Reply to ${activeConversationCiv.name}`}
-                />
-              </label>
-              {activeStance?.truce_active && (
-                <div className="empty-copy">
-                  Truce until turn {activeStance.truce_until}. Threats and war declarations are disabled.
-                </div>
-              )}
-              <button
-                className="button-primary"
-                onClick={sendMessage}
-                disabled={busy || !isHumanTurn || !messageText.trim()}
-              >
-                Send
-              </button>
-            </div>
-
-            {activeDiplomaticEvents.length > 0 && (
-              <details className="incidents-details">
-                <summary>
-                  Recent Incidents ({activeDiplomaticEvents.length})
-                </summary>
                 <div className="list-stack">
-                  {[...activeDiplomaticEvents].reverse().slice(0, 8).map((event, index) => (
+                  {activeCity.production_queue.map((item, idx) => (
                     <div
-                      key={`${event.turn}-${event.kind}-${index}`}
+                      key={`${item}-${idx}`}
                       className="list-row"
                       style={{ cursor: "default" }}
                     >
                       <span>
-                        T{event.turn} · {capitalize(event.kind)}
+                        {idx === 0 ? "▶ " : `${idx + 1}. `}
+                        {capitalize(item)}
+                      </span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                        {idx === 0 && (
+                          <small style={{ color: "var(--ink-muted)" }}>
+                            {activeCity.production_stored} stored
+                          </small>
+                        )}
+                        <button
+                          type="button"
+                          className="city-drawer__cancel"
+                          onClick={() => cancelProduction(activeCity.id, idx)}
+                          disabled={busy || !isHumanTurn}
+                          title={
+                            idx === 0
+                              ? "Cancel — forfeits stored production"
+                              : "Remove from queue"
+                          }
+                          aria-label="Remove from queue"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="city-drawer__section">
+              <div className="plate-label">Build Order</div>
+              {buildableUnits.length === 0 ? (
+                <EmptyCopy>Research more technologies to unlock new units.</EmptyCopy>
+              ) : (
+                <div className="list-stack city-drawer__buildables">
+                  {buildableUnits.map((unit) => (
+                    <button
+                      key={unit.id}
+                      type="button"
+                      className="list-row"
+                      onClick={() => queueProduction(activeCity.id, unit.id)}
+                      disabled={busy || !isHumanTurn}
+                    >
+                      <span>{unit.label}</span>
+                      <span>{unit.cost} prod</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="city-drawer__section">
+              <div className="plate-label">
+                Structures · {humanCiv?.gold ?? 0} gold
+              </div>
+              <p className="empty-copy" style={{ margin: 0 }}>
+                Each structure costs {STRUCTURE_GOLD_COST} gold and adds
+                +{STRUCTURE_PRODUCTION_BONUS} production. One of each per city.
+              </p>
+              <div className="list-stack">
+                {STRUCTURE_CATEGORIES.map((cat) => {
+                  const owned = activeCity.purchased_structures.includes(cat.id);
+                  const canAfford = (humanCiv?.gold ?? 0) >= STRUCTURE_GOLD_COST;
+                  const disabled = owned || !canAfford || busy || !isHumanTurn;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className="list-row"
+                      onClick={() => purchaseStructure(activeCity.id, cat.id)}
+                      disabled={disabled}
+                      title={
+                        owned
+                          ? "Already built in this city"
+                          : !canAfford
+                            ? `Need ${STRUCTURE_GOLD_COST} gold`
+                            : "Place this structure"
+                      }
+                    >
+                      <span>
+                        <strong>{cat.label}</strong>
+                        <div
+                          style={{
+                            color: "var(--ink-muted)",
+                            fontSize: "0.78rem",
+                          }}
+                        >
+                          {cat.hint}
+                        </div>
                       </span>
                       <span>
-                        {event.relationship_delta >= 0 ? "+" : ""}
-                        {event.relationship_delta}
+                        {owned ? (
+                          <span style={{ color: "var(--accent)" }}>✓ Built</span>
+                        ) : (
+                          `${STRUCTURE_GOLD_COST}g`
+                        )}
                       </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {activeCity.buildings.length > 0 && (
+              <details className="incidents-details">
+                <summary>Buildings ({activeCity.buildings.length})</summary>
+                <div className="list-stack">
+                  {activeCity.buildings.map((b, i) => (
+                    <div
+                      key={`${b}-${i}`}
+                      className="list-row"
+                      style={{ cursor: "default" }}
+                    >
+                      <span>{capitalize(b)}</span>
                     </div>
                   ))}
                 </div>
@@ -1203,6 +1621,51 @@ export default function HomePage() {
           </>
         )}
       </aside>
+
+      {/* Sovereign portrait — opened by clicking the empire badge. */}
+      {showSovereign && humanCiv && (
+        <div
+          className="intro-screen sovereign-overlay"
+          onClick={() => setShowSovereign(false)}
+        >
+          <div
+            className="intro-screen__bg"
+            style={
+              assets?.leaders[humanCiv.id]?.splashUrl
+                ? {
+                    backgroundImage: `url(${assets.leaders[humanCiv.id].splashUrl})`,
+                  }
+                : undefined
+            }
+          />
+          <button
+            type="button"
+            className="sovereign-overlay__close"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSovereign(false);
+            }}
+            aria-label="Close sovereign view"
+          >
+            × Return
+          </button>
+          <section
+            className="intro-screen__panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="plate-label intro-screen__chapter">Sovereign</div>
+            <h1 className="intro-screen__civ">{humanCiv.name}</h1>
+            <div className="intro-screen__leader">
+              {setup.leaderName.trim() || humanCiv.leader_name}
+            </div>
+            <p className="intro-screen__epitaph">
+              {setup.leaderDescription.trim() ||
+                "An age unfolds beneath your banner. The chronicles will record what you make of it."}
+            </p>
+            <div className="intro-screen__hint">click anywhere · esc to return</div>
+          </section>
+        </div>
+      )}
 
       {error && <div className="toast">{error}</div>}
     </main>

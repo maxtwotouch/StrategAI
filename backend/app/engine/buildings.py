@@ -86,3 +86,23 @@ def trained_unit_health_bonus(city: City) -> int:
     return sum(
         BUILDINGS[b].trained_unit_health_bonus for b in city.buildings if b in BUILDINGS
     )
+
+
+# ---------------------------------------------------------------------------
+# Asset-API structures — gold-purchased buildings keyed by category.
+# ---------------------------------------------------------------------------
+# Categories mirror the asset service's StructureCategory enum so the frontend
+# can render real building art on purchase. Each category, regardless of which
+# one is chosen, currently grants the same +production bonus — the asset is
+# what differentiates them visually; gameplay-wise they are equivalent for now.
+
+PURCHASABLE_STRUCTURE_CATEGORIES: frozenset[str] = frozenset(
+    {"fortification", "production", "housing", "sacred"}
+)
+STRUCTURE_GOLD_COST: int = 80
+STRUCTURE_PRODUCTION_BONUS_PER: int = 2
+
+
+def city_structure_production_bonus(city: City) -> int:
+    """Production yield bonus from gold-purchased structures."""
+    return len(city.purchased_structures) * STRUCTURE_PRODUCTION_BONUS_PER

@@ -9,6 +9,8 @@
 import {
   ApiUnitType,
   BackgroundTileType,
+  ExistingLeader,
+  absoluteAssetUrl,
   assetApiConfigured,
   generateBackgroundTile,
   generateLeaderProfile,
@@ -16,6 +18,7 @@ import {
   generateStructure,
   generateTerrainFeature,
   generateUnit,
+  listLeaders,
 } from "@/lib/assetApi";
 import { leaderParamsFor } from "@/lib/leaderMapping";
 import {
@@ -61,6 +64,9 @@ export interface AssetManifest {
 export interface CivInput {
   civId: number;
   leaderName: string;
+  // When provided, used verbatim instead of the deterministic lookup table —
+  // lets the player author their own leader (see start screen inputs).
+  customLeaderParams?: import("@/lib/assetApi").LeaderParams;
 }
 
 export interface ResolveInput {
@@ -77,8 +83,18 @@ export interface ResolveOptions {
 
 const CACHE_PREFIX = "inf3600:assetManifest:";
 
+// Cache key includes a short tag of the asset host so swapping the asset
+// server (or moving from "unset" to a real URL) invalidates older entries.
+// Without this, a re-used gameId picks up stale URLs that 404.
+function hostTag(): string {
+  if (typeof window === "undefined") return "ssr";
+  // process.env.NEXT_PUBLIC_ASSET_API_URL is inlined at build time.
+  const raw = (process.env.NEXT_PUBLIC_ASSET_API_URL ?? "").replace(/\/+$/, "");
+  return raw.replace(/^https?:\/\//i, "").replace(/[^a-z0-9]/gi, "_") || "local";
+}
+
 function cacheKey(gameId: number): string {
-  return `${CACHE_PREFIX}${gameId}`;
+  return `${CACHE_PREFIX}${hostTag()}:${gameId}`;
 }
 
 export function loadCachedManifest(gameId: number): AssetManifest | null {
@@ -208,23 +224,61 @@ export async function resolveManifest(
     }
   });
 
-  const leaderWork = mapLimit(leaders, 2, async ({ civId, leaderName }) => {
+  // Pull the existing leader catalog once so we can fall back to it when a
+  // POST fails (e.g., upstream generation errors). Best-match by
+  // archetype+culture, then rotate by civ id so distinct civs get distinct
+  // leaders when the pool has more than one entry.
+  const leaderPool: ExistingLeader[] = await listLeaders(options.signal);
+
+  function pickFromPool(
+    archetype: string,
+    culture: string,
+    civId: number,
+  ): ExistingLeader | null {
+    if (leaderPool.length === 0) return null;
+    const ranked = [...leaderPool].sort((a, b) => {
+      const scoreA =
+        (a.archetype === archetype ? 2 : 0) + (a.culture === culture ? 1 : 0);
+      const scoreB =
+        (b.archetype === archetype ? 2 : 0) + (b.culture === culture ? 1 : 0);
+      return scoreB - scoreA;
+    });
+    return ranked[civId % ranked.length] ?? null;
+  }
+
+  const leaderWork = mapLimit(leaders, 2, async ({ civId, leaderName, customLeaderParams }) => {
     try {
-      const params = leaderParamsFor(leaderName);
-      const splash = await generateLeaderSplash(params, options.signal);
-      const assets: LeaderAssets = { splashUrl: splash.url };
+      const params = customLeaderParams ?? leaderParamsFor(leaderName);
+      const assets: LeaderAssets = {};
       try {
-        assets.profileUrl = await generateLeaderProfile(
-          params,
-          splash.leaderId,
-          options.signal,
-        );
+        const splash = await generateLeaderSplash(params, options.signal);
+        assets.splashUrl = splash.url;
+        try {
+          assets.profileUrl = await generateLeaderProfile(
+            params,
+            splash.leaderId,
+            options.signal,
+          );
+        } catch {
+          // Profile failed — keep the splash.
+        }
       } catch {
-        // Profile failed — keep the splash, drawer falls back to the initial.
+        // Splash POST failed (server-side generation outage). Fall back to a
+        // matching entry from the existing leader catalog so the slot still
+        // shows real art rather than an initial.
+        const fallback = pickFromPool(params.archetype, params.culture, civId);
+        if (fallback?.splash_url) {
+          assets.splashUrl = absoluteAssetUrl(fallback.splash_url);
+        }
+        if (fallback?.profile_url) {
+          assets.profileUrl = absoluteAssetUrl(fallback.profile_url);
+        }
       }
-      leaderAssets[civId] = assets;
+      if (assets.splashUrl || assets.profileUrl) {
+        leaderAssets[civId] = assets;
+      }
     } catch {
-      // Leader failed entirely → UI falls back to the colored initial.
+      // Total failure → UI falls back to the colored initial.
     } finally {
       tick();
     }

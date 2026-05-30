@@ -88,6 +88,17 @@ export function SquareMap(props: StrategyMapProps) {
   const [camera, setCamera] = useState<Camera | null>(null);
   const [dragging, setDragging] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
+  // URLs that failed to load are dropped from rendering so the color
+  // fill / glyph fallback shows through instead of a broken-image icon.
+  const [failedHrefs, setFailedHrefs] = useState<Set<string>>(new Set());
+  const markFailed = (href: string) => {
+    setFailedHrefs((prev) => {
+      if (prev.has(href)) return prev;
+      const next = new Set(prev);
+      next.add(href);
+      return next;
+    });
+  };
 
   // Drag state lives in refs so document-level listeners see the latest values.
   const dragRef = useRef<{
@@ -547,7 +558,7 @@ export function SquareMap(props: StrategyMapProps) {
             <g pointerEvents="none">
               {pixels.map(({ tile, x, y }) => {
                 const href = props.assets?.terrain[tile.terrain];
-                if (!href) return null;
+                if (!href || failedHrefs.has(href)) return null;
                 return (
                   <image
                     key={tileKey(tile.q, tile.r) + ":img"}
@@ -558,6 +569,7 @@ export function SquareMap(props: StrategyMapProps) {
                     height={TILE_SIZE}
                     preserveAspectRatio="none"
                     style={{ imageRendering: "pixelated" }}
+                    onError={() => markFailed(href)}
                   />
                 );
               })}
@@ -570,7 +582,7 @@ export function SquareMap(props: StrategyMapProps) {
             <g pointerEvents="none">
               {pixels.map(({ tile, x, y }) => {
                 const href = props.assets?.elevation?.[tile.terrain];
-                if (!href) return null;
+                if (!href || failedHrefs.has(href)) return null;
                 return (
                   <image
                     key={tileKey(tile.q, tile.r) + ":elev"}
@@ -581,6 +593,7 @@ export function SquareMap(props: StrategyMapProps) {
                     height={TILE_SIZE}
                     preserveAspectRatio="none"
                     style={{ imageRendering: "pixelated" }}
+                    onError={() => markFailed(href)}
                   />
                 );
               })}
@@ -950,7 +963,11 @@ export function SquareMap(props: StrategyMapProps) {
               const key = tileKey(city.q, city.r);
               const { x, y } = hexToPixel({ q: city.q, r: city.r });
               const color = CIV_COLORS[city.owner % CIV_COLORS.length];
-              const buildingUrl = props.assets?.structures?.[city.owner];
+              const rawBuildingUrl = props.assets?.structures?.[city.owner];
+              const buildingUrl =
+                rawBuildingUrl && !failedHrefs.has(rawBuildingUrl)
+                  ? rawBuildingUrl
+                  : undefined;
               return (
                 <g key={key + ":city"}>
                   {buildingUrl ? (
@@ -963,6 +980,7 @@ export function SquareMap(props: StrategyMapProps) {
                         height={TILE_SIZE}
                         preserveAspectRatio="none"
                         style={{ imageRendering: "pixelated" }}
+                        onError={() => markFailed(buildingUrl)}
                       />
                       <rect
                         x={x - half + 1}
@@ -1022,7 +1040,11 @@ export function SquareMap(props: StrategyMapProps) {
               const color = CIV_COLORS[unit.owner % CIV_COLORS.length];
               const isSelected = unit.id === props.selectedUnitId;
               const size = TILE_SIZE * 0.62;
-              const spriteUrl = props.assets?.units?.[unit.type];
+              const rawSpriteUrl = props.assets?.units?.[unit.type];
+              const spriteUrl =
+                rawSpriteUrl && !failedHrefs.has(rawSpriteUrl)
+                  ? rawSpriteUrl
+                  : undefined;
               const spriteSize = TILE_SIZE * 0.82;
               return (
                 <g key={key + ":unit:" + unit.id}>
@@ -1049,6 +1071,7 @@ export function SquareMap(props: StrategyMapProps) {
                         height={spriteSize}
                         preserveAspectRatio="xMidYMid meet"
                         style={{ imageRendering: "pixelated" }}
+                        onError={() => markFailed(spriteUrl)}
                       />
                     </>
                   ) : (

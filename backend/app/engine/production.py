@@ -10,6 +10,7 @@ from app.engine.buildings import (
     city_culture_bonus,
     city_food_bonus,
     city_production_bonus,
+    city_structure_production_bonus,
     trained_unit_health_bonus,
 )
 from app.engine.hex import hex_neighbors
@@ -63,7 +64,10 @@ def _city_tile_yields(state: GameState, city: City) -> tuple[int, int]:
     y = working_yields(state, city)
     return (
         CITY_BASE_FOOD + y.food + city_food_bonus(city),
-        CITY_BASE_PRODUCTION + y.production + city_production_bonus(city),
+        CITY_BASE_PRODUCTION
+        + y.production
+        + city_production_bonus(city)
+        + city_structure_production_bonus(city),
     )
 
 

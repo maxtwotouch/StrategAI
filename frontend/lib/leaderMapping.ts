@@ -63,3 +63,24 @@ export function leaderParamsFor(leaderName: string): LeaderParams {
     mood: def.mood,
   };
 }
+
+// Build LeaderParams from user-supplied fields, filling in safe defaults and
+// padding too-short descriptions so the API's 50-char floor is always met.
+export function buildCustomLeaderParams(input: {
+  leaderName: string;
+  archetype?: string;
+  culture?: string;
+  description?: string;
+}): LeaderParams {
+  const fallback = FALLBACK;
+  const trimmedDesc = (input.description ?? "").trim();
+  const description = trimmedDesc.length >= 50 ? trimmedDesc : fallback.description;
+  return {
+    leaderName: input.leaderName.trim() || "Unknown Sovereign",
+    leaderDescription: description,
+    archetype: input.archetype || fallback.archetype,
+    culture: input.culture || fallback.culture,
+    timeOfDay: fallback.timeOfDay,
+    mood: fallback.mood,
+  };
+}

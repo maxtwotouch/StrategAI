@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 
 from app.engine.directives import (
+    CancelProduction,
     DirectiveError,
+    PurchaseStructure,
     QueueProduction,
     StartResearch,
     apply_directive,
@@ -24,6 +26,7 @@ from app.engine.models import (
 def _state(
     cities: tuple[City, ...] = (),
     civ_known: frozenset[str] = frozenset(),
+    civ_gold: int = 0,
 ) -> GameState:
     civs = (
         Civilization(
@@ -32,6 +35,7 @@ def _state(
             leader_name="L",
             is_human=False,
             known_techs=civ_known,
+            gold=civ_gold,
         ),
         Civilization(id=1, name="B", leader_name="L", is_human=False),
     )
@@ -90,6 +94,139 @@ def test_queue_production_rejects_unknown_city():
         apply_directive(
             state, 0, QueueProduction(city_id=404, item=BuildItem.unit(UnitType.WARRIOR))
         )
+
+
+@pytest.mark.unit
+def test_cancel_production_removes_item_at_index():
+    city = City(
+        id=1,
+        owner=0,
+        name="Home",
+        location=Hex(0, 0),
+        production_queue=(
+            BuildItem.unit(UnitType.SCOUT),
+            BuildItem.unit(UnitType.WARRIOR),
+            BuildItem.unit(UnitType.SETTLER),
+        ),
+        production_stored=4,
+    )
+    state = _state(cities=(city,))
+    new_state = apply_directive(state, 0, CancelProduction(city_id=1, index=1))
+    assert new_state.cities[0].production_queue == (
+        BuildItem.unit(UnitType.SCOUT),
+        BuildItem.unit(UnitType.SETTLER),
+    )
+    # Cancelling a non-head item keeps stored production intact.
+    assert new_state.cities[0].production_stored == 4
+
+
+@pytest.mark.unit
+def test_cancel_production_head_forfeits_stored_production():
+    city = City(
+        id=1,
+        owner=0,
+        name="Home",
+        location=Hex(0, 0),
+        production_queue=(
+            BuildItem.unit(UnitType.WARRIOR),
+            BuildItem.unit(UnitType.SCOUT),
+        ),
+        production_stored=7,
+    )
+    state = _state(cities=(city,))
+    new_state = apply_directive(state, 0, CancelProduction(city_id=1, index=0))
+    assert new_state.cities[0].production_queue == (BuildItem.unit(UnitType.SCOUT),)
+    assert new_state.cities[0].production_stored == 0
+
+
+@pytest.mark.unit
+def test_cancel_production_rejects_out_of_bounds():
+    city = City(
+        id=1,
+        owner=0,
+        name="Home",
+        location=Hex(0, 0),
+        production_queue=(BuildItem.unit(UnitType.SCOUT),),
+    )
+    state = _state(cities=(city,))
+    with pytest.raises(DirectiveError, match="out of bounds"):
+        apply_directive(state, 0, CancelProduction(city_id=1, index=5))
+
+
+@pytest.mark.unit
+def test_cancel_production_rejects_foreign_city():
+    foreign = City(
+        id=99,
+        owner=1,
+        name="Other",
+        location=Hex(0, 0),
+        production_queue=(BuildItem.unit(UnitType.SCOUT),),
+    )
+    state = _state(cities=(foreign,))
+    with pytest.raises(DirectiveError, match="not owned"):
+        apply_directive(state, 0, CancelProduction(city_id=99, index=0))
+
+
+@pytest.mark.unit
+def test_purchase_structure_adds_category_and_deducts_gold():
+    city = City(id=1, owner=0, name="Home", location=Hex(0, 0))
+    state = _state(cities=(city,), civ_gold=100)
+    new_state = apply_directive(
+        state, 0, PurchaseStructure(city_id=1, category="production")
+    )
+    assert "production" in new_state.cities[0].purchased_structures
+    assert new_state.civs[0].gold == 20  # 100 - 80
+
+
+@pytest.mark.unit
+def test_purchase_structure_rejects_insufficient_gold():
+    city = City(id=1, owner=0, name="Home", location=Hex(0, 0))
+    state = _state(cities=(city,), civ_gold=10)
+    with pytest.raises(DirectiveError, match="not enough gold"):
+        apply_directive(
+            state, 0, PurchaseStructure(city_id=1, category="production")
+        )
+
+
+@pytest.mark.unit
+def test_purchase_structure_rejects_duplicate_category():
+    city = City(
+        id=1,
+        owner=0,
+        name="Home",
+        location=Hex(0, 0),
+        purchased_structures=frozenset({"production"}),
+    )
+    state = _state(cities=(city,), civ_gold=200)
+    with pytest.raises(DirectiveError, match="already has"):
+        apply_directive(
+            state, 0, PurchaseStructure(city_id=1, category="production")
+        )
+
+
+@pytest.mark.unit
+def test_purchase_structure_rejects_unknown_category():
+    city = City(id=1, owner=0, name="Home", location=Hex(0, 0))
+    state = _state(cities=(city,), civ_gold=200)
+    with pytest.raises(DirectiveError, match="unknown structure category"):
+        apply_directive(
+            state, 0, PurchaseStructure(city_id=1, category="bogus")
+        )
+
+
+@pytest.mark.unit
+def test_purchase_structure_increases_production_yield():
+    """A purchased structure increases the city's production tile yield."""
+    from app.engine.production import _city_tile_yields
+
+    city = City(id=1, owner=0, name="Home", location=Hex(0, 0))
+    state = _state(cities=(city,), civ_gold=200)
+    _, before_prod = _city_tile_yields(state, state.cities[0])
+    new_state = apply_directive(
+        state, 0, PurchaseStructure(city_id=1, category="production")
+    )
+    _, after_prod = _city_tile_yields(new_state, new_state.cities[0])
+    assert after_prod == before_prod + 2
 
 
 @pytest.mark.unit

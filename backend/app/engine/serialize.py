@@ -89,6 +89,7 @@ def _serialize_city(city: City, *, owned: bool = False) -> dict[str, Any]:
         "max_health": city.max_health,
         "is_capital": city.is_capital,
         "buildings": sorted(b.value for b in city.buildings),
+        "purchased_structures": sorted(city.purchased_structures),
         "border_radius": city.border_radius,
         "culture_stored": city.culture_stored,
     }

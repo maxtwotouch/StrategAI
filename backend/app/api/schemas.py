@@ -75,6 +75,7 @@ class CityOut(BaseModel):
     max_health: int
     is_capital: bool
     buildings: list[str]
+    purchased_structures: list[str] = Field(default_factory=list)
     production_queue: list[str]
     border_radius: int
     culture_stored: int
@@ -397,6 +398,18 @@ class BuildRequest(BaseModel):
     unit_type: str | None = None
     build_kind: str = Field(default="unit")
     item_id: str | None = None
+
+
+class CancelBuildRequest(BaseModel):
+    civ_id: int
+    city_id: int
+    index: int
+
+
+class PurchaseStructureRequest(BaseModel):
+    civ_id: int
+    city_id: int
+    category: str
 
 
 class MessageRequest(BaseModel):
