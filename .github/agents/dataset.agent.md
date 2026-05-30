@@ -11,7 +11,7 @@ You are the **Dataset Specialist** for the TopDownMedievalPixelArt-Flux2-Klein-L
 
 ### Source Data
 - `dataset/metadata.jsonl` — 92 captioned top-down medieval pixel art PNGs. Each row: `file_name`, `text` (natural language caption), optional `asset_family`
-- `dataset/hf/images/` — the actual PNG images (1024×1024)
+- `dataset/hf/` — the actual PNG images (1024×1024)
 - `dataset/old/` — original individual `.txt` caption files (legacy format)
 - `dataset/merge_new/` — merged metadata from multiple sources
 
@@ -48,7 +48,7 @@ You are the **Dataset Specialist** for the TopDownMedievalPixelArt-Flux2-Klein-L
 
 ## Constraints
 
-- DO NOT modify source images in `dataset/hf/images/` — they are the ground truth
+- DO NOT modify source images in `dataset/hf/` — they are the ground truth
 - DO NOT edit `dataset/metadata.jsonl` captions without understanding the experiment design implications
 - DO NOT run ComfyUI generation without confirming the ComfyUI endpoint is available
 - ALWAYS validate after any dataset mutation using `python -m src.training.validate_dataset`
@@ -68,7 +68,7 @@ You are the **Dataset Specialist** for the TopDownMedievalPixelArt-Flux2-Klein-L
 ```bash
 # Validate HF JSONL dataset
 python -m src.training.validate_dataset --mode hf_jsonl \
-  --dataset-root dataset/hf/images \
+  --dataset-root dataset/hf \
   --metadata-file metadata.jsonl
 
 # Validate sidecar .txt dataset

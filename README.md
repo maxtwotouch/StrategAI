@@ -57,7 +57,7 @@ flowchart TD
 │   └── train_experiments.sh # Batch training launcher
 ├── dataset/
 │   ├── raw/                 # Generated PNGs (ComfyUI output)
-│   ├── hf/images/           # Published dataset (clean PNGs + metadata.jsonl)
+│   ├── hf/                   # Published dataset (clean PNGs + metadata.jsonl)
 │   ├── prompts/             # Prompt JSONL data
 │   └── derived/             # Caption variants (minimal/detailed/ultra_minimal)
 ├── tests/

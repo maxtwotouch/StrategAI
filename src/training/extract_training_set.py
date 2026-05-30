@@ -49,11 +49,11 @@ DEFAULT_TRIGGER_WORD = "<tdp>"
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Extract a ratio-controlled training set.")
-    p.add_argument("--metadata", type=Path, default=Path("dataset/hf/images/metadata.jsonl"))
+    p.add_argument("--metadata", type=Path, default=Path("dataset/hf/metadata.jsonl"))
     p.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path("dataset/hf/images"),
+        default=Path("dataset/hf"),
         help="Dataset root directory. file_name paths in metadata are resolved relative to this.",
     )
     p.add_argument("--out", type=Path, default=Path("training_set"),

@@ -26,7 +26,7 @@ Key files you must be aware of:
 - `config/comfyui/*.json` — 3 ComfyUI workflow API JSONs
 - `config/prompt_templates.json` — prompt generation templates
 - `dataset/metadata.jsonl` — source caption metadata (92 images)
-- `dataset/hf/images/` — published dataset (PNGs + metadata.jsonl)
+- `dataset/hf/` — published dataset (PNGs + metadata.jsonl)
 - `dataset/derived/` — derived caption variants (detailed, minimal, ultra_minimal)
 - `src/generation/` — dataset generation tooling (prompt_generator, dataset_generator, image_metadata, prepare_dataset)
 - `src/training/` — training tooling (validate, derive captions, extract training set, sync prompts)
