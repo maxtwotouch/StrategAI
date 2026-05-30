@@ -20,11 +20,10 @@ Key files you must be aware of:
 - `docs/generation.md` — the complete dataset generation reference
 - `docs/comfyui-workflows.md` — ComfyUI workflow deep-dive
 - `README.md` — project overview and quick-start
-- `PUBLISHING.md` — model card template and publishing checklist
 - `config/training/*.yaml` — 6 training experiment configs
-- `config/comfyui/*.json` — 3 ComfyUI workflow API JSONs
+- `config/comfyui/*.json` — 2 ComfyUI workflow API JSONs
 - `config/prompt_templates.json` — prompt generation templates
-- `dataset/metadata.jsonl` — source caption metadata (92 images)
+- `dataset/metadata.jsonl` — source caption metadata (100 images)
 - `dataset/hf/` — published dataset (PNGs + metadata.jsonl)
 - `dataset/derived/` — derived caption variants (detailed, minimal, ultra_minimal)
 - `src/generation/` — dataset generation tooling (prompt_generator, dataset_generator, image_metadata, prepare_dataset)

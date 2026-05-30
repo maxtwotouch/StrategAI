@@ -105,10 +105,10 @@ prepare-dataset ./dataset/raw --out-dir ./dataset/hf
 ```
 
 Output:
-- `dataset/hf/0000001.png`, `0000002.png`, ... — clean PNGs (no embedded metadata)
+- `dataset/hf/00001.png`, `00002.png`, ... — clean PNGs (no embedded metadata)
 - `dataset/hf/metadata.jsonl` — HF `imagefolder` format:
   ```json
-  {"file_name": "0000001.png", "text": "a medieval watermill in a cozy harvest season setting...", "asset_type": "structure", "palette": "earthy palette"}
+  {"file_name": "00001.png", "text": "a medieval watermill in a cozy harvest season setting...", "asset_type": "structure", "palette": "earthy palette"}
   ```
 
 ## Asset Types & Ratios
@@ -133,7 +133,7 @@ Output:
 
 | Field | Description |
 |-------|-------------|
-| `file_name` | Sequential filename (`0000001.png`) |
+| `file_name` | Sequential filename (`00001.png`) |
 | `text` | Clean caption |
 | `asset_type` | Asset category |
 | `palette` | Palette name |

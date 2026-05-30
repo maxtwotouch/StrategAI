@@ -346,6 +346,9 @@ def load_prompt_templates(path: Path) -> dict:
 # ------------------------------------------------------------
 def ratio_to_counts(total_target: int, ratios: dict) -> dict:
     keys = list(ratios.keys())
+    if not keys:
+        return {}
+
     vals = [max(0.0, float(ratios[k])) for k in keys]
     s = sum(vals)
 

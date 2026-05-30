@@ -85,7 +85,7 @@ def main() -> int:
             continue
 
         counter += 1
-        new_name = f"{counter:07d}.png"
+        new_name = f"{counter:05d}.png"
         dest_png = out_dir / new_name
 
         # Copy as a clean PNG with no embedded metadata

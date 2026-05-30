@@ -275,7 +275,7 @@ No additional dependency or abstraction layer is needed.
 
 ### 9.1 Why sequential numbering
 
-The source images have non-sequential IDs (0000001, 0000009, 0000011, ...)
+The source images have sequential IDs (00001–00100)
 inherited from the generation pipeline.  For a public dataset, sequential
 numbering (00001–00100) is cleaner, easier to reference, and follows
 HuggingFace conventions.

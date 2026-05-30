@@ -46,7 +46,7 @@ CATEGORY_RULES: List[Tuple[str, str]] = [
     (r"\b(grass|dirt|sand|stone|water|swamp|snow|ice|lava|cobblestone|gravel)\s+(tile|texture|patch|terrain)",
      "terrain"),
     (r"\b(bramble|reeds|bush|shrub|tree|forest|vine|thicket|undergrowth|fungus|mushroom|crop|foliage|canopy)\b",
-     "vegetation"),
+     "object"),
     (r"\b(building|tower|house|hall|forge\b|workshop|mill|farm|cottage|monastery|barracks|granary|sawmill|watchtower|outpost|station|laboratory|observatory|wall|keep|castle|temple|church|tavern|inn|shop|market|bridge|gate|mine|quarry|foundry|windmill|watermill|stronghold|fortress|citadel|spire)\b",
      "structure"),
     (r"\b(chest|barrel|crate|anvil|tool|weapon|shield|torch|lantern|bench|throne|statue|fountain|cart|wagon|cauldron|bookcase|bed|chair)\b",

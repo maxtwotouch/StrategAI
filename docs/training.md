@@ -49,8 +49,8 @@ extract-training-set --dry-run
 
 Produces:
 ```
-dataset/hf/0000001.png
-dataset/hf/0000001.txt   ← "[trigger] top-down view. A medieval granary..."
+dataset/hf/00001.png
+dataset/hf/00001.txt   ← "[trigger] top-down view. A medieval granary..."
 ```
 
 The tool reads `dataset/hf/metadata.jsonl`, injects `[trigger]` into captions, and writes `.txt` files alongside each image. At training time, the Ostris toolkit replaces `[trigger]` with `<tdp>`.
@@ -149,10 +149,10 @@ A dataset directory with images and matching `.txt` caption files:
 
 ```
 dataset/hf/
-├── 0000001.png
-├── 0000001.txt
-├── 0000002.png
-├── 0000002.txt
+├── 00001.png
+├── 00001.txt
+├── 00002.png
+├── 00002.txt
 └── ...
 ```
 
