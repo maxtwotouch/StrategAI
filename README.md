@@ -206,16 +206,18 @@ All POST endpoints return a consistent structure:
 }
 ```
 
-Leader responses use `leader_id` instead of `asset_id`. Unit responses use `unit_id` and include the submitted `description`.
+Leader responses use `leader_id` instead of `asset_id`. Unit responses use `unit_id`.
+Background tile responses use `background_tile_id`. All responses include the submitted `description` where applicable.
 
 ### Error Responses
 
 | Code | Meaning |
 |------|---------|
-| `400` | Invalid request (bad enum value, missing required field, validation error) |
+| `400` | Invalid request (bad enum value, missing required field, engine-level validation error) |
 | `404` | Asset or record not found |
 | `411` | Missing Content-Length header on POST/PUT/PATCH requests |
 | `413` | Request body exceeds configured size limit |
+| `422` | Pydantic validation error (missing field, too short/long, bad enum) |
 | `503` | ComfyUI unavailable (engine not initialized) |
 | `500` | Internal server error |
 
@@ -223,108 +225,10 @@ Leader responses use `leader_id` instead of `asset_id`. Unit responses use `unit
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  FastAPI (src/main.py)                                  │
-│  Endpoints: /leader, /structure, /object, /terrain,     │
-│             /unit, /background_tile, /assets, /health   │
-├──────────────────┬──────────────────┬───────────────────┤
-│  Leader Engine   │  Tile Engine     │  Unit Engine      │
-│  (leader/)       │  (tile/)         │  (unit/)          │
-│  ├ LeaderEngine  │  ├ TileEngine    │  ├ UnitEngine     │
-│  ├ StaticLeader  │  ├ StaticTile    │  ├ StaticUnit     │
-│  └ Models/Reg    │  └ Background    │  └ Models/Reg     │
-├──────────────────┴──────────────────┴───────────────────┤
-│  ComfyUIClient (comfyui_client.py)                      │
-│  Async HTTP+WS: httpx + websockets                      │
-│  Workflow validation, patching, queueing, result download│
-├─────────────────────────────────────────────────────────┤
-│  ComfyUILoadBalancer (comfyui_loadbalancer.py)          │
-│  Multi-node: health checks, queue-depth routing          │
-├─────────────────────────────────────────────────────────┤
-│  AssetStore (storage.py)                                │
-│  In-memory LRU cache + disk persistence                  │
-├─────────────────────────────────────────────────────────┤
-│  SQLite DB (database.py)                                │
-│  AssetRecord, LeaderRecord, StructureRecord,            │
-│  ObjectRecord, TerrainRecord, UnitRecord,               │
-│  BackgroundTileRecord                                   │
-└─────────────────────────────────────────────────────────┘
-```
+See [docs/architecture.md](docs/architecture.md) for the full system architecture,
+component breakdown, workflow templates, and generation mode documentation.
 
-### Generation Modes
-
-Each asset family can be independently configured:
-
-| Mode | Behaviour |
-|------|-----------|
-| `comfyui` | Delegates to an external ComfyUI server via HTTP+WebSocket |
-| `static` | Serves pre-made PNGs from `static_tiles/` directory |
-| `placeholder` | Returns a procedural coloured placeholder (zero dependencies) |
-
-Set in `config.yaml` under `generation.modes`:
-
-```yaml
-generation:
-  default_mode: "comfyui"
-  modes:
-    structure: "comfyui"
-    object: "comfyui"
-    terrain: "comfyui"
-    background_tile: "static"
-    leader: "comfyui"
-    unit: "static"
-```
-
----
-
-## Project Structure
-
-```
-.
-├── src/
-│   ├── main.py                  # FastAPI app, endpoints, CORS, middleware, lifespan
-│   ├── config.py                # Pydantic Settings (modes, paths, ComfyUI URL)
-│   ├── database.py              # SQLAlchemy ORM + SQLite (7 record types)
-│   ├── storage.py               # AssetStore: in-memory LRU cache + disk I/O
-│   ├── comfyui_client.py        # Async HTTP+WebSocket client for ComfyUI
-│   ├── comfyui_loadbalancer.py  # Multi-node queue-depth routing + health checks
-│   ├── static_catalog.py        # Scans static_tiles/ for available PNGs
-│   ├── font_utils.py            # Font loading for placeholder renderers
-│   ├── prompt_templates.py      # JSON template loader (prefix/suffix wrapping)
-│   ├── leader/
-│   │   ├── engine.py            # Splash → profile → action orchestrator
-│   │   ├── models.py            # Enums + Pydantic request/response schemas
-│   │   ├── prompts.py           # Enum injection maps + prompt builders
-│   │   └── registry.py          # SQLite-backed leader CRUD
-│   ├── tile/
-│   │   ├── engine.py            # Structure/Object/Terrain generation
-│   │   ├── background_engine.py # Background tile generation
-│   │   ├── models.py            # Tile enums + Pydantic schemas
-│   │   ├── background_models.py # Background tile models
-│   │   ├── prompts.py           # Tile prompt builders
-│   │   ├── registry.py          # Structure/Object/Terrain CRUD
-│   │   └── background_registry.py # Background tile CRUD
-│   └── unit/
-│       ├── engine.py            # Unit sprite generation
-│       ├── models.py            # Unit enums + Pydantic schemas
-│       ├── prompts.py           # Unit prompt builders
-│       └── registry.py          # SQLite-backed unit CRUD
-├── workflows/                   # ComfyUI workflow JSON templates
-│   ├── txt2img.json             # Flux2 Klein txt2img (used by tile + unit engines)
-│   ├── background_tile.json     # Seamless texture workflow
-│   └── leader/
-│       ├── leader_splash.json   # Splash generation (txt2img)
-│       ├── leader_profile.json  # Profile generation (img2img with reference)
-│       └── leader_action.json   # Action scene generation
-├── static_tiles/                # Pre-made PNGs (used in static mode)
-├── leader_references/           # Runtime reference images for leader pipeline
-├── generated_assets/            # Output directory (runtime)
-├── config.yaml                  # Version-controlled config
-├── pyproject.toml               # Package metadata + dependencies
-├── pytest.ini                   # Test configuration
-└── docs/                        # Architecture docs, prompt guides, plans
-```
+For project structure, see [docs/architecture.md §4](docs/architecture.md#4-component-architecture).
 
 ---
 
@@ -409,7 +313,7 @@ This drops and recreates all tables. **Warning: this deletes all data.**
 - **SQLite** is used by default and works for single-worker deployments. For concurrent requests, switch to **PostgreSQL**.
   - Set `DATABASE_URL` in `.env` to a PostgreSQL connection string.
   - A startup warning is emitted if running in production mode with SQLite.
-- Multi-worker: run behind `gunicorn` with `uvicorn` workers, or use a process manager.
+- Multi-worker: run behind `gunicorn` with `uvicorn` workers (not yet configured — see [docs/next_steps.md](docs/next_steps.md)), or use a process manager.
 
 ### Common Issues
 | Symptom | Likely Cause | Fix |

@@ -241,7 +241,7 @@ A single PNG per unit type — simple flat naming.
 | ``description`` missing or blank | 422 | Pydantic validation |
 | ``description`` < 20 chars | 422 | Pydantic validation |
 | ``description`` > 400 chars | 422 | Pydantic validation |
-| Invalid ``unit_type`` (e.g. ``"dragon"``) | 400 | ``"Invalid unit_type: 'dragon'. Valid types: archer, scout, settler, warrior"`` |
+| Invalid ``unit_type`` (e.g. ``"dragon"``) | 400 | ``"Unknown unit_type 'dragon'. Must be one of: archer, scout, settler, warrior"`` |
 | ComfyUI unreachable | 503 | ``"Unit generation not available (ComfyUI unreachable)"`` |
 | Generation error | 500 | ``"Internal server error: ..."`` |
 

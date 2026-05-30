@@ -49,7 +49,7 @@ leader portraits use separate templates/workflows without this LoRA.
 ## 4. Component Architecture
 
 ### A. API Layer (`src/main.py` & per-pipeline `models.py`)
-- **FastAPI**: Async HTTP server with CORS middleware. Endpoints (28 total):
+- **FastAPI**: Async HTTP server with CORS middleware. Endpoints (33 total):
   **Leader**: `POST /leader`, `GET /leader`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`
   **Structure**: `POST /structure`, `GET /structure`, `GET /structure/catalog`, `GET /structure/{structure_id}`, `DELETE /structure/{structure_id}`
   **Object**: `POST /object`, `GET /object`, `GET /object/catalog`, `GET /object/{object_id}`, `DELETE /object/{object_id}`

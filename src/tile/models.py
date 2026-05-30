@@ -310,7 +310,7 @@ class StructureResponse(BaseModel):
     generation_mode: str
     status: str = "completed"
     prompt_used: Optional[str] = None
-    resolution: Optional[str] = None                  # "512x512"
+    resolution: Optional[str] = None                  # "128x128"
     generation_time_ms: Optional[int] = None
 
 
@@ -326,7 +326,7 @@ class ObjectResponse(BaseModel):
     generation_mode: str
     status: str = "completed"
     prompt_used: Optional[str] = None
-    resolution: Optional[str] = None
+    resolution: Optional[str] = None                  # "128x128"
     generation_time_ms: Optional[int] = None
 
 
@@ -342,7 +342,7 @@ class TerrainResponse(BaseModel):
     generation_mode: str
     status: str = "completed"
     prompt_used: Optional[str] = None
-    resolution: Optional[str] = None
+    resolution: Optional[str] = None                  # "128x128"
     generation_time_ms: Optional[int] = None
 
 

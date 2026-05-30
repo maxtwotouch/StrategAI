@@ -196,3 +196,5 @@ contemplative
 | `action_category` missing for action | 400 | `"action_category is required for action assets."` |
 | `action_description` missing for action | 400 | `"action_description is required for action assets."` |
 | `leader_description` < 50 chars | 422 | Pydantic validation |
+| `leader_description` > 800 chars | 422 | Pydantic validation |
+| `action_description` > 800 chars | 422 | Pydantic validation |

@@ -3,7 +3,7 @@
 Mirrors the tile pipeline pattern: constrained enum vocabularies the client
 picks from, with rich field descriptions so clients know exactly what to send.
 
-Each unit generates a single south-facing (front view) sprite at 512×512.
+Each unit generates a single south-facing (front view) sprite at 128×128.
 """
 
 from enum import Enum
@@ -78,7 +78,7 @@ class UnitResponse(BaseModel):
     generation_mode: str                              # "comfyui" | "static" | "placeholder"
     status: str = "completed"
     prompt_used: Optional[str] = None
-    resolution: Optional[str] = None                  # "512x512"
+    resolution: Optional[str] = None                  # "128x128"
     generation_time_ms: Optional[int] = None
 
 

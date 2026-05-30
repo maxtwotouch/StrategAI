@@ -1,9 +1,32 @@
 
-Now I have a thorough understanding of the entire codebase. Let me compile the comprehensive testing plan.
- 
-Comprehensive Testing Suite Plan
-Test Architecture Overview
-The test suite should follow pytest conventions, live in a tests/ directory at the project root, and use fixtures, parametrization, and mocking patterns consistent with FastAPI + SQLAlchemy best practices. Tests are organized into layers: unit → integration → API.
+> **⚠️ This is a forward-looking testing roadmap, not a description of the current test suite.**
+> The actual test suite has ~342 tests across 24 files in `tests/`. Tests described
+> below that are NOT yet implemented are marked with `[PLANNED]`. File paths in this
+> document use a flat `tests/` naming convention; the actual suite uses subdirectories
+> (`tests/leader/`, `tests/tile/`, `tests/unit/`).
+>
+> **Current test coverage by area** (what actually exists today):
+> - API endpoints: `tests/test_main.py` (58 tests) — all 33 endpoints covered
+> - Database: `tests/test_database.py` (18 tests) — all 7 tables covered
+> - Storage: `tests/test_storage.py` (13 tests) — LRU cache + disk fallback
+> - Static catalog: `tests/test_static_catalog.py` (23 tests) — full scan/resolve
+> - ComfyUI client: `tests/test_comfyui_client.py` (11 tests) — workflow patching
+> - Load balancer: `tests/test_comfyui_loadbalancer.py` (21 tests) — multi-node routing
+> - Config: `tests/test_config.py` (10 tests) — settings + env overrides
+> - Leader: `tests/leader/` (75 tests across 5 files) — engine, models, prompts, registry
+> - Tile: `tests/tile/` (55 tests across 5 files) — engine, models, prompts, registry, background
+> - Unit: `tests/unit/` (26 tests across 4 files) — engine, models, prompts, registry
+> - Cross-cutting: concurrency (5), response consistency (11), doc-code consistency (16)
+>
+> **Key gaps** (no tests exist yet): inpainting, generator-factory dispatch,
+> dedicated E2E pipeline flows, dedicated error handling, mock-based ComfyUI
+> WebSocket lifecycle tests.
+>
+> ---
+>
+> Comprehensive Testing Suite Plan
+> Test Architecture Overview
+> The test suite should follow pytest conventions, live in a tests/ directory at the project root, and use fixtures, parametrization, and mocking patterns consistent with FastAPI + SQLAlchemy best practices. Tests are organized into layers: unit → integration → API.
  
 1. Test Infrastructure & Dependencies
 1.1 New dependencies (requirements-dev.txt or added to requirements.txt)
