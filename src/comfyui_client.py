@@ -193,6 +193,11 @@ class ComfyUIClient:
                 fname = f"{uuid.uuid4()}.png"
                 uploaded[node_id] = await self.upload_image(img, fname)
 
+        # 2.5 Generate a single client_id for this generation session.
+        #     Using the same client_id in queue_workflow and the WebSocket
+        #     lets ComfyUI route execution events cleanly to our listener.
+        client_id = str(uuid.uuid4())
+
         # 3. Patch only prompt, seed, and input images into the workflow.
         #    All other parameters (guidance, steps, denoise, sampler,
         #    resolution) are baked into the workflow JSONs.
@@ -206,12 +211,12 @@ class ComfyUIClient:
         )
 
         try:
-            # 4. Queue
-            prompt_id = await self.queue_workflow(workflow)
+            # 4. Queue — use the same client_id for the WS listener
+            prompt_id = await self.queue_workflow(workflow, client_id=client_id)
             logger.info("ComfyUI prompt queued: %s", prompt_id)
 
             # 5. Wait for completion — raises RuntimeError with details on failure
-            await self._wait_for_completion_checked(prompt_id)
+            await self._wait_for_completion_checked(prompt_id, client_id=client_id)
 
             # 6. Retrieve output filenames
             result = await self.get_result(prompt_id)
@@ -293,9 +298,14 @@ class ComfyUIClient:
         logger.info("Uploaded reference image: %s", filename)
         return filename
 
-    async def queue_workflow(self, workflow: dict) -> str:
-        """Submit a workflow JSON.  Returns the ``prompt_id``."""
-        client_id = str(uuid.uuid4())
+    async def queue_workflow(self, workflow: dict, *, client_id: str | None = None) -> str:
+        """Submit a workflow JSON.  Returns the ``prompt_id``.
+
+        If *client_id* is provided, ComfyUI routes execution events to
+        a WebSocket listener with the same ID, reducing broadcast noise.
+        """
+        if client_id is None:
+            client_id = str(uuid.uuid4())
         http = await self.get_http()
         resp = await http.post(
             "/prompt",
@@ -322,13 +332,13 @@ class ComfyUIClient:
             )
         return body["prompt_id"]
 
-    async def _wait_for_completion_checked(self, prompt_id: str) -> None:
+    async def _wait_for_completion_checked(self, prompt_id: str, *, client_id: str | None = None) -> None:
         """Block until the prompt finishes.  Raises RuntimeError with details on failure.
 
         WebSocket is preferred; falls back to polling on connection errors.
         """
         try:
-            await self._wait_via_ws(prompt_id)
+            await self._wait_via_ws(prompt_id, client_id=client_id)
         except (
             websockets.exceptions.WebSocketException,
             ConnectionError,
@@ -410,15 +420,17 @@ class ComfyUIClient:
     #  Private: waiting strategies
     # ------------------------------------------------------------------
 
-    async def _wait_via_ws(self, prompt_id: str) -> None:
+    async def _wait_via_ws(self, prompt_id: str, *, client_id: str | None = None) -> None:
         """Use async WebSocket to track execution progress.
 
         Returns normally on success.  Raises RuntimeError with details
         from ComfyUI's ``execution_error`` message on failure.
         """
+        if client_id is None:
+            client_id = str(uuid.uuid4())
         ws_url = self.base_url.replace("http", "ws", 1)
         async with websockets.connect(
-            f"{ws_url}/ws?clientId={uuid.uuid4()}",
+            f"{ws_url}/ws?clientId={client_id}",
             open_timeout=10,
             close_timeout=5,
         ) as ws:
