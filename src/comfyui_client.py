@@ -304,22 +304,21 @@ class ComfyUIClient:
         )
         resp.raise_for_status()
         body = resp.json()
-        if "node_errors" in body:
-            errors = body["node_errors"]
-            if errors:
-                detail = f"Workflow validation errors: {json.dumps(errors)}"
-            else:
-                # ComfyUI returned empty node_errors — include the top-level
-                # error field (if any) for debuggability.
-                top_error = body.get("error", "no details provided")
-                detail = (
-                    f"ComfyUI rejected workflow but returned empty node_errors. "
-                    f"Top-level error: {top_error}"
-                )
-            raise ValueError(detail)
-        if "prompt_id" not in body:
+
+        # ComfyUI always includes "node_errors" in the response — even on
+        # success (as an empty dict).  Only treat non-empty node_errors as
+        # a hard failure.  The presence of "prompt_id" signals acceptance.
+        node_errors = body.get("node_errors", {})
+        if node_errors:
             raise ValueError(
-                f"ComfyUI did not return a prompt_id. Response: {body}"
+                f"Workflow validation errors: {json.dumps(node_errors)}"
+            )
+
+        if "prompt_id" not in body:
+            top_error = body.get("error", "no details provided")
+            raise ValueError(
+                f"ComfyUI rejected workflow. "
+                f"Error: {top_error}"
             )
         return body["prompt_id"]
 
