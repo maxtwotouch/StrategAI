@@ -428,14 +428,15 @@ class ComfyUIClient:
         """
         if client_id is None:
             client_id = str(uuid.uuid4())
-        ws_url = self.base_url.replace("http", "ws", 1)
+        ws_url = self.base_url.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
         async with websockets.connect(
             f"{ws_url}/ws?clientId={client_id}",
             open_timeout=10,
             close_timeout=5,
         ) as ws:
             try:
-                async for raw in ws:
+                while True:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
                     data = json.loads(raw)
                     msg_type = data.get("type", "")
                     msg_data = data.get("data", {})
@@ -461,6 +462,12 @@ class ComfyUIClient:
                             f"ComfyUI execution error for {prompt_id}: "
                             f"{err_type}: {err_detail}"
                         )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "WebSocket timed out waiting for message (prompt %s) — "
+                    "falling back to polling to verify completion",
+                    prompt_id,
+                )
             except websockets.exceptions.ConnectionClosed as exc:
                 logger.warning(
                     "WebSocket closed prematurely (code=%s): %s — "
@@ -629,7 +636,6 @@ def _patch_workflow(
     Node identification is by ``class_type``:
 
     - ``CLIPTextEncode`` → positive prompt
-    - ``SamplerCustomAdvanced`` → noise_seed
     - ``RandomNoise`` → noise_seed (img2img workflows)
     - ``LoadImage`` → uploaded image (keyed by node_id) or reference filename
     - Arbitrary node overrides via ``extra_overrides``
@@ -654,10 +660,8 @@ def _patch_workflow(
             if positive_prompt is not None:
                 inputs["text"] = positive_prompt
 
-        # --- Seed: Flux2 Klein (SamplerCustomAdvanced + noise_seed) ---
-        if ct == "SamplerCustomAdvanced":
-            if "noise_seed" in inputs:
-                inputs["noise_seed"] = seed
+        # --- Seed: RandomNoise handles seed injection for Flux2 Klein ---
+        # (no workflows use noise_seed on SamplerCustomAdvanced)
 
         # --- LoadImage (uploaded by node_id) ---
         if ct == "LoadImage" and node_id in uploaded:

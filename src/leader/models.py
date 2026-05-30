@@ -1,7 +1,7 @@
 """Leader pipeline models — enums and Pydantic request/response schemas."""
 
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, Literal
 
 
@@ -75,6 +75,8 @@ class ActionCategory(str, Enum):
 class LeaderRequest(BaseModel):
     """Flat request model matching the style of GenerationRequest and SplashRequest."""
 
+    model_config = ConfigDict(extra="forbid")
+
     asset_type: LeaderAssetType = Field(
         ...,
         description="Pipeline stage: 'splash', 'profile', or 'action'",
@@ -89,7 +91,7 @@ class LeaderRequest(BaseModel):
     )
     leader_description: str = Field(
         ...,
-        min_length=50,
+        min_length=20,
         max_length=800,
         description=(
             "Physical description: age, build, skin tone, hair, eyes, "

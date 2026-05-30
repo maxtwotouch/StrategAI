@@ -12,9 +12,12 @@ All callers share a single cached font per size via a thread-safe singleton.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from PIL import ImageFont
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -88,8 +91,8 @@ def _resolve_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         cfg_path = getattr(settings.paths, "font_path", None)
         if cfg_path and os.path.isfile(cfg_path):
             return ImageFont.truetype(cfg_path, size)
-    except Exception:
-        pass  # config not yet loaded or path invalid — try fallbacks
+    except Exception as e:
+        logger.warning("Font config unavailable, using fallback font: %s", e)
 
     # 2. Common system paths
     for path in _FALLBACK_PATHS:

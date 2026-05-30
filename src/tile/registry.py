@@ -11,7 +11,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.database import SessionLocal, AssetRecord, StructureRecord, ObjectRecord, TerrainRecord
+from src.database import SessionLocal, AssetRecord, StructureRecord, ObjectRecord, TerrainRecord, _execute_with_busy_retry
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class StructureRegistry:
                 generation_mode=generation_mode,
             ))
             if _close:
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
             logger.info("Structure registered: %s (%s)", structure_id, category)
         finally:
             if _close:
@@ -117,7 +117,7 @@ class StructureRegistry:
                 db.delete(record)
                 # Also delete the parent AssetRecord to prevent orphan leaks
                 db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
                 # Best-effort cleanup of the image file on disk
                 try:
                     store.delete(image_id)
@@ -166,7 +166,7 @@ class ObjectRegistry:
                 generation_mode=generation_mode,
             ))
             if _close:
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
             logger.info("Object registered: %s (%s)", object_id, category)
         finally:
             if _close:
@@ -202,7 +202,7 @@ class ObjectRegistry:
                 db.delete(record)
                 # Also delete the parent AssetRecord to prevent orphan leaks
                 db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
                 try:
                     store.delete(image_id)
                 except (FileNotFoundError, OSError) as exc:
@@ -250,7 +250,7 @@ class TerrainRegistry:
                 generation_mode=generation_mode,
             ))
             if _close:
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
             logger.info("Terrain registered: %s (%s)", terrain_id, category)
         finally:
             if _close:
@@ -286,7 +286,7 @@ class TerrainRegistry:
                 db.delete(record)
                 # Also delete the parent AssetRecord to prevent orphan leaks
                 db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
                 try:
                     store.delete(image_id)
                 except (FileNotFoundError, OSError) as exc:

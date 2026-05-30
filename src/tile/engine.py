@@ -16,6 +16,7 @@ Resolution (1024→128) and all sampling parameters are baked into the
 workflow JSON.  The engine only injects: positive_prompt, seed.
 """
 from __future__ import annotations
+import asyncio
 import logging
 import os
 import secrets
@@ -27,7 +28,7 @@ from PIL import Image, ImageDraw
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
-from src.database import SessionLocal, AssetRecord
+from src.database import SessionLocal, AssetRecord, _execute_with_busy_retry
 from .models import (
     StructureRequest, StructureResponse,
     ObjectRequest, ObjectResponse,
@@ -131,15 +132,21 @@ class TileEngine:
         asset_id = generate_id(req.category)
 
         # 3. Seed
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         # 4. Run ComfyUI
         start = time.time()
-        img = await self._client.generate(
-            os.path.join(settings.workflow_dir, "txt2img.json"),
-            positive_prompt=prompt,
-            seed=seed,
-        )
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    os.path.join(settings.workflow_dir, "txt2img.json"),
+                    positive_prompt=prompt,
+                    seed=seed,
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
 
         # 5. Save to AssetStore
         filename = f"{uuid.uuid4()}.png"
@@ -163,7 +170,7 @@ class TileEngine:
                     generation_mode="comfyui",
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -205,7 +212,7 @@ class StaticTileEngine:
             start = time.time()
             filename = _load_and_save(path)
             elapsed = int((time.time() - start) * 1000)
-            static_seed = req.seed if req.seed is not None else secrets.randbits(31)
+            static_seed = req.seed if req.seed is not None else secrets.randbits(32)
             try:
                 with SessionLocal() as db:
                     db.add(AssetRecord(
@@ -223,7 +230,7 @@ class StaticTileEngine:
                         generation_mode="static",
                         session=db,
                     )
-                    db.commit()
+                    _execute_with_busy_retry(db, db.commit)
             except Exception:
                 try_remove_asset(filename)
                 raise
@@ -238,12 +245,16 @@ class StaticTileEngine:
         prompt = build_object_prompt(req)
         asset_id = generate_object_id(req.category)
 
+        # NOTE: static_catalog.resolve_random("nature_object") ignores
+        # req.category — an ObjectRequest(category="debris") may return a
+        # vegetation PNG.  Category-aware resolution requires catalog support.
+        logger.debug("Static object resolution ignores category=%s", req.category)
         path = static_catalog.resolve_random("nature_object")
         if path:
             start = time.time()
             filename = _load_and_save(path)
             elapsed = int((time.time() - start) * 1000)
-            static_seed = req.seed if req.seed is not None else secrets.randbits(31)
+            static_seed = req.seed if req.seed is not None else secrets.randbits(32)
             try:
                 with SessionLocal() as db:
                     db.add(AssetRecord(
@@ -261,7 +272,7 @@ class StaticTileEngine:
                         generation_mode="static",
                         session=db,
                     )
-                    db.commit()
+                    _execute_with_busy_retry(db, db.commit)
             except Exception:
                 try_remove_asset(filename)
                 raise
@@ -325,7 +336,7 @@ class _PlaceholderTileEngine:
     ):
         prompt = build_prompt(req)
         asset_id = generate_id(req.category)
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         start = time.time()
 
@@ -354,24 +365,24 @@ class _PlaceholderTileEngine:
                 db.add(AssetRecord(
                     id=filename,
                     asset_family=family,
-                    generation_mode="placeholder",
+                    generation_mode="static",
                 ))
                 _register_tile(
                     registry_register,
                     asset_id=asset_id, req=req,
                     image_id=filename, seed=seed,
                     prompt_used=prompt,
-                    generation_mode="placeholder",
+                    generation_mode="static",
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
 
         elapsed = int((time.time() - start) * 1000)
         return _build_response(response_cls, req, asset_id, filename,
-                               prompt, "placeholder", elapsed, f"{img.width}x{img.height}",
+                               prompt, "static", elapsed, f"{img.width}x{img.height}",
                                seed=seed)
 
 

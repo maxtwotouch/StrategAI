@@ -13,6 +13,7 @@ tiles (``config/prompt_templates.json → background_tile``) also omits the
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import secrets
@@ -23,7 +24,7 @@ from PIL import Image, ImageDraw
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
-from src.database import SessionLocal, AssetRecord
+from src.database import SessionLocal, AssetRecord, _execute_with_busy_retry
 from src.prompt_templates import render as _render
 from src.static_catalog import catalog as static_catalog
 from src.storage import store, try_remove_asset
@@ -119,16 +120,22 @@ class BackgroundTileEngine:
             )
 
         prompt = _render("background_tile", tile_type=tile_type)
-        seed = seed if seed is not None else secrets.randbits(31)
+        seed = seed if seed is not None else secrets.randbits(32)
         bg_tile_id = _generate_bg_tile_id(tile_type)
 
         start = time.time()
 
-        img = await self._client.generate(
-            os.path.join(settings.workflow_dir, "background_tile.json"),
-            positive_prompt=prompt,
-            seed=seed,
-        )
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    os.path.join(settings.workflow_dir, "background_tile.json"),
+                    positive_prompt=prompt,
+                    seed=seed,
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
 
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
@@ -149,7 +156,7 @@ class BackgroundTileEngine:
                     image_filename=filename,
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -181,7 +188,7 @@ class StaticBackgroundTileEngine:
             raise ValueError(
                 f"Unknown tile_type '{tile_type}'. Valid: {sorted(TILE_TYPES)}"
             )
-        seed = seed if seed is not None else secrets.randbits(31)
+        seed = seed if seed is not None else secrets.randbits(32)
         bg_tile_id = _generate_bg_tile_id(tile_type)
 
         # Try static catalog first
@@ -203,7 +210,7 @@ class StaticBackgroundTileEngine:
                         image_filename=filename,
                         session=db,
                     )
-                    db.commit()
+                    _execute_with_busy_retry(db, db.commit)
             except Exception:
                 try_remove_asset(filename)
                 raise
@@ -231,7 +238,7 @@ class _PlaceholderBackgroundTileEngine:
     async def generate(self, tile_type: str, seed: int | None = None) -> BackgroundTileResult:
         color = _PLACEHOLDER_COLORS.get(tile_type, (128, 128, 128, 255))
         font = _get_font(12)
-        seed = seed if seed is not None else secrets.randbits(31)
+        seed = seed if seed is not None else secrets.randbits(32)
         bg_tile_id = _generate_bg_tile_id(tile_type)
 
         img = Image.new("RGBA", (GAME_ASSET_SIZE, GAME_ASSET_SIZE), color)
@@ -257,7 +264,7 @@ class _PlaceholderBackgroundTileEngine:
                 db.add(AssetRecord(
                     id=filename,
                     asset_family="background_tile",
-                    generation_mode="placeholder",
+                    generation_mode="static",
                     tile_type=tile_type,
                 ))
                 BackgroundTileRegistry.register(
@@ -267,7 +274,7 @@ class _PlaceholderBackgroundTileEngine:
                     image_filename=filename,
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -278,7 +285,7 @@ class _PlaceholderBackgroundTileEngine:
             bg_tile_id=bg_tile_id,
             seed=seed,
             prompt_used=_render("background_tile", tile_type=tile_type),
-            generation_mode="placeholder",
+            generation_mode="static",
             elapsed_ms=0,
         )
 

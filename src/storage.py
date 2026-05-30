@@ -163,5 +163,39 @@ def try_remove_asset(filename: str) -> None:
         logger.error("Failed to clean up orphaned asset %s: %s", filename, exc)
 
 
+def cleanup_orphaned_assets(db_session) -> int:
+    """Scan generated_assets/ for PNGs with no matching AssetRecord and delete them.
+
+    Args:
+        db_session: An active SQLAlchemy Session (caller owns the transaction).
+
+    Returns:
+        Number of orphaned files cleaned up.
+    """
+    from src.database import AssetRecord
+
+    output_dir = os.path.join(BASE_DIR, settings.paths.output_dir)
+    if not os.path.isdir(output_dir):
+        return 0
+
+    cleaned = 0
+    for entry in os.listdir(output_dir):
+        if not entry.lower().endswith(".png"):
+            continue
+        # Check if this file has a matching AssetRecord
+        exists = db_session.query(
+            db_session.query(AssetRecord).filter(AssetRecord.id == entry).exists()
+        ).scalar()
+        if not exists:
+            filepath = os.path.join(output_dir, entry)
+            try:
+                os.unlink(filepath)
+                logger.info("Cleaned up orphaned generated asset: %s", entry)
+                cleaned += 1
+            except OSError as exc:
+                logger.warning("Failed to delete orphaned asset %s: %s", entry, exc)
+    return cleaned
+
+
 # Global instance
 store = AssetStore()

@@ -58,7 +58,7 @@ def upgrade() -> None:
     sa.Column('culture', sa.String(), nullable=False),
     sa.Column('time_of_day', sa.String(), nullable=False),
     sa.Column('mood', sa.String(), nullable=False),
-    sa.Column('splash_image_id', sa.String(), nullable=False),
+    sa.Column('splash_image_id', sa.String(), nullable=True),
     sa.Column('splash_seed', sa.Integer(), nullable=False),
     sa.Column('splash_prompt', sa.String(), nullable=False),
     sa.Column('profile_image_id', sa.String(), nullable=True),

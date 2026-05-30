@@ -16,6 +16,7 @@ workflow JSON.  The engine only injects: positive_prompt, seed.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import secrets
@@ -26,7 +27,7 @@ from PIL import Image, ImageDraw
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings
-from src.database import SessionLocal, AssetRecord
+from src.database import SessionLocal, AssetRecord, _execute_with_busy_retry
 from .models import UnitRequest, UnitResponse, UnitType
 from .prompts import build_unit_prompt
 from .registry import generate_unit_id, UnitRegistry
@@ -69,15 +70,21 @@ class UnitEngine:
         """Generate a single south-facing sprite for a unit type."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         start = time.time()
 
-        img = await self._client.generate(
-            os.path.join(settings.workflow_dir, "txt2img.json"),
-            positive_prompt=prompt,
-            seed=seed,
-        )
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    os.path.join(settings.workflow_dir, "txt2img.json"),
+                    positive_prompt=prompt,
+                    seed=seed,
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
         filename = f"{uuid.uuid4()}.png"
         store.save_image(filename, img)
 
@@ -99,7 +106,7 @@ class UnitEngine:
                     generation_mode="comfyui",
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -130,7 +137,7 @@ class StaticUnitEngine:
         """Resolve a unit sprite from static_tiles/unit/, falling back to placeholder."""
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         start = time.time()
 
@@ -160,7 +167,7 @@ class StaticUnitEngine:
                     generation_mode="static",
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -190,7 +197,7 @@ class _PlaceholderUnitEngine:
     async def generate(self, req: UnitRequest) -> UnitResponse:
         prompt = build_unit_prompt(req.unit_type, req.description)
         unit_id = generate_unit_id(req.unit_type)
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         start = time.time()
 
@@ -222,7 +229,7 @@ class _PlaceholderUnitEngine:
                 db.add(AssetRecord(
                     id=filename,
                     asset_family="unit",
-                    generation_mode="placeholder",
+                    generation_mode="static",
                 ))
                 UnitRegistry.register(
                     unit_id=unit_id,
@@ -231,10 +238,10 @@ class _PlaceholderUnitEngine:
                     image_id=filename,
                     seed=seed,
                     prompt_used=prompt,
-                    generation_mode="placeholder",
+                    generation_mode="static",
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -247,7 +254,7 @@ class _PlaceholderUnitEngine:
             unit_type=req.unit_type,
             description=req.description,
             seed=seed,
-            generation_mode="placeholder",
+            generation_mode="static",
             prompt_used=prompt,
             resolution=f"{GAME_ASSET_SIZE}x{GAME_ASSET_SIZE}",
             generation_time_ms=elapsed,

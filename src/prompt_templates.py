@@ -109,6 +109,23 @@ def render(family: str, **kwargs: str) -> str:
     """
     tmpl = get_template(family)
     template_str = tmpl["template"]
+
+    # Detect mismatches between placeholders and supplied kwargs
+    placeholders = set(_PLACEHOLDER_RE.findall(template_str))
+    kwarg_keys = set(kwargs.keys())
+    extra = kwarg_keys - placeholders
+    missing = placeholders - kwarg_keys
+    if extra:
+        logging.getLogger(__name__).debug(
+            "Unused kwargs in template render (family=%s): %s", family, sorted(extra)
+        )
+    if missing:
+        logging.getLogger(__name__).warning(
+            "Missing placeholder values in template (family=%s): %s — "
+            "literal {placeholder} text will appear in prompt",
+            family, sorted(missing),
+        )
+
     return template_str.format_map(kwargs)
 
 

@@ -162,7 +162,7 @@ class TestStaticTileEngine:
         resp = await engine.generate_terrain(req)
 
         assert resp.asset_type == "terrain"
-        assert resp.generation_mode == "placeholder"
+        assert resp.generation_mode == "static"
 
 
 class TestPlaceholderTileEngine:
@@ -177,7 +177,7 @@ class TestPlaceholderTileEngine:
         resp = await engine.generate_structure(req)
 
         assert resp.asset_type == "structure"
-        assert resp.generation_mode == "placeholder"
+        assert resp.generation_mode == "static"
         assert resp.url.startswith("/assets/")
         assert resp.resolution == "128x128"
 
@@ -190,7 +190,7 @@ class TestPlaceholderTileEngine:
         resp = await engine.generate_object(req)
 
         assert resp.asset_type == "object"
-        assert resp.generation_mode == "placeholder"
+        assert resp.generation_mode == "static"
 
     @pytest.mark.asyncio
     async def test_generate_terrain(self, test_store, test_db, monkeypatch):
@@ -201,7 +201,7 @@ class TestPlaceholderTileEngine:
         resp = await engine.generate_terrain(req)
 
         assert resp.asset_type == "terrain"
-        assert resp.generation_mode == "placeholder"
+        assert resp.generation_mode == "static"
 
     @pytest.mark.asyncio
     async def test_persists_registry_record(self, test_store, test_db, monkeypatch):

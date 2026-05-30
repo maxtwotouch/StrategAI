@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.config import settings, DeploymentMode
-from src.database import SessionLocal, AssetRecord, verify_db_connectivity, verify_schema_health, reset_database
+from src.database import SessionLocal, AssetRecord, LeaderRecord, verify_db_connectivity, verify_schema_health, reset_database
 from src.comfyui_client import close_comfyui_client, get_comfyui_loadbalancer
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
 from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
@@ -119,10 +119,10 @@ async def lifespan(app: FastAPI):
                 "Set SERVER__CORS_ORIGINS to your actual domain(s).",
                 settings.server.cors_origins,
             )
-        if "sqlite" in str(settings.model_config.get("DATABASE_URL", "")).lower():
-            logger.warning(
-                "PRODUCTION mode with SQLite — consider migrating to PostgreSQL "
-                "for concurrent request safety."
+        if "sqlite" in str(getattr(settings, "database_url", "") or "").lower():
+            logger.info(
+                "PRODUCTION mode with SQLite — WAL journal mode is active "
+                "for concurrent access safety."
             )
 
     # --- Startup validation ---
@@ -214,6 +214,92 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning(msg + " — generation may fail for these workflows.")
 
+    # Verify leader_action.json LoadImage nodes use sentinel values (not stale hardcoded filenames)
+    try:
+        import json as _json  # local import — needed for this validation block
+        la_path = _workflow_files["leader_action"]
+        if os.path.isfile(la_path):
+            with open(la_path, "r") as fh:
+                la_wf = _json.load(fh)
+            la_load_nodes = {
+                nid: node for nid, node in la_wf.items()
+                if node.get("class_type") == "LoadImage"
+            }
+            for nid in ("35", "36"):
+                node = la_load_nodes.get(nid)
+                if node is None:
+                    logger.warning(
+                        "leader_action.json: node %s (LoadImage) is missing; "
+                        "multi-leader action generation will fail.", nid
+                    )
+                else:
+                    image_val = node.get("inputs", {}).get("image", "")
+                    if image_val not in ("__LEADER_REF_1__", "__LEADER_REF_2__"):
+                        logger.warning(
+                            "leader_action.json: node %s has hardcoded filename '%s' "
+                            "instead of sentinel '__LEADER_REF_%s__'. "
+                            "Engine may silently use stale/wrong reference images.",
+                            nid, image_val, nid,
+                        )
+    except Exception as exc:
+        logger.warning("leader_action.json: failed to validate LoadImage nodes: %s", exc)
+
+    # --- Workflow ↔ Prompt-template LoRA pairing validation ---
+    # Templates containing <tdp> trigger a top-down LoRA.  The workflow used
+    # for those families MUST include a LoraLoaderModelOnly node; conversely,
+    # families whose templates do NOT use <tdp> MUST use a workflow without one.
+    # This is a quality guard, not a hard startup failure — mismatches produce
+    # degraded output but do not crash the service.
+    _template_to_workflow: dict[str, str] = {
+        "structure":       "txt2img",
+        "object":          "txt2img",
+        "terrain":         "txt2img",
+        "unit":            "txt2img",
+        "background_tile": "background_tile",
+        "leader_splash":   "leader_splash",
+        "leader_profile":  "leader_profile",
+        "leader_action":   "leader_action",
+    }
+    try:
+        _tpl_path = os.path.join(_project_root, "config", "prompt_templates.json")
+        with open(_tpl_path, "r") as fh:
+            _tpl_data = _json.load(fh)
+        _templates = _tpl_data.get("templates", {})
+
+        for _family, _wf_name in _template_to_workflow.items():
+            _tpl_text = _templates.get(_family, {}).get("template", "")
+            _tpl_has_tdp = "<tdp>" in _tpl_text
+
+            _wf_path = _workflow_files.get(_wf_name)
+            if not _wf_path or not os.path.isfile(_wf_path):
+                continue  # already reported as missing above
+
+            with open(_wf_path, "r") as fh:
+                _wf_data = _json.load(fh)
+            _wf_has_lora = any(
+                node.get("class_type") == "LoraLoaderModelOnly"
+                for node in _wf_data.values()
+            )
+
+            if _tpl_has_tdp and not _wf_has_lora:
+                logger.critical(
+                    "Workflow–template mismatch: '%s' template contains <tdp> "
+                    "LoRA trigger token, but workflow '%s.json' has no "
+                    "LoraLoaderModelOnly node.  Output quality will be degraded.",
+                    _family, _wf_name,
+                )
+            elif not _tpl_has_tdp and _wf_has_lora:
+                logger.critical(
+                    "Workflow–template mismatch: '%s' template does NOT contain "
+                    "<tdp> LoRA trigger token, but workflow '%s.json' HAS a "
+                    "LoraLoaderModelOnly node.  Output quality will be degraded.",
+                    _family, _wf_name,
+                )
+    except Exception as _exc:
+        logger.warning(
+            "Failed to validate workflow–template LoRA pairing: %s", _exc
+        )
+
     # --- Database initialisation ---
     global _db_schema_ok
 
@@ -256,6 +342,58 @@ async def lifespan(app: FastAPI):
         # Verify that the on-disk schema matches the current model definitions
         schema_ok, schema_mismatches = verify_schema_health()
         _db_schema_ok = schema_ok
+
+    # --- Orphaned asset cleanup (non-blocking, logged) ---
+    # Clean up leader reference images for leaders no longer in the database
+    if _db_schema_ok:
+        _leader_ref_dir = os.path.join(BASE_DIR, settings.paths.leader_reference_dir)
+        if os.path.isdir(_leader_ref_dir):
+            _ref_cleaned = 0
+            try:
+                with SessionLocal() as _db:
+                    _existing_ids = {
+                        row[0] for row in _db.query(LeaderRecord.leader_id).all()
+                    }
+                    for _entry in os.listdir(_leader_ref_dir):
+                        if not _entry.startswith("ref_leader_") or not _entry.endswith(".png"):
+                            continue
+                        # Extract leader_id: ref_leader_<id>.png → <id>
+                        _lid = _entry[len("ref_leader_"):-len(".png")]
+                        if _lid not in _existing_ids:
+                            _path = os.path.join(_leader_ref_dir, _entry)
+                            try:
+                                os.unlink(_path)
+                                logger.info("Cleaned up orphaned leader reference: %s", _entry)
+                                _ref_cleaned += 1
+                            except OSError as _exc:
+                                logger.warning(
+                                    "Failed to delete orphaned reference %s: %s", _entry, _exc
+                                )
+                if _ref_cleaned > 0:
+                    logger.info("Cleaned up %d orphaned leader reference file(s)", _ref_cleaned)
+            except Exception as _exc:
+                logger.warning("Leader reference cleanup skipped — %s", _exc)
+
+        # Clean up generated_assets/ PNGs with no matching AssetRecord
+        try:
+            with SessionLocal() as _db:
+                from src.storage import cleanup_orphaned_assets
+                _asset_cleaned = cleanup_orphaned_assets(_db)
+                if _asset_cleaned > 0:
+                    logger.info("Cleaned up %d orphaned generated asset(s)", _asset_cleaned)
+        except Exception as _exc:
+            logger.warning("Generated asset cleanup skipped — %s", _exc)
+
+    # --- Startup advisory: splash_assets/ is empty ---
+    _splash_dir = os.path.join(BASE_DIR, settings.paths.splash_dir)
+    if os.path.isdir(_splash_dir) and not any(
+        f.lower().endswith(".png") for f in os.listdir(_splash_dir)
+    ):
+        logger.warning(
+            "splash_assets/ directory is empty — no static splash assets available. "
+            "Populate it with PNG files to enable static splash serving, or use "
+            "comfyui/placeholder mode for leader generation."
+        )
 
     # --- Engine initialization ---
     # For single-node configs this is equivalent to a plain ComfyUIClient.
@@ -476,9 +614,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     disable rate limiting by mutating the settings singleton.
     """
 
-    def __init__(self, app, post_rps: float, get_rps: float, burst: int, enabled: bool = True):
+    def __init__(self, app, post_rps: float, get_rps: float, burst: int):
         super().__init__(app)
-        self._enabled = enabled
         self._post_bucket = _TokenBucket(post_rps, burst)
         self._get_bucket = _TokenBucket(get_rps, burst * 10)
 
@@ -500,7 +637,6 @@ app.add_middleware(
     post_rps=settings.rate_limit.post_rps,
     get_rps=settings.rate_limit.get_rps,
     burst=settings.rate_limit.burst_size,
-    enabled=settings.rate_limit.enabled,
 )
 
 
@@ -724,10 +860,10 @@ async def generate_leader(request: LeaderRequest):
         raise  # re-raise HTTP exceptions unchanged
     except RuntimeError as e:
         logger.error("Leader runtime error: %s", e)
-        raise HTTPException(503, detail=str(e))
+        raise HTTPException(503, detail="Generation failed. Please try again.")
     except Exception as e:
         logger.error("Leader generation error: %s", e)
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail="Internal server error")
 
 
 @app.get("/leader", responses={200: {"description": "List of registered leaders"}})
@@ -810,10 +946,10 @@ async def generate_structure(request: StructureRequest):
         raise HTTPException(400, detail=str(e))
     except RuntimeError as e:
         logger.error("Structure runtime error: %s", e)
-        raise HTTPException(503, detail=str(e))
+        raise HTTPException(503, detail="Generation failed. Please try again.")
     except Exception as e:
         logger.error("Structure generation error: %s", e)
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail="Internal server error")
 
 
 @app.get("/structure", responses={200: {"description": "List of generated structures"}})
@@ -904,10 +1040,10 @@ async def generate_object(request: ObjectRequest):
         raise HTTPException(400, detail=str(e))
     except RuntimeError as e:
         logger.error("Object runtime error: %s", e)
-        raise HTTPException(503, detail=str(e))
+        raise HTTPException(503, detail="Generation failed. Please try again.")
     except Exception as e:
         logger.error("Object generation error: %s", e)
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail="Internal server error")
 
 
 @app.get("/object", responses={200: {"description": "List of generated objects"}})
@@ -995,10 +1131,10 @@ async def generate_terrain(request: TerrainRequest):
         raise HTTPException(400, detail=str(e))
     except RuntimeError as e:
         logger.error("Terrain runtime error: %s", e)
-        raise HTTPException(503, detail=str(e))
+        raise HTTPException(503, detail="Generation failed. Please try again.")
     except Exception as e:
         logger.error("Terrain generation error: %s", e)
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail="Internal server error")
 
 
 @app.get("/terrain", responses={200: {"description": "List of generated terrain tiles"}})
@@ -1095,10 +1231,10 @@ async def generate_unit(request: UnitRequest):
         raise HTTPException(400, detail=str(e))
     except RuntimeError as e:
         logger.error("Unit runtime error: %s", e)
-        raise HTTPException(503, detail=str(e))
+        raise HTTPException(503, detail="Generation failed. Please try again.")
     except Exception as e:
         logger.error("Unit generation error: %s", e)
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail="Internal server error")
 
 
 @app.get("/unit", responses={200: {"description": "List of generated unit sprites"}})
@@ -1205,10 +1341,10 @@ async def generate_background_tile(request: BackgroundTileRequest):
         raise HTTPException(400, detail=str(e))
     except RuntimeError as e:
         logger.error("Background tile runtime error: %s", e)
-        raise HTTPException(503, detail=str(e))
+        raise HTTPException(503, detail="Generation failed. Please try again.")
     except Exception as e:
         logger.error("Background tile generation error: %s", e)
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail="Internal server error")
 
 
 @app.get("/background_tile", responses={200: {"description": "List of generated background tiles"}})
@@ -1220,22 +1356,25 @@ async def list_background_tiles(
     _require_db()
     records = BackgroundTileRegistry.list_all(limit=limit, offset=offset)
     total = BackgroundTileRegistry.count_all()
-    results = []
-    for r in records:
-        results.append(BackgroundTileResponse(
+
+    # Batch-fetch generation_mode from AssetRecord (avoid N+1 queries)
+    image_ids = [r.image_id for r in records]
+    asset_mode_map: dict[str, str] = {}
+    if image_ids:
+        with SessionLocal() as db:
+            assets = db.query(AssetRecord).filter(AssetRecord.id.in_(image_ids)).all()
+            asset_mode_map = {a.id: (a.generation_mode or "unknown") for a in assets}
+
+    results = [
+        BackgroundTileResponse(
             url=f"/assets/{r.image_id}",
             background_tile_id=r.background_tile_id,
             tile_type=r.tile_type,
             seed=r.seed,
-            generation_mode=r.generation_mode if hasattr(r, "generation_mode") and r.generation_mode else "unknown",
-        ))
-    # Enrich with generation_mode from AssetRecord as fallback
-    with SessionLocal() as db:
-        for i, r in enumerate(records):
-            if results[i].generation_mode == "unknown":
-                asset = db.query(AssetRecord).filter(AssetRecord.id == r.image_id).first()
-                if asset and asset.generation_mode:
-                    results[i].generation_mode = asset.generation_mode
+            generation_mode=asset_mode_map.get(r.image_id, "unknown"),
+        )
+        for r in records
+    ]
     return _paginated_response(results, total_count=total, limit=limit, offset=offset)
 
 
@@ -1254,12 +1393,12 @@ async def get_background_tile(background_tile_id: str):
     record = BackgroundTileRegistry.get(background_tile_id)
     if not record:
         raise HTTPException(404, f"Background tile '{background_tile_id}' not found")
-    # Get generation_mode from AssetRecord
+    # Get generation_mode from AssetRecord (single query, fine for get-by-ID)
     generation_mode = "unknown"
     with SessionLocal() as db:
         asset = db.query(AssetRecord).filter(AssetRecord.id == record.image_id).first()
-        if asset:
-            generation_mode = asset.generation_mode or "unknown"
+        if asset and asset.generation_mode:
+            generation_mode = asset.generation_mode
     return BackgroundTileResponse(
         url=f"/assets/{record.image_id}",
         background_tile_id=record.background_tile_id,

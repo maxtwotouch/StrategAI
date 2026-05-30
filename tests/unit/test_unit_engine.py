@@ -107,7 +107,7 @@ class TestStaticUnitEngine:
         resp = await engine.generate(req)
 
         assert resp.asset_type == "unit"
-        assert resp.generation_mode == "placeholder"
+        assert resp.generation_mode == "static"
 
 
 class TestPlaceholderUnitEngine:
@@ -122,7 +122,7 @@ class TestPlaceholderUnitEngine:
         resp = await engine.generate(req)
 
         assert resp.asset_type == "unit"
-        assert resp.generation_mode == "placeholder"
+        assert resp.generation_mode == "static"
         assert resp.unit_type == "archer"
         assert resp.url.startswith("/assets/")
         assert resp.resolution == "128x128"

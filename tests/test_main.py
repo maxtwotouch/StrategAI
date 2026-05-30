@@ -328,7 +328,7 @@ class TestTerrainEndpoints:
         data = resp.json()
         assert data["asset_type"] == "terrain"
         assert data["category"] == "hill"
-        assert data["generation_mode"] == "placeholder"
+        assert data["generation_mode"] == "static"
 
     @pytest.mark.asyncio
     async def test_generate_terrain_validation_error(self, async_client):
@@ -775,7 +775,7 @@ class TestUnitEndpoints:
         data = resp.json()
         assert data["asset_type"] == "unit"
         assert data["unit_type"] == "archer"
-        assert data["generation_mode"] == "placeholder"
+        assert data["generation_mode"] == "static"
         assert data["url"].startswith("/assets/")
         assert data["unit_id"].startswith("unit_archer_")
         # Response completeness (optional fields — may be None in static/placeholder modes)
@@ -835,6 +835,48 @@ class TestUnitEndpoints:
         data = resp.json()
         assert "unit_types" in data
         assert "archer" in data["unit_types"]
+
+    @pytest.mark.asyncio
+    async def test_generate_unit_rejects_invalid_unit_type(self, async_client):
+        """POST /unit with invalid unit_type returns 422."""
+        resp = await async_client.post("/unit", json={
+            "unit_type": "catapult",
+            "description": "A heavy siege weapon with wheels and a tension mechanism.",
+        })
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_list_units_returns_paginated(self, async_client):
+        """GET /unit returns paginated list with X-Total-Count and X-Has-More headers."""
+        # Generate a unit first
+        await async_client.post("/unit", json={
+            "unit_type": "archer",
+            "description": "A medieval archer in green leather armor with a longbow and quiver of arrows.",
+        })
+        resp = await async_client.get("/unit")
+        assert resp.status_code == 200
+        assert "x-total-count" in resp.headers
+        assert "x-has-more" in resp.headers
+        assert int(resp.headers["x-total-count"]) >= 1
+        assert resp.headers["x-has-more"] in ("true", "false")
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+
+    @pytest.mark.asyncio
+    async def test_unit_list_respects_limit(self, async_client):
+        """GET /unit?limit=1 returns at most 1 item."""
+        # Generate two units
+        for _ in range(2):
+            await async_client.post("/unit", json={
+                "unit_type": "archer",
+                "description": "A medieval archer in green leather armor with a longbow and quiver of arrows.",
+            })
+        resp = await async_client.get("/unit?limit=1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) <= 1
 
 
 # ===========================================================================
@@ -908,7 +950,7 @@ class TestBackgroundTileEndpoints:
         assert data["status"] == "completed"
         assert isinstance(data["seed"], int)
         assert data["seed"] > 0  # Regression: was 0 before fix
-        assert data["generation_mode"] in ("comfyui", "static", "placeholder")
+        assert data["generation_mode"] in ("comfyui", "static")
         # Response completeness — these should be populated (regression: were null before fix)
         assert data.get("resolution") is not None, "resolution should be populated"
         assert data.get("generation_time_ms") is not None, "generation_time_ms should be populated"
@@ -971,6 +1013,51 @@ class TestBackgroundTileEndpoints:
         """DELETE nonexistent background tile → 404."""
         resp = await async_client.delete("/background_tile/nonexistent_bg_id")
         assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_background_tile_by_id(self, async_client):
+        """GET /background_tile/{id} returns the tile."""
+        gen_resp = await async_client.post("/background_tile", json={
+            "tile_type": "grass",
+        })
+        bg_tile_id = gen_resp.json()["background_tile_id"]
+
+        resp = await async_client.get(f"/background_tile/{bg_tile_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["background_tile_id"] == bg_tile_id
+        assert data["tile_type"] == "grass"
+
+    @pytest.mark.asyncio
+    async def test_get_background_tile_not_found(self, async_client):
+        """GET /background_tile/{id} with nonexistent id returns 404."""
+        resp = await async_client.get("/background_tile/nonexistent_bg_id")
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_list_background_tiles_returns_paginated(self, async_client):
+        """GET /background_tile returns paginated list with X-Total-Count and X-Has-More headers."""
+        await async_client.post("/background_tile", json={"tile_type": "grass"})
+        resp = await async_client.get("/background_tile")
+        assert resp.status_code == 200
+        assert "x-total-count" in resp.headers
+        assert "x-has-more" in resp.headers
+        assert int(resp.headers["x-total-count"]) >= 1
+        assert resp.headers["x-has-more"] in ("true", "false")
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+
+    @pytest.mark.asyncio
+    async def test_background_tile_list_respects_limit(self, async_client):
+        """GET /background_tile?limit=1 returns at most 1 item."""
+        for _ in range(2):
+            await async_client.post("/background_tile", json={"tile_type": "grass"})
+        resp = await async_client.get("/background_tile?limit=1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) <= 1
 
 
 # ===========================================================================
@@ -1049,4 +1136,394 @@ class TestResponseFields:
             f"multi-action seed should be > 0, got {data['seed']} (regression: was hardcoded to 0)"
         assert data["leader_ids"] == [lid]
         assert lid in data["leader_ids"]
+
+
+# ===========================================================================
+#  Pagination (cross-endpoint)
+# ===========================================================================
+
+
+class TestPagination:
+    """Tests for pagination across list endpoints."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("endpoint", [
+        "/leader", "/structure", "/object", "/terrain", "/unit", "/background_tile"
+    ])
+    async def test_list_endpoint_supports_limit(self, async_client, endpoint):
+        """All list endpoints support ?limit= query param and return ≤limit items."""
+        resp = await async_client.get(f"{endpoint}?limit=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) <= 2
+        assert "x-total-count" in resp.headers
+        assert "x-has-more" in resp.headers
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("endpoint", [
+        "/leader", "/structure", "/object", "/terrain", "/unit", "/background_tile"
+    ])
+    async def test_list_endpoint_supports_offset(self, async_client, endpoint):
+        """All list endpoints support ?offset= query param without error."""
+        resp = await async_client.get(f"{endpoint}?offset=0")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert "x-total-count" in resp.headers
+
+    @pytest.mark.asyncio
+    async def test_limit_clamped_to_maximum(self, async_client):
+        """?limit=99999 is clamped to the configured maximum (200) and does not 500."""
+        resp = await async_client.get("/leader?limit=99999")
+        # Should either succeed with clamped limit or return 422 for exceeding max
+        assert resp.status_code in (200, 422)
+        if resp.status_code == 200:
+            data = resp.json()
+            assert isinstance(data, list)
+            assert len(data) <= 200  # max limit
+
+
+# ===========================================================================
+#  Multi-leader action (additional edge cases)
+# ===========================================================================
+
+
+class TestMultiLeaderAction:
+    """Tests for multi-leader action generation."""
+
+    @pytest.mark.asyncio
+    async def test_multi_leader_action_requires_leader_ids(self, async_client):
+        """POST /leader with asset_type=action and leader_ids list succeeds."""
+        # Create two leaders first
+        lid1 = await self._create_splash(async_client, "Julius Caesar",
+            "A tall Roman general with short cropped dark hair, a prominent aquiline nose, "
+            "deep-set brown eyes, and a clean-shaven angular face. He wears a white toga "
+            "with a purple stripe over a crimson tunic, with a laurel wreath on his head.")
+        lid2 = await self._create_splash(async_client, "Vercingetorix",
+            "A Gallic chieftain with long braided blond hair, a thick drooping mustache, "
+            "fierce blue eyes, and a muscular build. He wears chainmail armor with a torc "
+            "around his neck and carries a long iron sword.")
+
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Gaul Surrender",
+            "leader_description": "Two leaders meeting after battle — one victorious Roman, "
+                "one defiant Gallic chieftain standing across a wooden table.",
+            "leader_ids": [lid1, lid2],
+            "archetype": "diplomat",
+            "culture": "roman_imperial",
+            "time_of_day": "midday",
+            "mood": "grim_determined",
+            "action_category": "diplomatic",
+            "action_description": "Vercingetorix throws down his sword at Caesar's feet "
+                "in surrender as Roman soldiers look on.",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["asset_type"] == "action"
+        assert data["leader_ids"] == [lid1, lid2]
+        assert data["leader_names"] == ["Julius Caesar", "Vercingetorix"]
+        assert data["url"].startswith("/assets/")
+        assert isinstance(data["seed"], int)
+        assert data["seed"] > 0
+
+    @pytest.mark.asyncio
+    async def test_multi_action_single_leader_ok(self, async_client):
+        """Multi-leader action with a single leader_id is accepted (≥1 required)."""
+        lid = await self._create_splash(async_client, "Single Leader",
+            "A lone warrior king with broad shoulders and a shaved head, wearing silver "
+            "plate armor with an azure cape, standing tall with a greatsword planted before him.")
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Single Leader",
+            "leader_description": "A lone warrior king with broad shoulders and a shaved head, "
+                "wearing silver plate armor with an azure cape.",
+            "leader_ids": [lid],
+            "archetype": "warrior_king",
+            "culture": "medieval_european",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "action_category": "military",
+            "action_description": "The warrior king stands atop a hill surveying the battlefield "
+                "after a decisive victory.",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["asset_type"] == "action"
+        assert data["leader_ids"] == [lid]
+
+    @pytest.mark.asyncio
+    async def test_multi_action_missing_action_category_422(self, async_client):
+        """Multi-leader action without action_category → 422."""
+        lid = await self._create_splash(async_client, "Test Leader MC",
+            "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. "
+            "She wears a white linen dress and a nemes headdress with a golden cobra emblem.")
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Test Leader MC",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry. "
+                "She wears white linen and a nemes headdress.",
+            "leader_ids": [lid],
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "action_description": "Leading troops into battle.",
+        })
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_multi_action_missing_description_422(self, async_client):
+        """Multi-leader action without action_description → 422."""
+        lid = await self._create_splash(async_client, "Test Leader MD",
+            "A regal Egyptian queen with dark hair, gold jewelry, and a commanding presence. "
+            "She wears a white linen dress and a nemes headdress with a golden cobra emblem.")
+        resp = await async_client.post("/leader", json={
+            "asset_type": "action",
+            "leader_name": "Test Leader MD",
+            "leader_description": "A regal Egyptian queen with dark hair, gold jewelry. "
+                "She wears white linen and a nemes headdress.",
+            "leader_ids": [lid],
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+            "action_category": "military",
+        })
+        assert resp.status_code == 422
+
+    # --- helpers --------------------------------------------------------
+
+    @staticmethod
+    async def _create_splash(client, name: str, description: str) -> str:
+        """Create a splash leader and return the leader_id."""
+        resp = await client.post("/leader", json={
+            "asset_type": "splash",
+            "leader_name": name,
+            "leader_description": description,
+            "archetype": "warrior_queen",
+            "culture": "ancient_egyptian",
+            "time_of_day": "golden_hour",
+            "mood": "triumphant",
+        })
+        assert resp.status_code == 200, f"Splash failed for {name}: {resp.text}"
+        return resp.json()["leader_id"]
+
+
+# ===========================================================================
+#  Rate limiting middleware
+# ===========================================================================
+
+
+class TestRateLimiting:
+    """Tests for rate limiting middleware.
+
+    The RateLimitMiddleware creates its token buckets once at app startup with
+    the configured rates.  Changing settings.rate_limit.post_rps after startup
+    has no effect on the already-instantiated buckets.  These tests therefore
+    work with the *default* bucket parameters (burst_size=5, post_rps=2.0) and
+    exhaust the burst to trigger 429s.
+    """
+
+    async def _drain_post_bucket(self, async_client) -> None:
+        """Send enough rapid POST requests to exhaust the burst bucket.
+
+        The default burst_size is 5, so 6 requests in rapid succession
+        should produce at least one 429 once the burst is consumed.
+        """
+        # First enable rate limiting (disabled by default in test fixture)
+        import src.config as config_mod
+        config_mod.settings.rate_limit.enabled = True
+
+        # Drain the bucket by sending 7 rapid requests
+        statuses = []
+        for _ in range(7):
+            resp = await async_client.post("/structure", json={
+                "category": "fortification",
+                "style": "nordic_wooden",
+                "condition": "pristine",
+                "scale": "small",
+                "description": "A small wooden watchtower with a pointed roof and a lookout platform.",
+            })
+            statuses.append(resp.status_code)
+
+        return statuses
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_429_when_exceeded(self, async_client, monkeypatch):
+        """Rapid POST requests beyond the burst limit return 429."""
+        import src.config as config_mod
+
+        orig_enabled = config_mod.settings.rate_limit.enabled
+        try:
+            statuses = await self._drain_post_bucket(async_client)
+
+            assert 429 in statuses, (
+                f"Expected at least one 429 after exhausting burst (burst_size=5), "
+                f"got statuses: {statuses}"
+            )
+
+        finally:
+            config_mod.settings.rate_limit.enabled = orig_enabled
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_disabled_bypasses_check(self, async_client, monkeypatch):
+        """When rate_limit.enabled=False, no 429 is returned even with rapid requests."""
+        import src.config as config_mod
+
+        orig_enabled = config_mod.settings.rate_limit.enabled
+        try:
+            config_mod.settings.rate_limit.enabled = False
+
+            # Send several rapid requests — all should succeed
+            statuses = []
+            for _ in range(7):
+                resp = await async_client.post("/structure", json={
+                    "category": "fortification",
+                    "style": "nordic_wooden",
+                    "condition": "pristine",
+                    "scale": "small",
+                    "description": "A small wooden watchtower with a pointed roof and a lookout platform.",
+                })
+                statuses.append(resp.status_code)
+
+            # All should succeed (200) since rate limiting is disabled
+            assert all(s == 200 for s in statuses), (
+                f"Expected all 200 with rate limiting disabled, got: {statuses}"
+            )
+
+        finally:
+            config_mod.settings.rate_limit.enabled = orig_enabled
+
+    @pytest.mark.asyncio
+    async def test_get_requests_use_separate_bucket(self, async_client, monkeypatch):
+        """GET requests use a different (higher) rate limit bucket than POST.
+
+        Even after exhausting the POST bucket, GET requests should still
+        succeed because they use a separate bucket with higher limits
+        (default get_rps=50.0, burst=50).
+        """
+        import src.config as config_mod
+
+        orig_enabled = config_mod.settings.rate_limit.enabled
+        try:
+            # First exhaust the POST bucket to prove POSTs are rate-limited
+            config_mod.settings.rate_limit.enabled = True
+            post_statuses = await self._drain_post_bucket(async_client)
+            assert 429 in post_statuses, "POST bucket should be exhausted"
+
+            # Now send many GET requests — they should all succeed
+            # because GET uses a separate, higher-capacity bucket
+            get_statuses = []
+            for _ in range(10):
+                resp = await async_client.get("/health")
+                get_statuses.append(resp.status_code)
+
+            assert all(s == 200 for s in get_statuses), (
+                f"GET requests should not be rate-limited even when POST bucket is "
+                f"exhausted, got: {get_statuses}"
+            )
+
+        finally:
+            config_mod.settings.rate_limit.enabled = orig_enabled
+
+
+# ===========================================================================
+#  API key authentication middleware
+# ===========================================================================
+
+
+class TestAPIKeyAuth:
+    """Tests for API key authentication middleware."""
+
+    @pytest.mark.asyncio
+    async def test_health_endpoint_exempt_from_auth(self, async_client, monkeypatch):
+        """GET /health works without API key even when auth is enabled."""
+        import src.config as config_mod
+
+        orig_key = config_mod.settings.server.api_key
+        try:
+            config_mod.settings.server.api_key = "test-secret-key"
+            resp = await async_client.get("/health")
+            assert resp.status_code == 200
+            assert resp.json()["status"] in ("ok", "degraded")
+        finally:
+            config_mod.settings.server.api_key = orig_key
+
+    @pytest.mark.asyncio
+    async def test_assets_endpoint_exempt_from_auth(self, async_client, monkeypatch):
+        """GET /assets/{filename} works without API key even when auth is enabled."""
+        import src.config as config_mod
+
+        orig_key = config_mod.settings.server.api_key
+        try:
+            config_mod.settings.server.api_key = "test-secret-key"
+            # /assets/ even for nonexistent files should return 404, not 401
+            resp = await async_client.get("/assets/nonexistent.png")
+            assert resp.status_code == 404  # not 401
+        finally:
+            config_mod.settings.server.api_key = orig_key
+
+    @pytest.mark.asyncio
+    async def test_401_when_api_key_required_but_missing(self, async_client, monkeypatch):
+        """When api_key is set, requests without X-API-Key return 401."""
+        import src.config as config_mod
+
+        orig_key = config_mod.settings.server.api_key
+        try:
+            config_mod.settings.server.api_key = "test-secret-key"
+            resp = await async_client.get("/modes")
+            assert resp.status_code == 401
+            assert "Invalid or missing API key" in resp.json()["detail"]
+        finally:
+            config_mod.settings.server.api_key = orig_key
+
+    @pytest.mark.asyncio
+    async def test_401_when_api_key_wrong(self, async_client, monkeypatch):
+        """Wrong API key returns 401."""
+        import src.config as config_mod
+
+        orig_key = config_mod.settings.server.api_key
+        try:
+            config_mod.settings.server.api_key = "test-secret-key"
+            resp = await async_client.get(
+                "/modes",
+                headers={"X-API-Key": "wrong-key"},
+            )
+            assert resp.status_code == 401
+            assert "Invalid or missing API key" in resp.json()["detail"]
+        finally:
+            config_mod.settings.server.api_key = orig_key
+
+    @pytest.mark.asyncio
+    async def test_200_when_api_key_correct(self, async_client, monkeypatch):
+        """Correct API key allows request through."""
+        import src.config as config_mod
+
+        orig_key = config_mod.settings.server.api_key
+        try:
+            config_mod.settings.server.api_key = "test-secret-key"
+            resp = await async_client.get(
+                "/modes",
+                headers={"X-API-Key": "test-secret-key"},
+            )
+            assert resp.status_code == 200
+            assert "modes" in resp.json()
+        finally:
+            config_mod.settings.server.api_key = orig_key
+
+    @pytest.mark.asyncio
+    async def test_auth_disabled_when_api_key_empty(self, async_client, monkeypatch):
+        """When api_key is empty string, all requests pass without auth."""
+        import src.config as config_mod
+
+        orig_key = config_mod.settings.server.api_key
+        try:
+            config_mod.settings.server.api_key = ""
+            resp = await async_client.get("/modes")
+            assert resp.status_code == 200
+            assert "modes" in resp.json()
+        finally:
+            config_mod.settings.server.api_key = orig_key
 

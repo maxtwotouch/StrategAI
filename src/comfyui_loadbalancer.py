@@ -332,7 +332,4 @@ class ComfyUILoadBalancer:
             resp.raise_for_status()
             logger.debug("Cancelled all queued prompts on %s", node.url)
         except Exception:
-            logger.debug(
-                "Could not cancel prompts on %s (node likely unreachable)",
-                node.url,
-            )
+            logger.exception("Failed to cancel jobs on node %s", node)

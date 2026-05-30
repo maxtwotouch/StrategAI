@@ -12,7 +12,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from src.database import SessionLocal, AssetRecord, UnitRecord
+from src.database import SessionLocal, AssetRecord, UnitRecord, _execute_with_busy_retry
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ class UnitRegistry:
             )
             db.add(record)
             if _close:
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
             logger.info("Unit registered: %s (%s)", unit_id, unit_type)
         finally:
             if _close:
@@ -120,7 +120,7 @@ class UnitRegistry:
             db.delete(record)
             # Also delete the parent AssetRecord to prevent orphan leaks
             db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
-            db.commit()
+            _execute_with_busy_retry(db, db.commit)
             # Best-effort cleanup of the image file on disk
             try:
                 store.delete(image_id)

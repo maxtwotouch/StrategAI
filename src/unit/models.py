@@ -7,7 +7,7 @@ Each unit generates a single south-facing (front view) sprite at 128×128.
 """
 
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 
 
@@ -27,6 +27,8 @@ class UnitType(str, Enum):
 # ===========================================================================
 
 class UnitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     unit_type: str = Field(
         ...,
         description=f"One of: {', '.join(sorted(e.value for e in UnitType))}",

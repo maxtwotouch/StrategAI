@@ -40,8 +40,7 @@ except Exception:
 # for writes.  max_overflow=5 provides headroom for load spikes without
 # overwhelming the single-writer lock.
 #
-# If migrating to PostgreSQL, increase pool_size (e.g. 20) and add
-# pool_pre_ping=True, pool_recycle=3600, pool_size=20.
+# The pool is sized conservatively for SQLite's single-writer architecture.
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
@@ -56,8 +55,7 @@ engine = create_engine(
 def _set_sqlite_pragma(dbapi_connection, connection_record):
     """Enable SQLite PRAGMAs for production safety and concurrency.
 
-    Applied on every new SQLite connection.  All are no-ops on PostgreSQL
-    and other non-SQLite backends.
+    Applied on every new SQLite connection.
 
     PRAGMAs set:
     - ``foreign_keys=ON`` — enforce FK constraints (off by default).
@@ -139,7 +137,7 @@ class AssetRecord(Base):
     tile_type: str | None = Column(String, nullable=True)  # type: ignore[assignment]
     structure_subtype: str | None = Column(String, nullable=True)  # type: ignore[assignment]
     generation_mode: str | None = Column(String, nullable=True)  # type: ignore[assignment]
-    created_at: DateTime = Column(DateTime, server_default=func.now())  # type: ignore[assignment]
+    created_at: DateTime = Column(DateTime, server_default=func.now(), index=True)  # type: ignore[assignment]
     updated_at: DateTime = Column(DateTime, server_default=func.now(), onupdate=func.now())  # type: ignore[assignment]
 
 
@@ -163,7 +161,7 @@ class LeaderRecord(Base):
     # Canonical identity
     splash_image_id: str = Column(  # type: ignore[assignment]
         String, ForeignKey("asset_records.id", ondelete="SET NULL"),
-        nullable=False, index=True,
+        nullable=True, index=True,
     )
     splash_seed: int = Column(Integer, nullable=False)  # type: ignore[assignment]
     splash_prompt: str = Column(String, nullable=False)  # type: ignore[assignment]
@@ -178,7 +176,7 @@ class LeaderRecord(Base):
     # Reference image
     reference_filename: str = Column(String, nullable=False)  # type: ignore[assignment]
 
-    created_at: DateTime = Column(DateTime, server_default=func.now())  # type: ignore[assignment]
+    created_at: DateTime = Column(DateTime, server_default=func.now(), index=True)  # type: ignore[assignment]
     updated_at: DateTime = Column(DateTime, server_default=func.now(), onupdate=func.now())  # type: ignore[assignment]
 
 
@@ -272,7 +270,7 @@ class BackgroundTileRecord(Base):
         String, ForeignKey("asset_records.id", ondelete="CASCADE"),
         nullable=False, index=True,
     )
-    created_at: DateTime = Column(DateTime, server_default=func.now())  # type: ignore[assignment]
+    created_at: DateTime = Column(DateTime, server_default=func.now(), index=True)  # type: ignore[assignment]
     updated_at: DateTime = Column(DateTime, server_default=func.now(), onupdate=func.now())  # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
@@ -293,8 +291,7 @@ def get_db() -> Generator[Session, None, None]:
 def verify_db_connectivity() -> bool:
     """Check that the database is reachable and all expected tables exist.
 
-    Uses SQLAlchemy's inspector API so the check is database-agnostic
-    (works with SQLite, PostgreSQL, MySQL, etc.).
+    Uses SQLAlchemy's inspector API so the check is database-agnostic.
 
     Returns True if the database is healthy, False otherwise.
     Called at startup by the application lifespan handler.

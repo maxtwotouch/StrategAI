@@ -18,8 +18,8 @@ def _make_workflow():
     Nodes that are baked into the workflow JSON (FluxGuidance, CFGGuider,
     BasicScheduler, KSamplerSelect, EmptyLatentImage — guidance, steps,
     denoise, sampler, resolution) are included for structural correctness
-    but are NOT patched at runtime.  Only CLIPTextEncode, SamplerCustomAdvanced,
-    LoadImage, and RandomNoise receive runtime injection.
+    but are NOT patched at runtime.  Only CLIPTextEncode, LoadImage, and
+    RandomNoise receive runtime injection.
     """
     return {
         "1": {
@@ -93,23 +93,6 @@ class TestPatchClipTextEncode:
         wf = _make_workflow()
         result = _patch_workflow(wf, positive_prompt=None)
         assert result["1"]["inputs"]["text"] == "original positive"
-
-
-class TestPatchSamplerCustomAdvanced:
-    """Tests for SamplerCustomAdvanced patching (Flux2 — noise_seed)."""
-
-    def test_seed_set(self):
-        """inputs['noise_seed'] set."""
-        wf = _make_workflow()
-        result = _patch_workflow(wf, seed=42)
-        assert result["2"]["inputs"]["noise_seed"] == 42
-
-    def test_random_seed_when_none(self):
-        """seed=None → random noise_seed generated."""
-        wf = _make_workflow()
-        result = _patch_workflow(wf, seed=None)
-        assert isinstance(result["2"]["inputs"]["noise_seed"], int)
-        assert 0 <= result["2"]["inputs"]["noise_seed"] <= 2**32 - 1
 
 
 class TestPatchLoadImage:

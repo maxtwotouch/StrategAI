@@ -6,7 +6,7 @@ the entire frame with no white background isolation and use a separate
 ComfyUI workflow (``background_tile.json``) without the top-down LoRA.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 
 # ===========================================================================
@@ -21,6 +21,8 @@ VALID_TILE_TYPES = {"water", "grass", "sand", "stone", "dirt"}
 # ===========================================================================
 
 class BackgroundTileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     tile_type: str = Field(
         ...,
         description=f"Ground texture type. One of: {', '.join(sorted(VALID_TILE_TYPES))}",

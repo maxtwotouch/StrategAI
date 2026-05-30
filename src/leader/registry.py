@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from src.config import settings, BASE_DIR
-from src.database import SessionLocal, AssetRecord, LeaderRecord
+from src.database import SessionLocal, AssetRecord, LeaderRecord, _execute_with_busy_retry
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class LeaderRegistry:
             )
             db.add(record)
             if _close:
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
             logger.info("Leader registered: %s (%s)", leader_name, leader_id)
         except Exception:
             if _close:
@@ -167,7 +167,7 @@ class LeaderRegistry:
             if leader:
                 leader.profile_image_id = image_filename
                 if _close:
-                    db.commit()
+                    _execute_with_busy_retry(db, db.commit)
                 logger.info("Profile recorded for leader: %s", leader_id)
         finally:
             if _close:
@@ -200,7 +200,7 @@ class LeaderRegistry:
                 leader.action_image_ids = ids
                 flag_modified(leader, "action_image_ids")
                 if _close:
-                    db.commit()
+                    _execute_with_busy_retry(db, db.commit)
                 logger.info("Action recorded for leader: %s", leader_id)
         finally:
             if _close:
@@ -227,17 +227,20 @@ class LeaderRegistry:
                 LeaderRecord.leader_id == leader_id
             ).first()
             if leader:
-                # Collect all image filenames to clean up from disk
+                # Collect all image filenames to clean up from disk.
+                # Capture splash_image_id before deletion — the object
+                # is expired after commit.
                 image_ids_to_clean = []
-                if leader.splash_image_id:
-                    image_ids_to_clean.append(leader.splash_image_id)
+                splash_asset_id = leader.splash_image_id
+                if splash_asset_id:
+                    image_ids_to_clean.append(splash_asset_id)
                 if leader.profile_image_id:
                     image_ids_to_clean.append(leader.profile_image_id)
                 if leader.action_image_ids:
                     image_ids_to_clean.extend(leader.action_image_ids)
 
                 db.delete(leader)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
 
                 # Best-effort cleanup of generated image files on disk
                 for image_id in image_ids_to_clean:
@@ -248,11 +251,19 @@ class LeaderRegistry:
                             "Failed to delete image file %s for leader %s: %s",
                             image_id, leader_id, exc,
                         )
-                # Note: AssetRecords are NOT deleted here because
-                # splash_image_id is NOT NULL with ondelete=SET NULL —
-                # deleting the parent AssetRecord would violate the
-                # constraint.  Profile/action AssetRecords are cleaned up
-                # via ON DELETE CASCADE when the leader row is removed.
+
+                # Delete the associated splash AssetRecord now that the FK
+                # allows SET NULL (nullable=True).  Profile/action
+                # AssetRecords are cleaned up via ON DELETE CASCADE when
+                # the leader row is removed.
+                if splash_asset_id:
+                    splash_asset = db.query(AssetRecord).filter(
+                        AssetRecord.id == splash_asset_id
+                    ).first()
+                    if splash_asset:
+                        db.delete(splash_asset)
+                        _execute_with_busy_retry(db, db.commit)
+
                 logger.info("Leader deleted: %s", leader_id)
                 return True
         return False

@@ -453,7 +453,7 @@ class TestWebSocketLifecycle:
         ]
 
         mock_ws = AsyncMock()
-        mock_ws.__aiter__.return_value = messages
+        mock_ws.recv = AsyncMock(side_effect=messages)
         mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
         mock_ws.__aexit__ = AsyncMock(return_value=None)
 
@@ -476,7 +476,7 @@ class TestWebSocketLifecycle:
         ]
 
         mock_ws = AsyncMock()
-        mock_ws.__aiter__.return_value = messages
+        mock_ws.recv = AsyncMock(side_effect=messages)
         mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
         mock_ws.__aexit__ = AsyncMock(return_value=None)
 
@@ -491,9 +491,9 @@ class TestWebSocketLifecycle:
 
         mock_ws = AsyncMock()
         # Raise ConnectionClosed to trigger the internal except block
-        mock_ws.__aiter__.side_effect = __import__("websockets").exceptions.ConnectionClosed(
+        mock_ws.recv = AsyncMock(side_effect=__import__("websockets").exceptions.ConnectionClosed(
             None, None
-        )
+        ))
         mock_ws.__aenter__ = AsyncMock(return_value=mock_ws)
         mock_ws.__aexit__ = AsyncMock(return_value=None)
 

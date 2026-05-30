@@ -6,7 +6,7 @@ with rich field descriptions so clients know exactly what to send.
 """
 
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 
 
@@ -105,6 +105,8 @@ class TerrainMaterial(str, Enum):
 # ===========================================================================
 
 class StructureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     category: str = Field(
         ...,
         description=f"One of: {', '.join(sorted(e.value for e in StructureCategory))}",
@@ -176,6 +178,8 @@ class StructureRequest(BaseModel):
 
 
 class ObjectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     category: str = Field(
         ...,
         description=f"One of: {', '.join(sorted(e.value for e in ObjectCategory))}",
@@ -235,6 +239,8 @@ class ObjectRequest(BaseModel):
 
 
 class TerrainRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     category: str = Field(
         ...,
         description=f"One of: {', '.join(sorted(e.value for e in TerrainCategory))}",

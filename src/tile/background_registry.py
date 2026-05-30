@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.database import SessionLocal, AssetRecord, BackgroundTileRecord
+from src.database import SessionLocal, AssetRecord, BackgroundTileRecord, _execute_with_busy_retry
 from src.storage import store
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class BackgroundTileRegistry:
             )
             db.add(record)
             if _close:
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
             logger.info("Background tile registered: %s (%s)", background_tile_id, tile_type)
         finally:
             if _close:
@@ -84,7 +84,7 @@ class BackgroundTileRegistry:
                 db.delete(record)
                 # Also delete the parent AssetRecord to prevent orphan leaks
                 db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
                 # Best-effort cleanup of the image file on disk
                 try:
                     store.delete(image_id)

@@ -13,6 +13,7 @@ All generation methods are **async** and can be awaited directly from
 FastAPI endpoints -- no thread-pool required.
 """
 from __future__ import annotations
+import asyncio
 import logging
 import os
 import secrets
@@ -24,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from src.comfyui_client import ComfyUIClient
 from src.config import settings, BASE_DIR
-from src.database import SessionLocal, AssetRecord
+from src.database import SessionLocal, AssetRecord, _execute_with_busy_retry
 from .models import LeaderRequest, LeaderResponse
 from .prompts import build_prompt, build_multi_action_prompt
 from .registry import LeaderRegistry, generate_leader_id
@@ -66,18 +67,24 @@ class LeaderEngine:
         leader_id = generate_leader_id(req.leader_name)
 
         # 3. Seed — use cryptographically secure random unless caller provides one
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         # 4. Workflow path
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_splash.json")
 
         # 5. Run — only inject what changes per request
         start = time.time()
-        img = await self._client.generate(
-            wf_path,
-            positive_prompt=prompt,
-            seed=seed,
-        )
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    wf_path,
+                    positive_prompt=prompt,
+                    seed=seed,
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
 
         # 6. Save to AssetStore
         filename = f"{leader_id}_splash.png"
@@ -106,7 +113,7 @@ class LeaderEngine:
                     splash_prompt=prompt,
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             # Clean up orphaned image file if DB persist fails
             try_remove_asset(filename)
@@ -169,12 +176,18 @@ class LeaderEngine:
 
         # 6. Run — inject prompt, seed, and reference image filename
         start = time.time()
-        img = await self._client.generate(
-            wf_path,
-            positive_prompt=prompt,
-            seed=seed,
-            ref_image_filename=leader.reference_filename,
-        )
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    wf_path,
+                    positive_prompt=prompt,
+                    seed=seed,
+                    ref_image_filename=leader.reference_filename,
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
 
         # 7. Save
         filename = f"{req.leader_id}_profile.png"
@@ -191,7 +204,7 @@ class LeaderEngine:
                     generation_mode="comfyui",
                 ))
                 LeaderRegistry.record_profile(req.leader_id, filename, session=db)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -263,12 +276,18 @@ class LeaderEngine:
 
         # 6. Run — upload both images via input_images (node_id → PIL Image)
         start = time.time()
-        img = await self._client.generate(
-            wf_path,
-            positive_prompt=prompt,
-            seed=seed,
-            input_images={"35": ref_img, "36": empty_img},
-        )
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    wf_path,
+                    positive_prompt=prompt,
+                    seed=seed,
+                    input_images={"35": ref_img, "36": empty_img},
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
 
         # 7. Save
         filename = f"{req.leader_id}_action_{uuid.uuid4().hex[:6]}.png"
@@ -285,7 +304,7 @@ class LeaderEngine:
                     generation_mode="comfyui",
                 ))
                 LeaderRegistry.record_action(req.leader_id, filename, session=db)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -312,21 +331,55 @@ class LeaderEngine:
         """Generate a multi-leader action scene with multiple leaders via ComfyUI.
 
         Loads all leader records, builds a composite prompt from their
-        descriptions, and generates a single action image.
+        descriptions, uploads reference images for img2img consistency,
+        and generates a single action image.
+
+        The leader_action workflow has exactly 2 LoadImage nodes (35, 36)
+        for ImageStitch — exactly 2 leaders must be provided.
         """
         t0 = time.time()
 
-        # Load all leader records
+        # Validate: the workflow has exactly 2 LoadImage nodes for stitching
+        if len(leader_ids) != 2:
+            raise ValueError(
+                f"generate_multi_action requires exactly 2 leader_ids, "
+                f"got {len(leader_ids)}.  The leader_action workflow has "
+                f"2 LoadImage nodes (35, 36) for ImageStitch."
+            )
+
+        # Load all leader records and their reference images
+        leader_records = []
         leader_names = []
         leader_descriptions = []
+        ref_images: dict[str, Image.Image] = {}
+
         for lid in leader_ids:
             leader = LeaderRegistry.get(lid)
             if not leader:
                 raise ValueError(
                     f"Leader '{lid}' not found. Generate a splash first."
                 )
+            leader_records.append(leader)
             leader_names.append(leader.leader_name)
             leader_descriptions.append(leader.leader_description)
+
+            # Load reference image with path traversal protection
+            ref_base = Path(os.path.join(BASE_DIR, settings.paths.leader_reference_dir)).resolve()
+            ref_filename = os.path.basename(leader.reference_filename)
+            ref_path = (ref_base / ref_filename).resolve()
+            if not str(ref_path).startswith(str(ref_base)):
+                raise RuntimeError(
+                    f"Reference image path escapes directory: {leader.reference_filename}"
+                )
+            if not ref_path.exists():
+                raise RuntimeError(f"Reference image missing: {ref_path}")
+            try:
+                ref_img = Image.open(ref_path).convert("RGBA")
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to open reference image at {ref_path}: {exc}"
+                ) from exc
+            ref_images[lid] = ref_img
 
         # Build composite prompt
         prompt = build_multi_action_prompt(req, leader_descriptions, leader_names)
@@ -334,13 +387,27 @@ class LeaderEngine:
         # Workflow path — use the standard action workflow
         wf_path = str(Path(settings.leader_workflow_dir) / "leader_action.json")
 
-        # Run
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
-        img = await self._client.generate(
-            wf_path,
-            positive_prompt=prompt,
-            seed=seed,
-        )
+        # Map leader reference images to LoadImage node IDs (35, 36)
+        input_images: dict[str, Image.Image] = {
+            "35": ref_images[leader_ids[0]],
+            "36": ref_images[leader_ids[1]],
+        }
+
+        # Run — upload reference images via input_images so the engine
+        # patches LoadImage node filenames correctly
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
+        try:
+            img = await asyncio.wait_for(
+                self._client.generate(
+                    wf_path,
+                    positive_prompt=prompt,
+                    seed=seed,
+                    input_images=input_images,
+                ),
+                timeout=getattr(self._client, 'timeout', 300) + 60,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError("Generation timed out")
 
         # Save
         asset_id = str(uuid.uuid4())
@@ -359,7 +426,7 @@ class LeaderEngine:
                 # Link action to all participating leaders
                 for lid in leader_ids:
                     LeaderRegistry.record_action(lid, filename, session=db)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -476,7 +543,7 @@ class StaticLeaderEngine:
     async def _generate_splash(self, req: LeaderRequest) -> LeaderResponse:
         prompt = build_prompt(req)
         leader_id = generate_leader_id(req.leader_name)
-        seed = req.seed if req.seed is not None else secrets.randbits(31)
+        seed = req.seed if req.seed is not None else secrets.randbits(32)
 
         start = time.time()
 
@@ -511,7 +578,7 @@ class StaticLeaderEngine:
                     splash_prompt=prompt,
                     session=db,
                 )
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -568,7 +635,7 @@ class StaticLeaderEngine:
                     generation_mode="static",
                 ))
                 LeaderRegistry.record_profile(req.leader_id, filename, session=db)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -635,7 +702,7 @@ class StaticLeaderEngine:
                     generation_mode="static",
                 ))
                 LeaderRegistry.record_action(req.leader_id, filename, session=db)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -704,7 +771,7 @@ class StaticLeaderEngine:
                 # Link action to all participating leaders
                 for lid in leader_ids:
                     LeaderRegistry.record_action(lid, filename, session=db)
-                db.commit()
+                _execute_with_busy_retry(db, db.commit)
         except Exception:
             try_remove_asset(filename)
             raise
@@ -718,7 +785,7 @@ class StaticLeaderEngine:
             leader_id=asset_id,
             leader_ids=leader_ids,
             leader_names=leader_names,
-            seed=req.seed if req.seed is not None else secrets.randbits(31),
+            seed=req.seed if req.seed is not None else secrets.randbits(32),
             generation_mode="static",
             prompt_used=prompt,
             resolution=f"{img.width}x{img.height}",

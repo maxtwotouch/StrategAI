@@ -152,8 +152,8 @@ class TestResponseFieldTypes:
 
     @pytest.mark.asyncio
     async def test_generation_mode_is_valid(self, async_client):
-        """generation_mode must be one of: comfyui, static, placeholder."""
-        valid = {"comfyui", "static", "placeholder"}
+        """generation_mode must be one of: comfyui, static."""
+        valid = {"comfyui", "static"}
         resp = await async_client.post("/structure", json={
             "category": "fortification",
             "style": "nordic_wooden",
