@@ -444,11 +444,40 @@ organization specifically for ComfyUI compatibility.
 
 ---
 
+## 7. Multi-Instance Spawning
+
+For high-throughput deployments on GPU-rich nodes (e.g., Blackwell RTX 6000
+with 96 GB VRAM), you can run multiple ComfyUI workers on the same GPU using
+the spawn script:
+
+```bash
+# Launch 6 instances on ports 8188-8193
+bash scripts/spawn_comfyui.sh -n 6 start
+
+# Wait for all to be healthy before printing URLs
+bash scripts/spawn_comfyui.sh -n 6 -w start
+
+# Check status
+bash scripts/spawn_comfyui.sh status
+```
+
+Each Flux2 Klein 4B fp8 instance uses ~14 GB VRAM with headroom, so a 96 GB
+GPU can comfortably host 5-6 workers.  The script prints `host:port` URLs
+ready for the `comfyui.nodes` config block.
+
+See [DEPLOYMENT.md](../DEPLOYMENT.md#multi-instance-comfyui-on-a-single-gpu)
+for full documentation including systemd integration, multi-GPU setups, and
+load balancer configuration.
+
+---
+
 ## Next Steps
 
 - **LoRA setup**: The `<tdp>` LoRA (used by structure/object/terrain/unit
   pipelines for top-down camera angle) will be documented here once its
   filename and source are confirmed.
+- **Multi-instance spawning**: See [§7 Multi-Instance Spawning](#7-multi-instance-spawning)
+  above and [DEPLOYMENT.md](../DEPLOYMENT.md#multi-instance-comfyui-on-a-single-gpu).
 - **Multi-node**: See [architecture.md](architecture.md) §4 (ComfyUI Client)
   for load-balanced multi-GPU setup.
 - **Production**: See [architecture.md](architecture.md) §7 for known issues and

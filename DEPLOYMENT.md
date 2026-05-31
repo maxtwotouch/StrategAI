@@ -239,6 +239,153 @@ Always terminate TLS at the reverse proxy, not at the FastAPI server.
 
 ---
 
+## Multi-Instance ComfyUI on a Single GPU
+
+For GPU-rich nodes (e.g., Blackwell RTX 6000 with 96 GB VRAM), you can run
+**multiple ComfyUI workers on the same GPU** to increase throughput.  Each
+instance binds to a different port and shares the same model files (read-only
+via Linux mmap — no contention).
+
+### VRAM Budget
+
+| Workflow | VRAM per instance | Max instances (96 GB) |
+|---|---|---|
+| Flux2 Klein 4B fp8 (txt2img) | ~14 GB (with headroom) | 6 (84 GB used, 12 GB free) |
+| Conservative estimate | ~14 GB | 5 (70 GB used, 26 GB free) |
+
+### Using the Spawn Script
+
+Use `scripts/spawn_comfyui.sh` to launch, monitor, and tear down instances:
+
+```bash
+# Install ComfyUI + models first (one-time)
+bash scripts/setup_comfyui.sh
+
+# Launch N instances — prints host:port URLs for config.yaml
+bash scripts/spawn_comfyui.sh -n 6 start
+
+# Example output:
+# http://gpu-node-1:8188
+# http://gpu-node-1:8189
+# http://gpu-node-1:8190
+# http://gpu-node-1:8191
+# http://gpu-node-1:8192
+# http://gpu-node-1:8193
+```
+
+Common options:
+
+| Flag | Purpose | Example |
+|---|---|---|
+| `-n` | Number of instances | `-n 5` |
+| `-p` | Starting port | `-p 8190` |
+| `-g` | GPU device ID | `-g 1` |
+| `-l` | Bind address | `-l 0.0.0.0` |
+| `-w` | Wait for healthy before printing URLs | `-w` |
+| `--host` | Hostname in printed URLs | `--host gpu-node-1` |
+| `--pid-dir` | PID file location | `--pid-dir /run/comfyui` |
+| `--log-dir` | Per-instance log location | `--log-dir /var/log/comfyui` |
+
+### Management Commands
+
+```bash
+# Check which instances are running and healthy
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids status
+
+# Graceful shutdown (SIGTERM → wait → SIGKILL)
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids stop
+
+# Immediate force-kill
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids stop --force
+```
+
+### Configure the Load Balancer
+
+Paste the printed URLs into your production `.env` file:
+
+```bash
+# .env — production overrides
+COMFYUI__NODES='["http://gpu-node-1:8188","http://gpu-node-1:8189","http://gpu-node-1:8190","http://gpu-node-1:8191","http://gpu-node-1:8192","http://gpu-node-1:8193"]'
+```
+
+Or in `config.yaml`:
+
+```yaml
+comfyui:
+  nodes:
+    - "http://gpu-node-1:8188"
+    - "http://gpu-node-1:8189"
+    - "http://gpu-node-1:8190"
+    - "http://gpu-node-1:8191"
+    - "http://gpu-node-1:8192"
+    - "http://gpu-node-1:8193"
+  timeout: 300
+  health_check_interval: 30
+  max_retries: 3
+```
+
+The load balancer (`src/comfyui_loadbalancer.py`) distributes generation
+requests across all nodes using shortest-queue selection with transparent
+retry on connectivity failure.
+
+### Multi-GPU Nodes
+
+If your node has multiple GPUs (e.g., 4× RTX 4090), run the script once per
+GPU with distinct `--pid-dir` values:
+
+```bash
+# GPU 0: instances on ports 8188-8191
+bash scripts/spawn_comfyui.sh -n 4 -p 8188 -g 0 --pid-dir /tmp/comfyui-pids-gpu0 start
+
+# GPU 1: instances on ports 8192-8195
+bash scripts/spawn_comfyui.sh -n 4 -p 8192 -g 1 --pid-dir /tmp/comfyui-pids-gpu1 start
+
+# Management uses the same --pid-dir
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids-gpu0 status
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids-gpu1 status
+
+# Stop all
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids-gpu0 stop
+bash scripts/spawn_comfyui.sh --pid-dir /tmp/comfyui-pids-gpu1 stop
+```
+
+### Production Hardening
+
+For long-running deployments, wrap each ComfyUI instance in a process
+supervisor (systemd, supervisord) rather than relying on PID files alone.
+The spawn script is designed for **initial provisioning and manual
+management** — use a supervisor for automatic restart on crash.
+
+Example systemd template unit (`/etc/systemd/system/comfyui@.service`):
+
+```ini
+[Unit]
+Description=ComfyUI worker on port %i
+After=network.target
+
+[Service]
+Type=simple
+User=comfyui
+WorkingDirectory=/opt/ComfyUI
+Environment="CUDA_VISIBLE_DEVICES=0"
+ExecStart=/opt/ComfyUI/venv/bin/python main.py --port %i --listen 0.0.0.0 --highvram
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable instances with:
+
+```bash
+for port in 8188 8189 8190 8191 8192 8193; do
+    systemctl enable --now comfyui@$port
+done
+```
+
+---
+
 ## ComfyUI Setup Prerequisite
 
 The service **requires** a running ComfyUI server with Flux2 Klein models. See
