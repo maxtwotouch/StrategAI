@@ -1,12 +1,50 @@
 # Image Diffusion Service: Production Architecture
 
+> 📘 This document is a supplementary architecture reference. For the full project report — including design rationale, model selection justification, workflow node-by-node walkthrough, evaluation, and limitations — see [`project-report.md`](../project-report.md).
+
 ## 1. System Overview
+
 The Medieval Pixel Art Image Service is a decoupled web service that provides
 on-demand generative AI assets for a top-down medieval game.  The web server is
 a lightweight orchestrator — it never loads model weights.  All image generation
 is delegated to an external **ComfyUI** server via its HTTP + WebSocket API.
 Static/pre-made assets are served from a folder structure with zero configuration.
 A **placeholder** mode provides always-available procedural fallbacks.
+
+```mermaid
+graph TD
+    subgraph Client
+        GAME[Game Client / Frontend]
+    end
+
+    subgraph "FastAPI Web Server (CPU)"
+        MW[Middleware Stack<br/>CORS, RequestID, APIKey, SizeLimit, RateLimit]
+        ROUTER[Endpoint Router<br/>35 endpoints, 6 families]
+        ENGINES[Engine Layer<br/>LeaderEngine, TileEngine, UnitEngine, BackgroundTileEngine]
+        PROMPT[Prompt Assembly<br/>Templates, Enum Maps, Assembly Logic]
+        LB[Load Balancer<br/>Shortest-queue selection, failover]
+        DB[(SQLite WAL<br/>7 tables)]
+        STORE[AssetStore<br/>LRU Cache + Disk]
+    end
+
+    subgraph "ComfyUI GPU Server(s)"
+        NODE1[ComfyUI Node 1<br/>Flux2 Klein 4B]
+        NODE2[ComfyUI Node 2<br/>Flux2 Klein 4B]
+        NODEN[ComfyUI Node N<br/>Flux2 Klein 4B]
+    end
+
+    GAME -->|HTTP REST| MW
+    MW --> ROUTER
+    ROUTER --> ENGINES
+    ENGINES --> PROMPT
+    ENGINES --> LB
+    LB -->|HTTP + WebSocket| NODE1
+    LB -->|HTTP + WebSocket| NODE2
+    LB -->|HTTP + WebSocket| NODEN
+    ENGINES --> DB
+    ENGINES --> STORE
+    ROUTER --> STORE
+```
 
 ## 2. Core Operational Flow
 1. **Request Intake**: `FastAPI` validates incoming payloads (`LeaderRequest`,
@@ -46,17 +84,19 @@ templates.  It activates a LoRA that enforces **top-down camera angle** with
 medieval pixel-art styling.  Background tiles (seamless ground textures) and
 leader portraits use separate templates/workflows without this LoRA.
 
+**Why structured enums over free-form prompts?** This project deliberately rejects the pass-through model (accept a raw prompt string, forward to the model) used by general-purpose image APIs. Structured enums with curated injection maps serve two purposes specific to game development: (1) they eliminate the prompt-engineering burden — game designers send concepts they already work with (`"fortification"`, `"desert_biome"`), not diffusion-model tokens; and (2) they guarantee style consistency by locking all camera framing, quality tags, and LoRA triggers in version-controlled templates that no client request can override. For a full discussion of this tradeoff, see the [project report §3.8.1](../project-report.md#381-design-rationale-structured-enums-vs-free-form-prompts).
+
 ## 4. Component Architecture
 
 ### A. API Layer (`src/main.py` & per-pipeline `models.py`)
-- **FastAPI**: Async HTTP server with 5 middleware layers plus CORS. Endpoints (33 total):
-  **Leader**: `POST /leader`, `GET /leader`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`
+- **FastAPI**: Async HTTP server with 5 middleware layers plus CORS. Endpoints (35 total):
+  **Leader**: `POST /leader`, `GET /leader`, `GET /leader/catalog`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`
   **Structure**: `POST /structure`, `GET /structure`, `GET /structure/catalog`, `GET /structure/{structure_id}`, `DELETE /structure/{structure_id}`
   **Object**: `POST /object`, `GET /object`, `GET /object/catalog`, `GET /object/{object_id}`, `DELETE /object/{object_id}`
   **Terrain**: `POST /terrain`, `GET /terrain`, `GET /terrain/catalog`, `GET /terrain/{terrain_id}`, `DELETE /terrain/{terrain_id}`
   **Unit**: `POST /unit`, `GET /unit`, `GET /unit/catalog`, `GET /unit/{unit_id}`, `DELETE /unit/{unit_id}`
   **Background Tile**: `POST /background_tile`, `GET /background_tile`, `GET /background_tile/catalog`, `GET /background_tile/{background_tile_id}`, `DELETE /background_tile/{background_tile_id}`
-  **System**: `GET /health`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`
+  **System**: `GET /health`, `GET /health/ready`, `GET /modes`, `GET /catalog`, `GET /assets/{filename}`
   All GET list endpoints support pagination: `?limit=` (1–200, default 50) and `?offset=` (≥0).
 - **Pydantic**: Typed request/response schemas with enum validation.
 - **Fully async**: Generation runs on the asyncio event loop via `httpx` + `websockets`.
@@ -65,11 +105,11 @@ leader portraits use separate templates/workflows without this LoRA.
 
 | Order | Middleware | Purpose |
 |-------|-----------|---------|
-| 1 | `RequestIDMiddleware` | Injects a UUID4 `X-Request-ID` into every request for log correlation; echoes in response header |
-| 2 | `APIKeyMiddleware` | Validates `X-API-Key` header against `server.api_key` (disabled when key is empty). `/health` and `/assets/` are exempt |
-| 3 | `CORSMiddleware` | Configurable origins via `server.cors_origins`; `allow_credentials=False` |
+| 1 | `CORSMiddleware` | Configurable origins via `server.cors_origins`; `allow_credentials=False`. Outermost — handles browser CORS preflight `OPTIONS` before auth/rate-limit checks. |
+| 2 | `RequestIDMiddleware` | Injects a UUID4 `X-Request-ID` into every request for log correlation; echoes in response header |
+| 3 | `APIKeyMiddleware` | Validates `X-API-Key` header against `server.api_key` (disabled when key is empty). `/health`, `/health/ready`, and `/assets/` are exempt |
 | 4 | `RequestSizeLimitMiddleware` | Rejects POST/PUT/PATCH bodies exceeding `server.max_request_body_mb` (411 if no `Content-Length`, 413 if too large) |
-| 5 | `RateLimitMiddleware` | Global token-bucket: 2 POST/s (burst 5), 50 GET/s. Toggle via `rate_limit.enabled` |
+| 5 | `RateLimitMiddleware` | Global token-bucket: 2 POST/s (burst 5), 50 GET/s. Toggle via `rate_limit.enabled`. Innermost — closest to route handlers. |
 
 ### B. Storage Layer (`src/storage.py`)
 - **AssetStore**: Thread-safe in-memory LRU cache (OrderedDict + Lock, default
@@ -96,8 +136,8 @@ leader portraits use separate templates/workflows without this LoRA.
 
 ### E. Leader Pipeline (`src/leader/`)
 - **Three-stage generation**: splash (txt2img, canonical visual identity) →
-  profile (img2img, close-crop portrait, denoise=0.30) → action (img2img,
-  denoise=0.60).
+  profile (img2img, close-crop portrait, denoise=0.90) → action (img2img,
+  denoise=0.85).
 - **Multi-leader action**: txt2img composite prompt weaving together multiple
   leaders' descriptions. Triggered by `leader_ids` list.
 - **Structured prompt injection**: Clients select enum values; server maps to
@@ -157,8 +197,8 @@ injects prompt text and seed.
 | `txt2img.json` | Structures, objects, terrain, units | Top-down tile assets. `<tdp>` LoRA trigger in prompt template. |
 | `background_tile.json` | Background ground tiles (water, grass, sand, stone, dirt) | Seamless textures — NO `<tdp>` LoRA. |
 | `leader/leader_splash.json` | Leader splash (txt2img, 1920×1088) | Establishes canonical visual identity. |
-| `leader/leader_profile.json` | Leader profile (img2img, denoise=0.30) | Uses splash as reference image. |
-| `leader/leader_action.json` | Leader action (img2img, denoise=0.60 for single; txt2img for multi) | Uses splash as reference (single-leader only). |
+| `leader/leader_profile.json` | Leader profile (img2img, denoise=0.90) | Uses splash as reference image. |
+| `leader/leader_action.json` | Leader action (img2img, denoise=0.85 for single; txt2img for multi) | Uses splash as reference (single-leader only). |
 
 ## 6. Generation Modes (Per-Family)
 

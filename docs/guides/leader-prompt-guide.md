@@ -39,8 +39,8 @@ of a single `leader_id`. The server runs as txt2img with a composite
 prompt weaving together all leaders' descriptions — no reference
 image is used because multiple distinct faces must be depicted.
 
-See [`architecture.md`](./architecture.md) for the full system architecture and
-[`workflow-design-justification.md`](./workflow-design-justification.md) for Flux2 Klein design rationale.
+See [`architecture.md`](../architecture/architecture.md) for the full system architecture and
+[`workflow-design-justification.md`](../pipeline/workflow-design-justification.md) for Flux2 Klein design rationale.
 
 
 ═══════════════════════════════════════════════════════════════════

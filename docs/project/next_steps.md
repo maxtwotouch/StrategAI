@@ -1,5 +1,7 @@
 # Next Steps: Production & Future Roadmap
 
+> **Documentation Update (May 31, 2026):** Comprehensive project documentation completed. See [`project-report.md`](../project-report.md) for the full student technical report.
+
 > **Last updated: May 30, 2026** — reflects all work completed through the production-readiness implementation.
 
 ---
@@ -51,3 +53,4 @@ size limits, and 38 new tests (307 → 345).
 - [ ] Fine-tune workflow JSONs with actual ComfyUI testing (steps, CFG, denoise)
 - [ ] Expand static tile catalog with hand-crafted pixel art PNGs
 - [ ] Investigate post-processing pipeline (background removal, palette reduction)
+- [ ] **LoRA trigger token investigation**: The `<tdp>` LoRA needs provenance research. Key questions: what was the training dataset? Does `<tdp>` produce optimal results for medieval pixel art specifically? Should we train a custom LoRA on a curated dataset? Mitigate link-rot risk by mirroring the file.

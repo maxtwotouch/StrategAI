@@ -6,6 +6,28 @@ An on-demand generative AI microservice that produces pixel-art game assets for 
 
 ---
 
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Project Report](docs/project-report.md)** | Full student technical report — design rationale, DiT pipeline, evaluation, limitations |
+| **[Image Generation Pipeline](docs/pipeline/image-generation-pipeline.md)** | Deep-dive: DiT mechanics, node-by-node workflow walkthrough, runtime patching |
+| **[Asset Family Engines](docs/architecture/asset-family-engines.md)** | Per-family engine architecture — leader 3-stage, tile, unit, background |
+| **[Database Schema](docs/architecture/database-schema.md)** | ERD, table reference, FK strategies, query patterns |
+| **[Configuration Reference](docs/architecture/configuration-reference.md)** | Every config key explained, .env override syntax |
+| **[Architecture Overview](docs/architecture/architecture.md)** | System architecture, middleware stack, component breakdown |
+| **[Storage & Caching](docs/architecture/storage-and-caching.md)** | LRU cache, atomic writes, orphan cleanup |
+| **[ComfyUI Protocol](docs/architecture/comfyui-protocol.md)** | WebSocket + HTTP communication with ComfyUI |
+| **[Load Balancer](docs/architecture/load-balancer.md)** | Multi-node ComfyUI routing, failover |
+| **[Static Catalog](docs/architecture/static-catalog.md)** | Static asset resolution system |
+| **[Font Utilities](docs/architecture/font-utils.md)** | Cross-platform font resolution |
+| **[Workflow Design Justification](docs/pipeline/workflow-design-justification.md)** | Flux2 Klein model selection, node graph rationale |
+| **[ComfyUI Setup Guide](docs/architecture/comfyui-setup-guide.md)** | Hardware requirements, install steps, model download |
+| **[Testing Plan](docs/architecture/testing-plan.md)** | Test architecture, fixture inventory, coverage |
+| **Prompt Writing Guides** | [Leader](docs/guides/leader-prompt-guide.md) · [Tile](docs/guides/tile-prompt-guide.md) · [Unit](docs/guides/unit-prompt-guide.md) |
+
+---
+
 ## Quick Start
 
 ```bash
@@ -46,6 +68,7 @@ Every family supports full CRUD: `POST` (generate), `GET` (list), `GET /{id}` (g
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Service status, ComfyUI connectivity, registered asset counts, active modes |
+| `GET` | `/health/ready` | Lightweight readiness probe (returns 200 if DB connected, no ComfyUI check) |
 | `GET` | `/modes` | Active generation mode per asset family (`comfyui`/`static`/`placeholder`) |
 | `GET` | `/catalog` | Available enum values for all asset families (tile types, subtypes, unit types) |
 
@@ -64,6 +87,7 @@ Every family supports full CRUD: `POST` (generate), `GET` (list), `GET /{id}` (g
 | `POST` | `/leader` | Generate a leader asset (`asset_type`: `splash`, `profile`, or `action`) |
 | `GET` | `/leader` | List all registered leaders with asset URLs |
 | `GET` | `/leader/{leader_id}` | Get a specific leader's info and asset URLs |
+| `GET` | `/leader/catalog` | Available leader enum values (archetypes, cultures, times of day, moods, action categories) |
 | `DELETE` | `/leader/{leader_id}` | Remove a leader and their reference image |
 
 **Example — Full leader pipeline:**
@@ -129,7 +153,7 @@ curl -X POST http://localhost:8000/leader \
   }'
 ```
 
-For curl examples covering all 6 generation endpoints with enum references and troubleshooting, see [docs/api-examples.md](docs/api-examples.md).
+For curl examples covering all 6 generation endpoints with enum references and troubleshooting, see [docs/guides/api-examples.md](docs/guides/api-examples.md).
 
 ### Structure Tiles
 
@@ -227,10 +251,10 @@ Background tile responses use `background_tile_id`. All responses include the su
 
 ## Architecture
 
-See [docs/architecture.md](docs/architecture.md) for the full system architecture,
+See [docs/architecture/architecture.md](docs/architecture/architecture.md) for the full system architecture,
 component breakdown, workflow templates, and generation mode documentation.
 
-For project structure, see [docs/architecture.md §4](docs/architecture.md#4-component-architecture).
+For project structure, see [docs/architecture/architecture.md §4](docs/architecture/architecture.md#4-component-architecture).
 
 ---
 
@@ -328,7 +352,7 @@ This drops and recreates all tables. **Warning: this deletes all data.**
 
 ### Production Notes
 - **SQLite** is used exclusively. WAL journal mode enables safe concurrent reads and writes. For deployments with multiple worker processes, use a reverse proxy with sticky sessions.
-- Multi-worker: run behind `gunicorn` with `uvicorn` workers (not yet configured — see [docs/next_steps.md](docs/next_steps.md)), or use a process manager.
+- Multi-worker: run behind `gunicorn` with `uvicorn` workers (not yet configured — see [docs/project/next_steps.md](docs/project/next_steps.md)), or use a process manager.
 
 ### Common Issues
 | Symptom | Likely Cause | Fix |

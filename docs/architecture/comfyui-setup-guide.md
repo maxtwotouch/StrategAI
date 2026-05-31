@@ -339,7 +339,7 @@ If the model loads and an image appears, ComfyUI is correctly configured.
 ### 5.3 Run validation prompts
 
 The project includes 15 pre-built test prompts in
-[`docs/validation-prompts.md`](validation-prompts.md).  Copy each prompt into
+[`docs/validation-prompts.md`](../guides/validation-prompts.md).  Copy each prompt into
 its corresponding workflow and verify the output looks reasonable.
 
 For automated testing via `curl`:

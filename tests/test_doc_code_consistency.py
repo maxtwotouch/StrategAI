@@ -22,7 +22,7 @@ class TestLeaderDocEnums:
 
     @pytest.fixture(scope="class")
     def doc_text(self) -> str:
-        path = DOCS_DIR / "leader-prompt-guide.md"
+        path = DOCS_DIR / "guides" / "leader-prompt-guide.md"
         assert path.exists(), f"Missing: {path}"
         return path.read_text()
 
@@ -62,7 +62,7 @@ class TestTileDocEnums:
 
     @pytest.fixture(scope="class")
     def doc_text(self) -> str:
-        path = DOCS_DIR / "tile-prompt-guide.md"
+        path = DOCS_DIR / "guides" / "tile-prompt-guide.md"
         assert path.exists(), f"Missing: {path}"
         return path.read_text()
 
@@ -127,7 +127,7 @@ class TestUnitDocEnums:
 
     @pytest.fixture(scope="class")
     def doc_text(self) -> str:
-        path = DOCS_DIR / "unit-prompt-guide.md"
+        path = DOCS_DIR / "guides" / "unit-prompt-guide.md"
         assert path.exists(), f"Missing: {path}"
         return path.read_text()
 

@@ -62,7 +62,7 @@ All 4 workflows share the same Flux2-native node architecture. This is fundament
 ```mermaid
 graph TD
     A[UNETLoader<br/>flux-2-klein-4b-fp8] --> D[SamplerCustomAdvanced]
-    B[CLIPLoader<br/>qwen_3_4b, type:flux2] --> C[CLIPTextEncode<br/>Positive Prompt]
+    B[CLIPLoader<br/>qwen_3_4b] --> C[CLIPTextEncode<br/>Positive Prompt]
     C --> F[FluxGuidance<br/>guidance: 2.5-8]
     F --> E[CFGGuider<br/>cfg: 1.0]
     A --> E

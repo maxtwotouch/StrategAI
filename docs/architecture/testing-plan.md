@@ -1,12 +1,14 @@
 
+> 📘 This document is a supplementary reference. For the full project report — including test suite evaluation and coverage analysis — see [`project-report.md`](../project-report.md).
+
 > **⚠️ This is a forward-looking testing roadmap, not a description of the current test suite.**
-> The actual test suite has ~342 tests across 24 files in `tests/`. Tests described
+> The actual test suite has **547 tests** across **36 test files** in `tests/`. Tests described
 > below that are NOT yet implemented are marked with `[PLANNED]`. File paths in this
 > document use a flat `tests/` naming convention; the actual suite uses subdirectories
 > (`tests/leader/`, `tests/tile/`, `tests/unit/`).
 >
 > **Current test coverage by area** (what actually exists today):
-> - API endpoints: `tests/test_main.py` (58 tests) — all 33 endpoints covered
+> - API endpoints: `tests/test_main.py` (58 tests) — all 35 endpoints covered
 > - Database: `tests/test_database.py` (18 tests) — all 7 tables covered
 > - Storage: `tests/test_storage.py` (13 tests) — LRU cache + disk fallback
 > - Static catalog: `tests/test_static_catalog.py` (23 tests) — full scan/resolve
@@ -21,6 +23,66 @@
 > **Key gaps** (no tests exist yet): inpainting, generator-factory dispatch,
 > dedicated E2E pipeline flows, dedicated error handling, mock-based ComfyUI
 > WebSocket lifecycle tests.
+>
+> ---
+>
+> ## Test File Inventory
+>
+> | # | File | Purpose |
+> |---|------|---------|
+> | 1 | `tests/conftest.py` | Shared fixtures: temp project root, in-memory SQLite, AssetStore, StaticCatalog, httpx async client, mock ComfyUI client, sample requests/PNG |
+> | 2 | `tests/test_main.py` | API endpoint happy-path tests (placeholder mode) — all 35 endpoints |
+> | 3 | `tests/test_database.py` | Database models, CRUD, FK constraints, connection lifecycle |
+> | 4 | `tests/test_storage.py` | AssetStore: save/retrieve, LRU cache, disk fallback, eviction |
+> | 5 | `tests/test_storage_error_paths.py` | Storage error handling: disk full, permission denied, corruption |
+> | 6 | `tests/test_static_catalog.py` | StaticCatalog: scan, resolve, fallback, edge cases |
+> | 7 | `tests/test_config.py` | Settings: YAML defaults, .env overrides, mode dispatch |
+> | 8 | `tests/test_comfyui_integration.py` | ComfyUIClient: HTTP + WebSocket mock lifecycle |
+> | 9 | `tests/test_comfyui_loadbalancer.py` | LoadBalancer: multi-node routing, health checks, failover |
+> | 10 | `tests/test_workflow_patching.py` | Workflow JSON patching: prompt injection, seed, dimensions |
+> | 11 | `tests/test_concurrency.py` | Concurrent operations, race conditions, duplicate detection |
+> | 12 | `tests/test_response_consistency.py` | Response schema validation across all endpoints |
+> | 13 | `tests/test_edge_cases.py` | Boundary conditions: empty inputs, max-length strings, special chars |
+> | 14 | `tests/test_generator_dispatch.py` | Generator factory: mode dispatch, fallback chains |
+> | 15 | `tests/test_live_generation.py` | Live ComfyUI integration (requires GPU — skipped in CI) |
+> | 16 | `tests/test_websocket_lifecycle_extended.py` | WebSocket reconnect, timeout, message parsing edge cases |
+> | 17 | `tests/test_spawn_script.py` | ComfyUI spawn script validation |
+> | 18 | `tests/test_doc_code_consistency.py` | Doc-code consistency: verifies documented examples match actual code |
+> | 19 | `tests/leader/test_leader_engine.py` | Leader engine: splash/profile/action generation, img2img pipeline |
+> | 20 | `tests/leader/test_leader_models.py` | Leader Pydantic models: request/response validation |
+> | 21 | `tests/leader/test_leader_prompts.py` | Leader prompt builders: enum prose injection, template assembly |
+> | 22 | `tests/leader/test_leader_registry.py` | LeaderRegistry: CRUD, reference image management |
+> | 23 | `tests/leader/test_registries.py` | Cross-family registry tests: ID generation, slugging |
+> | 24 | `tests/tile/test_tile_engine.py` | Tile engine: structure/object/terrain generation, placeholder rendering |
+> | 25 | `tests/tile/test_tile_models.py` | Tile Pydantic models: enum validation, field constraints |
+> | 26 | `tests/tile/test_tile_prompts.py` | Tile prompt builders: template wrapping, description injection |
+> | 27 | `tests/tile/test_tile_registry.py` | Structure/Object/Terrain registries: CRUD, ID format |
+> | 28 | `tests/tile/test_background_engine.py` | Background tile engine: seamless tiling, generation |
+> | 29 | `tests/unit/test_unit_engine.py` | Unit engine: 4-directional sprite generation, fallback |
+> | 30 | `tests/unit/test_unit_models.py` | Unit Pydantic models: type validation, directions schema |
+> | 31 | `tests/unit/test_unit_prompts.py` | Unit prompt builders: direction-aware prose, transparency |
+> | 32 | `tests/unit/test_unit_registry.py` | UnitRegistry: CRUD, directional image tracking |
+>
+> ---
+>
+> ## Fixture Reference
+>
+> All fixtures are defined in `tests/conftest.py`.
+>
+> | Fixture | Scope | What It Provides |
+> |---------|-------|------------------|
+> | `tmp_project_root` | function | Temp directory with minimal project skeleton: `static_tiles/`, `generated_assets/`, `splash_assets/`, `leader_references/`, `config.yaml`, `config/prompt_templates.json` |
+> | `test_settings` | function | `Settings` instance pointed at `tmp_project_root`; all generation modes forced to `placeholder` |
+> | `test_db` | function | In-memory SQLite engine via `StaticPool` with all tables created; monkeypatches `src.database.engine` and `SessionLocal` across all modules |
+> | `db_session` | function | SQLAlchemy session from `test_db` — auto-closed after test |
+> | `test_store` | function | `AssetStore` pointed at temp `generated_assets/` dir; `max_cache_size=10` |
+> | `test_catalog_dir` | function | Controlled `static_tiles/` tree with sample PNGs for background_tile, structure, nature_object, character_sprite, unit |
+> | `test_catalog` | function | `StaticCatalog` scanning the `test_catalog_dir` tree |
+> | `async_client` | function | `httpx.AsyncClient` against the FastAPI app with full lifespan (placeholder mode, rate limiting disabled) |
+> | `mock_comfyui_client` | function | `AsyncMock` wrapping `ComfyUIClient` with `base_url` and `timeout` preset |
+> | `sample_requests` | function | Dict of valid request objects: `StructureRequest`, `ObjectRequest`, `TerrainRequest`, `GenerationRequest`, `SplashRequest`, `LeaderRequest`, `UnitRequest` |
+> | `sample_png` | function | Minimal 16×16 RGBA `PIL.Image` (red fill) |
+> | `test_db_file` | function | Persistent on-disk SQLite file (temp) — used for schema-mismatch and `DATABASE_RESET` escape-hatch tests |
 >
 > ---
 >
