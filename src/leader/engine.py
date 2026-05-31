@@ -161,7 +161,8 @@ class LeaderEngine:
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
         try:
-            ref_img = Image.open(ref_path).convert("RGBA")
+            with Image.open(ref_path) as fh:
+                ref_img = fh.convert("RGBA")
         except Exception as exc:
             raise RuntimeError(
                 f"Failed to open reference image at {ref_path}: {exc}"
@@ -256,7 +257,8 @@ class LeaderEngine:
         if not ref_path.exists():
             raise RuntimeError(f"Reference image missing: {ref_path}")
         try:
-            ref_img = Image.open(ref_path).convert("RGBA")
+            with Image.open(ref_path) as fh:
+                ref_img = fh.convert("RGBA")
         except Exception as exc:
             raise RuntimeError(
                 f"Failed to open reference image at {ref_path}: {exc}"
@@ -374,7 +376,8 @@ class LeaderEngine:
             if not ref_path.exists():
                 raise RuntimeError(f"Reference image missing: {ref_path}")
             try:
-                ref_img = Image.open(ref_path).convert("RGBA")
+                with Image.open(ref_path) as fh:
+                    ref_img = fh.convert("RGBA")
             except Exception as exc:
                 raise RuntimeError(
                     f"Failed to open reference image at {ref_path}: {exc}"

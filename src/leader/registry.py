@@ -215,6 +215,9 @@ class LeaderRegistry:
         """Remove a leader and clean up their reference image and all generated assets.
 
         Returns True if a leader was deleted, False if not found.
+        All DB operations happen in a SINGLE transaction with ONE commit,
+        preventing orphaned AssetRecords.  File cleanup is best-effort after
+        the DB commit succeeds.
         """
         # Clean up reference image
         ref_name = f"ref_{leader_id}.png"
@@ -226,44 +229,45 @@ class LeaderRegistry:
             leader = db.query(LeaderRecord).filter(
                 LeaderRecord.leader_id == leader_id
             ).first()
-            if leader:
-                # Collect all image filenames to clean up from disk.
-                # Capture splash_image_id before deletion — the object
-                # is expired after commit.
-                image_ids_to_clean = []
-                splash_asset_id = leader.splash_image_id
-                if splash_asset_id:
-                    image_ids_to_clean.append(splash_asset_id)
-                if leader.profile_image_id:
-                    image_ids_to_clean.append(leader.profile_image_id)
-                if leader.action_image_ids:
-                    image_ids_to_clean.extend(leader.action_image_ids)
+            if not leader:
+                return False
 
-                db.delete(leader)
-                _execute_with_busy_retry(db, db.commit)
+            # 1. Collect ALL AssetRecord IDs to delete from DB:
+            #    splash, profile, and every action image.
+            asset_ids_to_delete: list[str] = []
+            if leader.splash_image_id:
+                asset_ids_to_delete.append(leader.splash_image_id)
+            if leader.profile_image_id:
+                asset_ids_to_delete.append(leader.profile_image_id)
+            if leader.action_image_ids:
+                asset_ids_to_delete.extend(leader.action_image_ids)
 
-                # Best-effort cleanup of generated image files on disk
-                for image_id in image_ids_to_clean:
-                    try:
-                        store.delete(image_id)
-                    except (FileNotFoundError, OSError) as exc:
-                        logger.warning(
-                            "Failed to delete image file %s for leader %s: %s",
-                            image_id, leader_id, exc,
-                        )
+            # Also collect image IDs for best-effort file cleanup after commit
+            image_ids_to_clean = list(asset_ids_to_delete)
 
-                # Delete the associated splash AssetRecord now that the FK
-                # allows SET NULL (nullable=True).  Profile/action
-                # AssetRecords are cleaned up via ON DELETE CASCADE when
-                # the leader row is removed.
-                if splash_asset_id:
-                    splash_asset = db.query(AssetRecord).filter(
-                        AssetRecord.id == splash_asset_id
-                    ).first()
-                    if splash_asset:
-                        db.delete(splash_asset)
-                        _execute_with_busy_retry(db, db.commit)
+            # 2. Delete the LeaderRecord
+            db.delete(leader)
 
-                logger.info("Leader deleted: %s", leader_id)
-                return True
-        return False
+            # 3. Delete ALL associated AssetRecords by ID
+            for asset_id in asset_ids_to_delete:
+                asset = db.query(AssetRecord).filter(
+                    AssetRecord.id == asset_id
+                ).first()
+                if asset:
+                    db.delete(asset)
+
+            # 4. Single commit with busy retry (atomic)
+            _execute_with_busy_retry(db, db.commit)
+
+            # 5. Best-effort cleanup of generated image files on disk
+            for image_id in image_ids_to_clean:
+                try:
+                    store.delete(image_id)
+                except (FileNotFoundError, OSError) as exc:
+                    logger.warning(
+                        "Failed to delete image file %s for leader %s: %s",
+                        image_id, leader_id, exc,
+                    )
+
+            logger.info("Leader deleted: %s", leader_id)
+            return True

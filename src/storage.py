@@ -112,13 +112,15 @@ class AssetStore:
         """Helper to get a PIL Image for Copy-on-Write operations."""
         data = self.get_image_bytes(filename)
         if data:
-            return Image.open(io.BytesIO(data)).convert("RGBA")
+            with Image.open(io.BytesIO(data)) as img:
+                return img.convert("RGBA")
         raise FileNotFoundError(f"Asset {filename} not found.")
 
     def save_from_path(self, filename: str, src_path: str) -> None:
         """Convenience: open a PNG from disk and save it through the store."""
-        img = Image.open(src_path).convert("RGBA")
-        self.save_image(filename, img)
+        with Image.open(src_path) as img:
+            converted = img.convert("RGBA")
+        self.save_image(filename, converted)
 
     def delete(self, filename: str) -> bool:
         """Remove an image from disk and the in-memory cache.

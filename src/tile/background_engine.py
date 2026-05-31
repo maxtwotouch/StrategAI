@@ -298,7 +298,8 @@ class _PlaceholderBackgroundTileEngine:
 def _load_and_save(src_path: str) -> str:
     """Open a PNG from disk, save to AssetStore, return the UUID filename."""
     filename = f"{uuid.uuid4()}.png"
-    img = Image.open(src_path).convert("RGBA")
+    with Image.open(src_path) as img_src:
+        img = img_src.convert("RGBA")
     if img.size != (GAME_ASSET_SIZE, GAME_ASSET_SIZE):
         img = img.resize((GAME_ASSET_SIZE, GAME_ASSET_SIZE), Image.LANCZOS)
     store.save_image(filename, img)

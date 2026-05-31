@@ -16,7 +16,7 @@ from src.config import settings, DeploymentMode
 from src.database import SessionLocal, AssetRecord, LeaderRecord, verify_db_connectivity, verify_schema_health, reset_database
 from src.comfyui_client import close_comfyui_client, get_comfyui_loadbalancer
 from src.leader.engine import LeaderEngine, StaticLeaderEngine
-from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo
+from src.leader.models import LeaderRequest, LeaderResponse, LeaderInfo, LeaderCatalog
 from src.leader.registry import LeaderRegistry
 from src.static_catalog import catalog as static_catalog
 from src.storage import store
@@ -48,14 +48,14 @@ from src.unit.registry import UnitRegistry
 from src.prompt_templates import validate_all_templates
 
 # TODO(production): Switch to structured JSON logging for production observability.
-# Replace the default logging.Formatter with something like python-json-logger.
-# Format should include: timestamp, level, logger, message, request_id, endpoint, status_code, elapsed_ms.
+# Format includes: timestamp, level, logger, message, request_id, exception.
 
 # Setup production logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -86,12 +86,18 @@ class ModesResponse(BaseModel):
 
 
 class CatalogResponse(BaseModel):
-    """GET /catalog response — available static asset families and types."""
+    """GET /catalog response — available static asset families and types.
+
+    Each family reports both static-asset availability (filesystem) and
+    valid enum values (code) so clients can discover what's usable.
+    """
     background_tile: dict
     structure: dict
     nature_object: dict
     character_sprite: dict
     unit: dict
+    terrain: dict
+    object: dict
 
 
 # Leader engine (initialized in lifespan — comfyui or static mode)
@@ -114,6 +120,27 @@ unit_engine: UnitEngine | StaticUnitEngine | None = None
 
 # Background tile engine (initialized in lifespan)
 background_tile_engine: BackgroundTileEngine | StaticBackgroundTileEngine | None = None
+
+
+def _handle_warmup_result(task: asyncio.Task) -> None:
+    """Log the result of the ComfyUI warmup background task.
+
+    If the warmup failed, log a critical error so operators are alerted.
+    Otherwise log success at info level.
+    """
+    try:
+        exc = task.exception()
+    except asyncio.CancelledError:
+        logger.warning("ComfyUI warmup task was cancelled.")
+        return
+    except Exception as e:
+        logger.critical("ComfyUI warmup failed with unhandled exception: %s", e, exc_info=True)
+        return
+
+    if exc is None:
+        logger.info("ComfyUI warmup completed successfully")
+    else:
+        logger.critical("ComfyUI warmup failed: %s", exc, exc_info=exc)
 
 
 @asynccontextmanager
@@ -479,17 +506,15 @@ async def lifespan(app: FastAPI):
         and settings.comfyui.warmup_enabled
     ):
         async def _run_warmup() -> None:
-            try:
-                node = await lb._select_node()
-                ok, _ = await node.client.warmup(
-                    settings.comfyui.warmup_workflow
-                )
-                if ok:
-                    logger.info("ComfyUI model warmup completed successfully")
-            except Exception as exc:
-                logger.warning("Model warmup skipped: %s", exc)
+            node = await lb._select_node()
+            ok, _ = await node.client.warmup(
+                settings.comfyui.warmup_workflow
+            )
+            if not ok:
+                raise RuntimeError("ComfyUI warmup returned non-OK status")
 
-        asyncio.create_task(_run_warmup())
+        warmup_task = asyncio.create_task(_run_warmup())
+        warmup_task.add_done_callback(_handle_warmup_result)
 
     logger.info(
         "Application started.  Modes: %s",
@@ -520,12 +545,35 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-#  Request ID middleware — injects a correlation ID for production tracing
+#  Middleware registration order (FIRST registered = OUTERMOST in execution):
+#
+#  1. CORSMiddleware        — handles OPTIONS preflight BEFORE anything else
+#  2. RequestIDMiddleware    — injects correlation ID for every request
+#  3. APIKeyMiddleware       — validates X-API-Key header
+#  4. RequestSizeLimitMiddleware — rejects oversized request bodies
+#  5. RateLimitMiddleware    — innermost, closest to route handler
+#
+#  CORSMiddleware MUST be outermost so browser CORS preflight OPTIONS
+#  requests are never rate-limited or blocked by auth/size checks.
 # ---------------------------------------------------------------------------
 
 from fastapi import Request as FastAPIRequest
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse as StarletteJSONResponse
+
+# 1. CORS middleware — outermost: handles OPTIONS preflight before anything else
+#    Configure origins via config.yaml → server.cors_origins
+#    or env var SERVER__CORS_ORIGINS (JSON array).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.server.cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    max_age=600,
+)
+
+# 2. Request ID middleware — injects a correlation ID for production tracing
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
@@ -549,9 +597,8 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestIDMiddleware)
 
 
-# ---------------------------------------------------------------------------
-#  API key authentication middleware (optional — disabled when api_key is "")
-# ---------------------------------------------------------------------------
+# 3. API key authentication middleware (optional — disabled when api_key is "")
+
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """Validate the ``X-API-Key`` header against the configured key.
@@ -568,7 +615,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         # Skip auth if no key configured, or for health/readiness probes and asset serving
         if not api_key or request.url.path in ("/health", "/health/ready") or request.url.path.startswith("/assets/"):
             return await call_next(request)
-        if request.headers.get("X-API-Key") != api_key:
+        if not secrets.compare_digest(request.headers.get("X-API-Key") or "", api_key):
             return StarletteJSONResponse(
                 {"detail": "Invalid or missing API key"},
                 status_code=401,
@@ -578,18 +625,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(APIKeyMiddleware)
 
-# CORS middleware — configure origins via config.yaml → server.cors_origins
-# or env var SERVER__CORS_ORIGINS (JSON array).
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.server.cors_origins,
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    max_age=600,
-)
-
-# Request body size limit to prevent DOS
+# 4. Request body size limit to prevent DOS
 
 
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
@@ -742,22 +778,63 @@ async def get_asset(filename: str):
 
 @app.get("/catalog", response_model=CatalogResponse)
 async def get_catalog():
-    """Return available tile types, structure subtypes, and unit types from static_tiles/."""
+    """Return available static assets AND valid enum values for all families.
+
+    Each family reports:
+    - ``static_available``: whether static PNGs exist on disk
+    - ``static_types`` / ``static_subtypes``: which types are available from static_tiles/
+    - ``enum_values``: all valid enum choices usable with the API
+    """
+    from src.tile.background_models import TileType
+    from src.tile.models import (
+        ObjectCategory, Biome, Season,
+        TerrainCategory, TerrainScale, TerrainMaterial,
+        StructureCategory, StructureStyle, StructureCondition, StructureScale,
+    )
+    from src.unit.models import UnitType
+
     return {
         "background_tile": {
-            "tile_types": static_catalog.list_tile_types(),
+            "static_available": static_catalog.has_any("background_tile"),
+            "static_types": static_catalog.list_tile_types(),
+            "enum_values": [e.value for e in TileType],
         },
         "structure": {
-            "subtypes": static_catalog.list_structure_subtypes(),
+            "static_available": static_catalog.has_any("structure"),
+            "static_subtypes": static_catalog.list_structure_subtypes(),
+            "enum_values": {
+                "categories": [e.value for e in StructureCategory],
+                "styles": [e.value for e in StructureStyle],
+                "conditions": [e.value for e in StructureCondition],
+                "scales": [e.value for e in StructureScale],
+            },
         },
         "nature_object": {
-            "available": static_catalog.has_any("nature_object"),
+            "static_available": static_catalog.has_any("nature_object"),
         },
         "character_sprite": {
-            "available": static_catalog.has_any("character_sprite"),
+            "static_available": static_catalog.has_any("character_sprite"),
         },
         "unit": {
-            "unit_types": static_catalog.list_unit_types(),
+            "static_available": static_catalog.has_any("unit"),
+            "static_types": static_catalog.list_unit_types(),
+            "enum_values": [e.value for e in UnitType],
+        },
+        "terrain": {
+            "static_available": False,  # terrain has no static_tiles/ folder
+            "enum_values": {
+                "categories": [e.value for e in TerrainCategory],
+                "scales": [e.value for e in TerrainScale],
+                "materials": [e.value for e in TerrainMaterial],
+            },
+        },
+        "object": {
+            "static_available": False,  # nature_object is the static counterpart
+            "enum_values": {
+                "categories": [e.value for e in ObjectCategory],
+                "biomes": [e.value for e in Biome],
+                "seasons": [e.value for e in Season],
+            },
         },
     }
 
@@ -926,7 +1003,7 @@ async def generate_leader(request: LeaderRequest):
         raise HTTPException(500, detail="Internal server error")
 
 
-@app.get("/leader", responses={200: {"description": "List of registered leaders"}})
+@app.get("/leader", response_model=list[LeaderInfo], responses={200: {"description": "List of registered leaders"}})
 async def list_leaders(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10000),
@@ -950,6 +1027,20 @@ async def list_leaders(
         for r in records
     ]
     return _paginated_response(items, total_count=total, limit=limit, offset=offset)
+
+
+@app.get("/leader/catalog", response_model=LeaderCatalog)
+def get_leader_catalog():
+    """Return valid enum values for leader generation."""
+    from src.leader.models import Archetype, Culture, TimeOfDay, Mood, ActionCategory
+    return LeaderCatalog(
+        archetypes=[e.value for e in Archetype],
+        cultures=[e.value for e in Culture],
+        times_of_day=[e.value for e in TimeOfDay],
+        moods=[e.value for e in Mood],
+        action_categories=[e.value for e in ActionCategory],
+        asset_types=["splash", "profile", "action"],
+    )
 
 
 @app.get("/leader/{leader_id}", response_model=LeaderInfo)
@@ -1012,7 +1103,7 @@ async def generate_structure(request: StructureRequest):
         raise HTTPException(500, detail="Internal server error")
 
 
-@app.get("/structure", responses={200: {"description": "List of generated structures"}})
+@app.get("/structure", response_model=list[StructureResponse], responses={200: {"description": "List of generated structures"}})
 async def list_structures(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10000),
@@ -1106,7 +1197,7 @@ async def generate_object(request: ObjectRequest):
         raise HTTPException(500, detail="Internal server error")
 
 
-@app.get("/object", responses={200: {"description": "List of generated objects"}})
+@app.get("/object", response_model=list[ObjectResponse], responses={200: {"description": "List of generated objects"}})
 async def list_objects(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10000),
@@ -1197,7 +1288,7 @@ async def generate_terrain(request: TerrainRequest):
         raise HTTPException(500, detail="Internal server error")
 
 
-@app.get("/terrain", responses={200: {"description": "List of generated terrain tiles"}})
+@app.get("/terrain", response_model=list[TerrainResponse], responses={200: {"description": "List of generated terrain tiles"}})
 async def list_terrains(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10000),
@@ -1297,7 +1388,7 @@ async def generate_unit(request: UnitRequest):
         raise HTTPException(500, detail="Internal server error")
 
 
-@app.get("/unit", responses={200: {"description": "List of generated unit sprites"}})
+@app.get("/unit", response_model=list[UnitResponse], responses={200: {"description": "List of generated unit sprites"}})
 async def list_units(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10000),
@@ -1407,7 +1498,7 @@ async def generate_background_tile(request: BackgroundTileRequest):
         raise HTTPException(500, detail="Internal server error")
 
 
-@app.get("/background_tile", responses={200: {"description": "List of generated background tiles"}})
+@app.get("/background_tile", response_model=list[BackgroundTileResponse], responses={200: {"description": "List of generated background tiles"}})
 async def list_background_tiles(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=10000),
@@ -1440,9 +1531,10 @@ async def list_background_tiles(
 
 @app.get("/background_tile/catalog", response_model=BackgroundTileCatalog)
 async def background_tile_catalog():
-    """Return available background tile types."""
+    """Return valid background tile types (enum values, not filesystem state)."""
+    from src.tile.background_models import TileType
     return BackgroundTileCatalog(
-        tile_types=sorted(static_catalog.list_tile_types()),
+        tile_types=[e.value for e in TileType],
     )
 
 

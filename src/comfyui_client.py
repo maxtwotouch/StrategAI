@@ -305,7 +305,8 @@ class ComfyUIClient:
                         subfolder=img_info.get("subfolder", ""),
                         folder_type=img_info.get("type", "output"),
                     )
-                    img = Image.open(io.BytesIO(data)).convert("RGBA")
+                    with Image.open(io.BytesIO(data)) as pil_img:
+                        img = pil_img.convert("RGBA")
                     _validate_downloaded_image(img, img_info["filename"])
                     elapsed = time.monotonic() - _start_time
                     logger.info(

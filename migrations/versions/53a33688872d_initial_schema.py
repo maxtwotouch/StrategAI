@@ -1,8 +1,11 @@
 """initial_schema
 
 Revision ID: 53a33688872d
-Revises: 
+Revises:
 Create Date: 2026-05-30 09:33:08.157006
+
+Consolidated first-release schema — creates all 7 tables with all
+indexes (including the 4 that were previously in a follow-up migration).
 
 """
 from typing import Sequence, Union
@@ -38,6 +41,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_asset_records_asset_family'), 'asset_records', ['asset_family'], unique=False)
     op.create_index(op.f('ix_asset_records_base_image_id'), 'asset_records', ['base_image_id'], unique=False)
+    op.create_index(op.f('ix_asset_records_created_at'), 'asset_records', ['created_at'], unique=False)
     op.create_index(op.f('ix_asset_records_id'), 'asset_records', ['id'], unique=False)
     op.create_table('background_tile_records',
     sa.Column('background_tile_id', sa.String(), nullable=False),
@@ -49,6 +53,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['image_id'], ['asset_records.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('background_tile_id')
     )
+    op.create_index(op.f('ix_background_tile_records_created_at'), 'background_tile_records', ['created_at'], unique=False)
+    op.create_index(op.f('ix_background_tile_records_image_id'), 'background_tile_records', ['image_id'], unique=False)
     op.create_index(op.f('ix_background_tile_records_tile_type'), 'background_tile_records', ['tile_type'], unique=False)
     op.create_table('leader_records',
     sa.Column('leader_id', sa.String(), nullable=False),
@@ -70,6 +76,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['splash_image_id'], ['asset_records.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('leader_id')
     )
+    op.create_index(op.f('ix_leader_records_created_at'), 'leader_records', ['created_at'], unique=False)
     op.create_index(op.f('ix_leader_records_leader_id'), 'leader_records', ['leader_id'], unique=False)
     op.create_index(op.f('ix_leader_records_splash_image_id'), 'leader_records', ['splash_image_id'], unique=False)
     op.create_table('object_records',
@@ -173,11 +180,15 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_object_records_created_at'), table_name='object_records')
     op.drop_index(op.f('ix_object_records_category'), table_name='object_records')
     op.drop_table('object_records')
+    op.drop_index(op.f('ix_leader_records_created_at'), table_name='leader_records')
     op.drop_index(op.f('ix_leader_records_splash_image_id'), table_name='leader_records')
     op.drop_index(op.f('ix_leader_records_leader_id'), table_name='leader_records')
     op.drop_table('leader_records')
+    op.drop_index(op.f('ix_background_tile_records_created_at'), table_name='background_tile_records')
+    op.drop_index(op.f('ix_background_tile_records_image_id'), table_name='background_tile_records')
     op.drop_index(op.f('ix_background_tile_records_tile_type'), table_name='background_tile_records')
     op.drop_table('background_tile_records')
+    op.drop_index(op.f('ix_asset_records_created_at'), table_name='asset_records')
     op.drop_index(op.f('ix_asset_records_id'), table_name='asset_records')
     op.drop_index(op.f('ix_asset_records_base_image_id'), table_name='asset_records')
     op.drop_index(op.f('ix_asset_records_asset_family'), table_name='asset_records')

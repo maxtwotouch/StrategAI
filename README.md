@@ -13,7 +13,7 @@ An on-demand generative AI microservice that produces pixel-art game assets for 
 pip install -e ".[dev]"
 
 # Run (placeholder mode — no GPU needed)
-uvicorn src.main:app --host 0.0.0.0 --port 8000
+uvicorn src.main:app --host 127.0.0.1 --port 8000
 
 # Verify
 curl http://localhost:8000/health
@@ -270,14 +270,14 @@ pip install -e ".[dev]"
 
 ### Run (placeholder mode — no GPU)
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn src.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 All endpoints work with procedural placeholders.
 
 ### Run (comfyui mode)
 ```bash
 echo 'COMFYUI__BASE_URL=http://your-comfyui:8188' > .env
-uvicorn src.main:app --host 0.0.0.0 --port 8000
+uvicorn src.main:app --host 127.0.0.1 --port 8000
 ```
 
 ### Run Tests
@@ -307,7 +307,7 @@ The service runs **Alembic migrations automatically** at startup (`alembic upgra
 
 If the database schema gets out of sync (e.g., after a rollback), restart with:
 ```bash
-DATABASE_RESET=true uvicorn src.main:app --host 0.0.0.0 --port 8000
+DATABASE_RESET=true uvicorn src.main:app --host 127.0.0.1 --port 8000
 ```
 This drops and recreates all tables. **Warning: this deletes all data.**
 
@@ -343,7 +343,7 @@ Steps to deploy the service in a production environment:
 5. **Harden the host**: Bind to `127.0.0.1` if only the reverse proxy needs access (`SERVER__HOST=127.0.0.1`).
 6. **Monitor health**: Poll `GET /health` every 15–30 seconds. A `degraded` status means ComfyUI is unreachable but the API is still serving.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a full step-by-step deployment guide including nginx configuration.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for a full step-by-step deployment guide including nginx configuration.
 
 ---
 
@@ -355,7 +355,7 @@ for nested keys.  Defaults come from `config.yaml`; `.env` overrides them.
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `DEPLOYMENT_MODE` | `development` | `production` enables strict safety checks |
-| `SERVER__HOST` | `0.0.0.0` (in config.yaml) | Bind address; use `127.0.0.1` behind a reverse proxy |
+| `SERVER__HOST` | `127.0.0.1` (in config.yaml) | Bind address; use `127.0.0.1` behind a reverse proxy |
 | `SERVER__PORT` | `8000` (in config.yaml) | Listening port |
 | `SERVER__API_KEY` | `""` (empty) | When non-empty, all requests require `X-API-Key` header (except `/health` and `/assets/`) |
 | `SERVER__CORS_ORIGINS` | `["http://localhost:3000"]` | JSON array of allowed origins |

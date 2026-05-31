@@ -147,7 +147,8 @@ class StaticUnitEngine:
             return await _PlaceholderUnitEngine().generate(req)
 
         filename = f"{uuid.uuid4()}.png"
-        img = Image.open(path).convert("RGBA")
+        with Image.open(path) as img_src:
+            img = img_src.convert("RGBA")
         store.save_image(filename, img)
 
         try:

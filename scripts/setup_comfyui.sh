@@ -57,8 +57,7 @@ MODELS=(
     "unet|flux-2-klein-4b-fp8.safetensors|black-forest-labs/FLUX.2-klein-4b-fp8|flux-2-klein-4b-fp8.safetensors|~6.0 GB|5000000000"
     "clip|qwen_3_4b.safetensors|Comfy-Org/vae-text-encorder-for-flux-klein-4b|split_files/text_encoders/qwen_3_4b.safetensors|~8.0 GB|7000000000"
     "vae|flux2-vae.safetensors|Comfy-Org/vae-text-encorder-for-flux-klein-4b|split_files/vae/flux2-vae.safetensors|~320 MB|300000000"
-    # LoRA placeholder — uncomment and update when available:
-    # "loras|<tdp_lora_filename>|<repo>|<filepath>|~?? MB|1000000"
+    "loras|flux2_klein_4b_lora_000002400.safetensors|black-forest-labs/FLUX.2-klein-4b-fp8|flux2_klein_4b_lora_000002400.safetensors|~250 MB|200000000"
 )
 
 # ---- Helper functions -------------------------------------------------------

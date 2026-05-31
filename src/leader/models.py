@@ -278,3 +278,17 @@ class LeaderInfo(BaseModel):
     action_urls: list[str] = []                       # multiple action scenes
     splash_seed: Optional[int] = None
     created_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Leader catalog (for GET /leader/catalog)
+# ---------------------------------------------------------------------------
+
+class LeaderCatalog(BaseModel):
+    """Valid enum values for leader generation."""
+    archetypes: list[str]
+    cultures: list[str]
+    times_of_day: list[str]
+    moods: list[str]
+    action_categories: list[str]
+    asset_types: list[str]

@@ -6,14 +6,21 @@ the entire frame with no white background isolation and use a separate
 ComfyUI workflow (``background_tile.json``) without the top-down LoRA.
 """
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 
 # ===========================================================================
-#  Valid tile types
+#  Tile type enum
 # ===========================================================================
 
-VALID_TILE_TYPES = {"water", "grass", "sand", "stone", "dirt"}
+
+class TileType(str, Enum):
+    WATER = "water"
+    GRASS = "grass"
+    SAND = "sand"
+    STONE = "stone"
+    DIRT = "dirt"
 
 
 # ===========================================================================
@@ -23,25 +30,14 @@ VALID_TILE_TYPES = {"water", "grass", "sand", "stone", "dirt"}
 class BackgroundTileRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tile_type: str = Field(
+    tile_type: TileType = Field(
         ...,
-        description=f"Ground texture type. One of: {', '.join(sorted(VALID_TILE_TYPES))}",
+        description=f"Ground texture type. One of: {', '.join(sorted(e.value for e in TileType))}",
     )
     seed: Optional[int] = Field(
         default=None,
         description="Deterministic seed for reproducibility. Random if omitted.",
     )
-
-    @field_validator("tile_type")
-    @classmethod
-    def validate_tile_type(cls, v: str) -> str:
-        v = v.strip().lower()
-        if v not in VALID_TILE_TYPES:
-            raise ValueError(
-                f"Unknown tile_type '{v}'. "
-                f"Must be one of: {', '.join(sorted(VALID_TILE_TYPES))}"
-            )
-        return v
 
 
 # ===========================================================================

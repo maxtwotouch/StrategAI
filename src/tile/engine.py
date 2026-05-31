@@ -455,7 +455,8 @@ def _load_and_save(src_path: str) -> str:
     if not os.path.isfile(src_path):
         raise FileNotFoundError(f"Static tile asset not found: {src_path}")
     try:
-        img = Image.open(src_path).convert("RGBA")
+        with Image.open(src_path) as img_src:
+            img = img_src.convert("RGBA")
     except Exception as exc:
         raise ValueError(
             f"Failed to open image at {src_path}: {exc}"
