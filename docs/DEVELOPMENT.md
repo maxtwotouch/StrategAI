@@ -173,10 +173,16 @@ require a restart.
 
 ### Audio assets (optional)
 
-Drop two MP3s into `frontend/public/audio/`:
+Drop MP3s into `frontend/public/audio/`:
 
-- `intro.mp3` — plays from Begin Campaign through the intro screen.
-- `ambient.mp3` — loops quietly under the war room after the intro is dismissed.
+- `ambient.mp3` — first track, starts on Begin Campaign.
+- `bards-tale.mp3` — playlist track.
+- `medieval-battle.mp3` — playlist track.
+
+The player starts the playlist on Begin Campaign, lowers volume when the intro
+is dismissed, and advances to the next track whenever the current one ends.
+Current bundled music is from OpenGameArt. Attribution and license details live in
+`frontend/public/audio/ATTRIBUTION.md`.
 
 Missing files don't break anything; the audio hook silently catches the load
 failure. Volume and crossfade tuning lives at the top of `frontend/lib/useAudio.ts`.

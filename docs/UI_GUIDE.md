@@ -269,12 +269,16 @@ Dismiss: `× Return`, Esc, click anywhere outside the panel.
 
 ## 6. Audio
 
-`lib/useAudio.ts` manages two `HTMLAudioElement`s:
+`lib/useAudio.ts` manages one `HTMLAudioElement` with a playlist:
 
 | Track | File | When | Default volume |
 |---|---|---|---:|
-| intro | `public/audio/intro.mp3` | Begin Campaign → intro dismiss | 0.60 |
-| ambient | `public/audio/ambient.mp3` | Intro dismiss → forever (loops) | 0.22 |
+| playlist | `public/audio/ambient.mp3` | Begin Campaign → intro dismiss | 0.60 |
+| playlist | `public/audio/bards-tale.mp3` | Auto-advances after current track ends | 0.22 |
+| playlist | `public/audio/medieval-battle.mp3` | Auto-advances after current track ends | 0.22 |
+
+The bundled music comes from OpenGameArt. Attribution and license details are recorded in
+`public/audio/ATTRIBUTION.md`.
 
 API surface:
 
@@ -283,12 +287,12 @@ const { muted, toggleMute, startIntro, startAmbient } = useAudio();
 ```
 
 - `startIntro()` is called inside the **Begin Campaign click handler** — that's
-  the user gesture that unlocks audio under browser autoplay rules. Plays the
-  intro track and ramps it in over 1.2s.
+  the user gesture that unlocks audio under browser autoplay rules. Starts the
+  playlist and ramps it in over 1.2s.
 - `startAmbient()` is called inside `dismissIntro()` — fires whether the
-  user clicks the CTA, taps the backdrop, or hits Esc/Enter/Space. Crossfades
-  intro → ambient over 2.4s.
-- `toggleMute()` flips mute on both elements; the choice persists in
+  user clicks the CTA, taps the backdrop, or hits Esc/Enter/Space. It lowers the
+  live track to ambient volume over 2.4s.
+- `toggleMute()` flips mute on the music element; the choice persists in
   `localStorage` under `inf3600:audioMuted`.
 
 Missing files are tolerated: `audio.play()` returns a rejected promise which
@@ -297,7 +301,7 @@ is silently caught. Volume ramps are clamped to `[0, 1]` to avoid
 drift.
 
 Tuning knobs at the top of `lib/useAudio.ts`:
-`INTRO_SRC`, `AMBIENT_SRC`, `INTRO_VOLUME`, `AMBIENT_VOLUME`,
+`MUSIC_TRACKS`, `INTRO_VOLUME`, `AMBIENT_VOLUME`,
 `INTRO_FADE_IN_MS`, `CROSSFADE_MS`.
 
 ---

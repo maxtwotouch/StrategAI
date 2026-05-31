@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Drop two MP3/OGG/WAV files into frontend/public/audio/ and the hook picks
-// them up. Missing files are tolerated — audio.play() rejects silently and
-// the game continues without sound.
-const INTRO_SRC = "/audio/intro.mp3";
-const AMBIENT_SRC = "/audio/ambient.mp3";
+// Drop MP3/OGG/WAV files into frontend/public/audio/ and the hook picks them
+// up. Missing files are tolerated — audio.play() rejects silently and the game
+// continues without sound.
+const MUSIC_TRACKS = [
+  "/audio/ambient.mp3",
+  "/audio/bards-tale.mp3",
+  "/audio/medieval-battle.mp3",
+];
 
 // Volume targets and crossfade duration. Tweak here.
 const INTRO_VOLUME = 0.6;
@@ -53,9 +56,10 @@ function rampVolume(
 }
 
 export function useAudio(): UseAudio {
-  const introRef = useRef<HTMLAudioElement | null>(null);
-  const ambientRef = useRef<HTMLAudioElement | null>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
   const phaseRef = useRef<Phase>("silent");
+  const trackIndexRef = useRef(0);
+  const targetVolumeRef = useRef(INTRO_VOLUME);
   const [muted, setMuted] = useState(false);
 
   // Hydrate persisted mute preference once on mount.
@@ -76,66 +80,61 @@ export function useAudio(): UseAudio {
     } catch {
       // ignore
     }
-    if (introRef.current) introRef.current.muted = muted;
-    if (ambientRef.current) ambientRef.current.muted = muted;
+    if (musicRef.current) musicRef.current.muted = muted;
   }, [muted]);
 
   // Pause everything on unmount so HMR + navigation don't leak playback.
   useEffect(() => {
     return () => {
-      introRef.current?.pause();
-      ambientRef.current?.pause();
+      musicRef.current?.pause();
     };
   }, []);
 
   const ensureAudio = useCallback(() => {
     if (typeof window === "undefined") return;
-    if (!introRef.current) {
-      const intro = new Audio(INTRO_SRC);
-      intro.preload = "auto";
-      intro.loop = true;
-      intro.volume = 0;
-      intro.muted = muted;
-      introRef.current = intro;
-    }
-    if (!ambientRef.current) {
-      const ambient = new Audio(AMBIENT_SRC);
-      ambient.preload = "auto";
-      ambient.loop = true;
-      ambient.volume = 0;
-      ambient.muted = muted;
-      ambientRef.current = ambient;
-    }
+    if (musicRef.current) return;
+    const music = new Audio(MUSIC_TRACKS[0]);
+    music.preload = "auto";
+    music.loop = false;
+    music.volume = 0;
+    music.muted = muted;
+    music.addEventListener("ended", () => {
+      if (phaseRef.current === "silent") return;
+      const nextIndex = (trackIndexRef.current + 1) % MUSIC_TRACKS.length;
+      trackIndexRef.current = nextIndex;
+      music.src = MUSIC_TRACKS[nextIndex];
+      music.currentTime = 0;
+      music.volume = targetVolumeRef.current;
+      music.play().catch(() => {});
+    });
+    musicRef.current = music;
   }, [muted]);
 
   const startIntro = useCallback(() => {
     if (phaseRef.current !== "silent") return;
     phaseRef.current = "intro";
+    targetVolumeRef.current = INTRO_VOLUME;
+    trackIndexRef.current = 0;
     ensureAudio();
-    const intro = introRef.current;
-    if (!intro) return;
-    intro.volume = 0;
+    const music = musicRef.current;
+    if (!music) return;
+    music.src = MUSIC_TRACKS[0];
+    music.currentTime = 0;
+    music.volume = 0;
     // Reject is fine — missing file, autoplay denial, etc. Silence preserved.
-    intro.play().catch(() => {});
-    rampVolume(intro, INTRO_VOLUME, INTRO_FADE_IN_MS);
+    music.play().catch(() => {});
+    rampVolume(music, INTRO_VOLUME, INTRO_FADE_IN_MS);
   }, [ensureAudio]);
 
   const startAmbient = useCallback(() => {
     if (phaseRef.current === "ambient") return;
     phaseRef.current = "ambient";
+    targetVolumeRef.current = AMBIENT_VOLUME;
     ensureAudio();
-    const intro = introRef.current;
-    const ambient = ambientRef.current;
-    if (!ambient) return;
-    if (intro) {
-      rampVolume(intro, 0, CROSSFADE_MS, () => {
-        intro.pause();
-        intro.currentTime = 0;
-      });
-    }
-    ambient.volume = 0;
-    ambient.play().catch(() => {});
-    rampVolume(ambient, AMBIENT_VOLUME, CROSSFADE_MS);
+    const music = musicRef.current;
+    if (!music) return;
+    if (music.paused) music.play().catch(() => {});
+    rampVolume(music, AMBIENT_VOLUME, CROSSFADE_MS);
   }, [ensureAudio]);
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
