@@ -14,10 +14,10 @@ test_endpoint() {
     -H 'Content-Type: application/json' -d "$payload")
   if [ "$code" = "200" ]; then
     echo "  ✓ PASS  $name ($code)"
-    ((PASS++))
+    ((++PASS))
   else
     echo "  ✗ FAIL  $name (got $code, expected 200)"
-    ((FAIL++))
+    ((++FAIL))
   fi
   # Rate-limit: sleep briefly between requests
   sleep 0.5
