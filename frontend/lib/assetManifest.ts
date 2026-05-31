@@ -140,12 +140,28 @@ export async function resolveManifest(
   input: ResolveInput,
   options: ResolveOptions = {},
 ): Promise<AssetManifest | null> {
-  if (!assetApiConfigured()) return null;
+  if (!assetApiConfigured()) {
+    // eslint-disable-next-line no-console
+    console.info(
+      "[assetManifest] NEXT_PUBLIC_ASSET_API_URL is empty — skipping all asset fetches. Restart `next dev` after editing .env.local.",
+    );
+    return null;
+  }
 
   const { gameId, terrains, civs, leaders } = input;
 
   const cached = loadCachedManifest(gameId);
-  if (cached) return cached;
+  if (cached) {
+    // eslint-disable-next-line no-console
+    console.info(
+      `[assetManifest] Cache hit for game ${gameId} — no new fetches. Clear with: localStorage.removeItem('${cacheKey(gameId)}')`,
+    );
+    return cached;
+  }
+  // eslint-disable-next-line no-console
+  console.info(
+    `[assetManifest] Resolving game ${gameId}: ${terrains.length} tiles, ${civs.length} civs, ${leaders.length} leaders → POSTing to asset service…`,
+  );
 
   const distinctTerrains = [...new Set(terrains)].filter(
     (t) => t in TERRAIN_TO_TILE_TYPE,
