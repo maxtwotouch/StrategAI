@@ -84,11 +84,11 @@ class TestConfigOverrides:
         monkeypatch.chdir(tmp_project_root)
         # Overwrite the config.yaml from tmp_project_root fixture
         with open(os.path.join(tmp_project_root, "config.yaml"), "w") as f:
-            f.write("host: 127.0.0.1\nport: 9999\n")
+            f.write("server:\n  host: 127.0.0.1\n  port: 9999\n")
 
         s = Settings(_env_file="")
-        assert s.host == "127.0.0.1"
-        assert s.port == 9999
+        assert s.server.host == "127.0.0.1"
+        assert s.server.port == 9999
 
     def test_env_var_override(self, tmp_project_root, monkeypatch):
         """COMFYUI__BASE_URL env var wins over yaml."""

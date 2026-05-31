@@ -5,11 +5,6 @@
 # and are transparently layered on top of these defaults.
 # =====================================================================
 
-# ---- Network ----------------------------------------------------------
-# Set to "0.0.0.0" for container/Docker deployments to accept external connections
-host: "127.0.0.1"
-port: 8000
-
 # ---- ComfyUI connection -----------------------------------------------
 # Single-node (backward-compatible):
 #   comfyui:
@@ -46,6 +41,8 @@ paths:
 
 # ---- HTTP server ------------------------------------------------------
 server:
+  host: "127.0.0.1"
+  port: 8000
   cors_origins:
     - "http://localhost:3000"
   max_request_body_mb: 10

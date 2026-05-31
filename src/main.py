@@ -1566,3 +1566,19 @@ async def delete_background_tile(background_tile_id: str):
     if not deleted:
         raise HTTPException(404, f"Background tile '{background_tile_id}' not found")
     return DeleteResponse(status="deleted", id=background_tile_id, asset_type="background_tile")
+
+
+def main():
+    """Entry point for running the server via `python -m src.main` or `serve` script."""
+    import uvicorn
+
+    uvicorn.run(
+        "src.main:app",
+        host=settings.server.host,
+        port=settings.server.port,
+        log_level="info",
+    )
+
+
+if __name__ == "__main__":
+    main()

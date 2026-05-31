@@ -39,7 +39,7 @@ def tmp_project_root():
 
     # config.yaml
     with open(os.path.join(root, "config.yaml"), "w") as f:
-        f.write("host: 0.0.0.0\nport: 8000\n")
+        f.write("server:\n  host: 0.0.0.0\n  port: 8000\n")
 
     # prompt_templates.json
     templates = {

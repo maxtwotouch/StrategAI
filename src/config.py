@@ -55,11 +55,34 @@ class ComfyUISettings(BaseModel):
     def get_urls(self) -> list[str]:
         """Return the list of ComfyUI server URLs to connect to.
 
-        If ``nodes`` is non-empty it is used directly; otherwise
-        ``base_url`` is wrapped in a single-element list for backward
-        compatibility.
+        If ``nodes`` is non-empty it is used directly.  Otherwise the
+        ``COMFYUI__NODES`` environment variable is checked as a fallback
+        (pydantic-settings source ordering can lose list fields when
+        ``config.yaml`` is present).  Finally ``base_url`` is wrapped in a
+        single-element list for backward compatibility, with a warning log
+        so operators notice a missing multi-node override.
         """
-        return self.nodes if self.nodes else [self.base_url]
+        if self.nodes:
+            return self.nodes
+
+        # pydantic-settings YAML source (priority 3) can reset list fields
+        # when config.yaml lacks the key.  Check os.environ directly.
+        import json as _json, logging, os as _os
+        _env_val = _os.environ.get("COMFYUI__NODES")
+        if _env_val:
+            try:
+                _parsed = _json.loads(_env_val)
+                if _parsed:
+                    return _parsed
+            except (_json.JSONDecodeError, TypeError):
+                pass
+
+        logging.getLogger(__name__.rsplit(".", 1)[0] + ".comfyui").warning(
+            "ComfyUI nodes list is empty — falling back to single-node "
+            "base_url (%s).  Set COMFYUI__NODES in .env for multi-node mode.",
+            self.base_url,
+        )
+        return [self.base_url]
 
 
 class PathSettings(BaseModel):
@@ -97,7 +120,13 @@ class LeaderSettings(BaseModel):
 
 
 class ServerSettings(BaseModel):
-    """HTTP server configuration."""
+    """HTTP server configuration.
+
+    Use ``SERVER__HOST`` / ``SERVER__PORT`` environment variables to
+    override the bind address (e.g. in ``.env`` or deployment config).
+    """
+    host: str = "127.0.0.1"
+    port: int = 8000
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000"],
         description="CORS allowed origins.  The default allows local development. "
@@ -199,8 +228,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    host: str = "127.0.0.1"
-    port: int = 8000
     database_url: str = Field(
         default="",
         description="Database connection URL.  Leave empty to use the default "
@@ -264,6 +291,21 @@ class Settings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 settings = Settings()
+
+# ---- Post-processing: ensure multi-node config survives pydantic-settings ----
+# pydantic-settings YAML source (priority 3) in the chain can reset list fields
+# to their defaults when config.yaml lacks the key.  This explicit fallback
+# reads COMFYUI__NODES from os.environ (populated by load_dotenv above) and
+# patches settings.comfyui.nodes if it was lost during the source cascade.
+import json as _json, os as _os
+_env_nodes = _os.environ.get("COMFYUI__NODES")
+if _env_nodes:
+    try:
+        _parsed = _json.loads(_env_nodes)
+        if _parsed and not settings.comfyui.nodes:
+            settings.comfyui.nodes = _parsed
+    except (_json.JSONDecodeError, TypeError):
+        pass
 
 # Ensure output directories exist
 os.makedirs(os.path.join(BASE_DIR, settings.paths.output_dir), exist_ok=True)

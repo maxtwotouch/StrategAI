@@ -386,6 +386,48 @@ done
 
 ---
 
+### Reverse Proxy WebSocket Configuration
+
+ComfyUI uses WebSocket (`ws://` / `wss://`) for real-time execution status.
+If the service connects to ComfyUI through an HTTPS reverse proxy (nginx,
+Caddy, Cloudflare Tunnel, etc.), the proxy **must** forward WebSocket
+upgrade requests.  Without proper WebSocket passthrough, the client falls
+back to HTTP polling every 2 seconds — adding latency and log noise.
+
+**Symptom of broken WebSocket proxying:**
+```
+WebSocket received unparseable message (first 200 chars): '...<tr><td>Output:...
+```
+
+This means the proxy is returning HTML (usually the ComfyUI web UI) instead
+of upgrading the connection.  The system handles this gracefully but
+generation latency increases by up to 2 seconds per request.
+
+**nginx:**
+```nginx
+location / {
+    proxy_pass http://comfyui_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400s;  # long-lived WS connections
+}
+```
+
+**Caddy:**
+Caddy handles WebSocket upgrades automatically — no extra configuration needed.
+
+**Cloudflare / CDN:**
+Ensure WebSocket support is enabled (Cloudflare supports it by default on all plans).
+
+**Verification:**
+```bash
+# The health endpoint shows comfyui_nodes — confirm it matches your configuration
+curl -s http://127.0.0.1:8000/health | jq .comfyui_nodes
+```
+
+---
+
 ## ComfyUI Setup Prerequisite
 
 The service **requires** a running ComfyUI server with Flux2 Klein models. See
