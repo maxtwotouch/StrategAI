@@ -47,14 +47,8 @@ from src.unit.models import (
 from src.unit.registry import UnitRegistry
 from src.prompt_templates import validate_all_templates
 
-# TODO(production): Switch to structured JSON logging for production observability.
-# Format includes: timestamp, level, logger, message, request_id, exception.
-
-# Setup production logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# TODO(production): Switch to structured JSON logging (python-json-logger) for
+# production observability. Configure via uvicorn --log-config, not module-level.
 
 logger = logging.getLogger(__name__)
 
@@ -533,6 +527,10 @@ async def lifespan(app: FastAPI):
     global _service_ready
     _service_ready = True
     logger.info("Service ready — /health/ready will now return 200.")
+
+    # Explicit startup banner — ensures visibility regardless of logging config
+    # conflicts between the app module and uvicorn's internal logging.
+    print("INFO:     Application startup complete.", flush=True)
 
     yield
     await close_comfyui_client()
