@@ -333,24 +333,28 @@ Open DevTools console + Network tab, click Begin Campaign:
 
 ## 10. Known Issues with the Live Asset Service
 
-(As of this writing — see the commit history of the asset repo for current
-status.)
+(See the commit history of the asset repo for current status.)
 
-- **`POST /background_tile`, `/unit`, `/structure`, `/terrain`, `/object`
-  return HTTP 400** with `{"detail": "'utf-32-be' codec can't decode bytes
-  in position 8-11: code point not in range(0x110000)"}`. Reproducible across
-  request shapes; not a client encoding issue. The math: bytes 8-11 of
-  `{"tile_type":"grass"}` are ASCII `tile` = `0x7469_6C65` which exceeds
-  Unicode's `0x110000` cap. Something on the server is calling
-  `.decode("utf-32-be")` on raw UTF-8 JSON bytes in those routes. The
-  `/leader` pipeline doesn't go through that code path and is unaffected.
-- **Profile generation is rare in the existing leader pool.** All current
-  pool leaders have `profile_url: null`. Until the splash→profile chain
-  succeeds for at least one civ, portrait-shaped surfaces (empire badge,
-  drawer/audience avatars) keep falling back to initials.
-
-Tracked in the bug report; once the server is redeployed, no client changes
-are needed.
+- **Splash → profile chaining is intermittent.** `POST /leader` with
+  `asset_type: "splash"` is healthy and returns real cinematic art. The
+  chained `asset_type: "profile"` request (img2img off the splash) sometimes
+  returns HTTP 500. The resolver catches that silently and keeps the splash;
+  every portrait surface (empire badge, audience hero, diplomatic ribbon,
+  rival avatars) then reads `profileUrl ?? splashUrl` and renders a
+  face-biased crop (`object-position: center 20%`) of the splash instead of
+  letter-initials.
+- **Past upstream codec bug — now circumvented end-to-end.** Earlier in this
+  project's life the non-leader generation routes (`/background_tile`,
+  `/unit`, `/structure`, `/terrain`, `/object`) returned HTTP 400 with
+  `'utf-32-be' codec can't decode bytes …` on every request, plus 5xx
+  responses that lacked CORS headers (which the browser surfaces as a
+  generic "CORS policy" failure). Both classes of issue are now neutralized
+  by the same-origin proxy at `/api/asset/[...path]`: it strips the
+  browser's `Accept-Encoding` so upstream always sends plain JSON, and 5xx
+  errors are forwarded with the proxy's own `Access-Control-Allow-Origin:
+  *` headers so the browser sees a real status code instead of a CORS
+  error. The bug is documented historically here in case anyone investigates
+  the upstream code path; runtime impact on the game UI is zero.
 
 ---
 

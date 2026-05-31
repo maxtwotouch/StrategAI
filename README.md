@@ -109,12 +109,16 @@ testing playbook.
 
 ## Status & Known Issues
 
-- **Asset service generation** — the `/leader` pipeline works end-to-end;
-  five other families (`/background_tile`, `/unit`, `/structure`, `/terrain`,
-  `/object`) currently return HTTP 400 with a UTF-32-BE codec error.
-  Documented in [docs/ASSET_INTEGRATION.md §10](docs/ASSET_INTEGRATION.md#10-known-issues-with-the-live-asset-service).
-  The frontend handles the failures gracefully — game stays playable, map
-  renders with color fills until the server-side fix lands.
+- **Asset service is reached through a Next.js same-origin proxy** at
+  `/api/asset/[...path]`. The browser only talks to its own origin, so CORS
+  is never a factor — even when the upstream is degraded and would otherwise
+  return a 5xx response without `Access-Control-Allow-Origin` headers. See
+  [docs/ASSET_INTEGRATION.md §1](docs/ASSET_INTEGRATION.md#1-configuration).
+- **The leader profile pipeline is the asset service's only remaining
+  trouble spot.** `POST /leader` (splash) is healthy; the chained profile
+  stage occasionally returns HTTP 500. The frontend catches that silently
+  and falls back to the splash, cropped via `object-position: center 20%`,
+  so the empire badge and portrait surfaces still show real art.
 - **Playthrough test flakiness** — `tests/test_playthrough.py::test_playthrough_with_generated_map`
   intermittently fails with a city-capture move error. Pre-existing and
   unrelated to recent work; tracked in the backlog.

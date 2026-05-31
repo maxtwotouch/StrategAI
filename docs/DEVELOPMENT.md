@@ -49,25 +49,31 @@ INF-3600/
 │   │   │   └── game_factory.py  civ roster + map gen wiring
 │   │   └── engine/            pure-functional rules layer
 │   │       ├── models.py            frozen dataclasses + UNIT_STATS etc.
-│   │       ├── production.py        city tick / yields
-│   │       ├── buildings.py         building catalog + bonuses
-│   │       ├── combat.py            attack resolution + terrain mods
-│   │       ├── movement.py          move validation + healing
-│   │       ├── city_founding.py
-│   │       ├── borders.py           culture-driven border growth
-│   │       ├── diplomacy.py         stances, messages, truces
-│   │       ├── research.py          TECHS dict + UNIT_TECH_REQUIREMENTS
-│   │       ├── improvements.py      farm/mine/road work orders
-│   │       ├── city_names.py        deterministic civ-specific city names
-│   │       ├── victory.py           score / domination victory formula
-│   │       ├── openai_goals.py      LLM-backed goal source for AI civs
+│   │       ├── intents.py           dataclass intent types used by AI
 │   │       ├── operations.py        Intent → Goal lowering
+│   │       ├── executor.py          Goal → validated Action runner
+│   │       ├── human_source.py      human player's action-source adapter
+│   │       ├── openai_goals.py      LLM-backed goal source for AI civs
 │   │       ├── turn_resolver.py     AI turn orchestration
 │   │       ├── playthrough.py       end-to-end runner used in tests
 │   │       ├── directives.py        QueueProduction / CancelProduction /
 │   │       │                        PurchaseStructure / StartResearch
+│   │       ├── production.py        city tick / yields
+│   │       ├── economy.py           gold per turn, no-upkeep rules
+│   │       ├── buildings.py         building catalog + bonuses
+│   │       ├── city_founding.py     settler founding rules
+│   │       ├── city_names.py        deterministic civ-specific city names
+│   │       ├── starting_positions.py civ placement on generated maps
+│   │       ├── borders.py           culture-driven border growth
+│   │       ├── fog_of_war.py        per-civ visible-tile computation
+│   │       ├── combat.py            attack resolution + terrain mods
+│   │       ├── movement.py          move validation + healing
+│   │       ├── diplomacy.py         stances, messages, truces, met_civs
+│   │       ├── research.py          TECHS dict + UNIT_TECH_REQUIREMENTS
+│   │       ├── improvements.py      farm/mine/road work orders
+│   │       ├── victory.py           score victory formula
 │   │       ├── serialize.py         GameState → DTO
-│   │       ├── map_generator.py
+│   │       ├── map_generator.py     procedural map generator
 │   │       ├── terrain.py           passability + biome rules
 │   │       └── hex.py               coordinate math
 │   ├── scripts/

@@ -348,9 +348,11 @@ composer's tone dropdown.
 
 ### Diplomatic Audience (frontend)
 
-Clicking a rival leader in the right-rail "Other Leaders" panel opens a
-full-screen Diplomatic Audience overlay backed by the rival's splash art.
-See [UI_GUIDE.md](UI_GUIDE.md#diplomatic-audience).
+Clicking a leader avatar in the **Diplomatic Ribbon** on the right edge of
+the map opens a full-screen Diplomatic Audience overlay backed by the
+rival's splash art. See
+[UI_GUIDE.md §4.1](UI_GUIDE.md#41-diplomatic-ribbon-met-leader-portraits-on-the-map)
+and [UI_GUIDE.md §5 Diplomatic Audience](UI_GUIDE.md#diplomatic-audience-full-screen-overlay).
 
 ---
 

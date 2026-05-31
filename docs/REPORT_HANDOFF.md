@@ -23,8 +23,14 @@ playable, reportable game experience:
   placeholder names.
 - The UI has a polished war-room layout: map-first center, rails for minimap,
   selection, research, cities, standings, and a collapsible chronicle.
+- Met rivals appear as a Civ-style **Diplomatic Ribbon** of leader-portrait
+  avatars on the map's right edge; clicking one opens the full-screen
+  Diplomatic Audience with the rival's splash art as the backdrop.
 - The asset service provides generated terrain, units, leaders, elevation
   overlays, and structure art, with fallbacks when the service is unavailable.
+  Browser calls are routed through a Next.js same-origin proxy at
+  `/api/asset/[...path]` so CORS / upstream-5xx edge cases never reach the
+  game UI.
 - Players can drag purchasable structures from the city drawer onto empty
   tiles inside that city's borders.
 
@@ -98,8 +104,12 @@ and fall back to the preloaded `assets.structures[civId][category]` URL.
   empty tile inside that city's borders.
 - **Chronicle:** the bottom event log summarizes turn changes using frontend
   state diffing.
-- **Diplomacy UI:** rival leaders open a full-screen Diplomatic Audience with
-  splash art, message history, stance, relationship, and composer.
+- **Diplomacy UI:** rival leaders appear as portrait avatars on the
+  Diplomatic Ribbon at the map's right edge (faction-color fallback, ring
+  border tinted by relationship, stance dot, truce halo, inbox badge,
+  active-conversation outline). Clicking opens a full-screen Diplomatic
+  Audience whose translucent parchment panel anchors bottom-left so the
+  rival's splash art dominates the upper-right of the screen.
 - **Map polish:** minimap is compact, the mute button is an SVG HUD control,
   the top-left profile portrait is enlarged, and debug Global/Local map mode
   buttons were removed.
@@ -155,5 +165,6 @@ cd backend && ./.venv/bin/python -m pytest tests/test_playthrough.py
 | Turn loop | `backend/app/engine/turn_resolver.py`, `backend/app/engine/playthrough.py` |
 | Frontend war room | `frontend/app/page.tsx`, `frontend/app/globals.css` |
 | Map renderer | `frontend/components/SquareMap.tsx` |
-| Asset service | `frontend/lib/assetApi.ts`, `frontend/lib/assetManifest.ts`, `frontend/lib/assetMapping.ts` |
+| Diplomatic ribbon + audience | `frontend/app/page.tsx` (search `leader-ribbon` / `diplomacy-audience` JSX), `frontend/app/globals.css` (search `.leader-ribbon`, `.diplomacy-audience`) |
+| Asset service client + proxy | `frontend/lib/assetApi.ts`, `frontend/lib/assetManifest.ts`, `frontend/lib/assetMapping.ts`, `frontend/app/api/asset/[...path]/route.ts` |
 | Turn chronicle | `frontend/lib/turnEvents.ts` |

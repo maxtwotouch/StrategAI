@@ -98,12 +98,12 @@ intro screen is dismissed.
 │ Selection │  │   wheel to zoom         │    │  available techs              │
 │  unit     │  │   click tile to act     │    │                               │
 │  actions  │  │                         │    │ Cities list                   │
-│  improve  │  │   hover → terrain       │    │  click row → open City Drawer │
-│  found    │  │   readout overlay       │    │                               │
-│           │  └─────────────────────────┘    │ Other Leaders                 │
-│           │  Turn Chronicle banner          │  click row → Diplo Audience   │
+│  improve  │  │   diplomatic ribbon →   │    │  click row → open City Drawer │
+│  found    │  │     met-leader avatars  │    │                               │
+│           │  │     on right edge       │    │ Standings                     │
+│           │  └─────────────────────────┘    │  goal score + per-civ progress│
+│           │  Turn Chronicle banner          │                               │
 │           │  (briefly during turn changes)  │                               │
-│           │                                 │ Standings                     │
 ├───────────┴─────────────────────────────────┴───────────────────────────────┤
 │                            Chronicle (events log)                            │
 └───────────────────────────────────────────────────────────────────────────┘
@@ -145,10 +145,11 @@ The map plus two overlays:
   are met. Click a tech to start researching it.
 - **Cities list**. Compact rows (name + capital ★ + `pop · queue head`). Click
   a row to open the City Drawer; the active city row is highlighted.
-- **Other Leaders**. Compact rows for each met rival: portrait or initial,
-  civ name, stance + relationship + truce badge + unread inbox count. Click
-  to open the Diplomatic Audience.
 - **Standings**. The score table; your row is bolded.
+
+The "Other Leaders" right-rail panel that used to live here has been replaced
+by the **Diplomatic Ribbon** floating on the map (see §4.1 below). Met-leader
+interaction now happens entirely on the map surface.
 
 ### Chronicle (bottom)
 
@@ -203,6 +204,35 @@ layered `<g>` groups (bottom-up):
 The defensive guard in `onTileClick` (and the explicit owner check in
 `onUnitClick`) prevents accidentally commanding rival units.
 
+### 4.1 Diplomatic Ribbon (met-leader portraits on the map)
+
+Civ-style vertical column of leader portraits pinned to the **right edge of
+the map area**, below the zoom/Recenter HUD. Lives inside `.map-frame` as
+absolutely-positioned siblings of the SVG, defined in `app/page.tsx` and
+styled by `.leader-ribbon*` rules in `globals.css`.
+
+For each met civ:
+- **56px circle** (44px on viewports ≤ 1100px) with the leader's profile or
+  splash art (`object-position: center 20%` biases the crop toward the face
+  region of cinematic splashes).
+- Faction color as the background fallback when no art is loaded yet.
+- **Ring border colored by the diplomatic relationship** (red → hostile,
+  gold → neutral, green → friendly) using the same `relationshipColor` palette
+  the audience uses for its pills.
+- A small **stance dot** in the bottom-right reinforces the ring color (which
+  can be hard to read over dark splash crops).
+- **Dashed gold halo** when a truce is active.
+- **Gold count pill** at the top-right for unread inbox messages from that
+  civ.
+- **Active outline** when the Diplomatic Audience is open with that civ.
+
+Interaction: click an avatar → `setActiveConversationCivId(civ.id)` → opens
+the Diplomatic Audience. Hover gets a `title=` tooltip with name + leader
+name + stance + relationship + truce/inbox counts.
+
+The ribbon animates in (`leader-ribbon-fade-in`, 320ms) when it first appears
+and each avatar lifts slightly on hover.
+
 ---
 
 ## 5. Drawers & Overlays
@@ -237,15 +267,21 @@ right: 0; width: min(420px, 100vw)`. Slides via `transform: translateX`.
 
 ### Diplomatic Audience (full-screen overlay)
 
-Replaces the older slide-in drawer. Opens when a row in the right-rail
-**Other Leaders** panel is clicked.
+Replaces the older slide-in drawer. Opens by clicking a leader avatar in the
+**Diplomatic Ribbon** on the map edge.
 
 Visual:
-- **Backdrop**: the rival's splash art at full bleed, dimmed via radial
-  + linear gradients for legibility. If no splash is resolved yet, a dark
-  gradient still backs the panel.
-- **Panel**: centered parchment card (`rgba(245, 238, 219, 0.95)` with backdrop
-  blur). Black-on-cream typography.
+- **Backdrop**: the rival's splash art at full bleed. A radial vignette is
+  biased to the right (`ellipse at 68% 40%`) so the brightest spot of the
+  lighting lands on the exposed portion of the splash; the panel side gets a
+  gentle darken to anchor it. If no splash is resolved yet, a dark gradient
+  still backs the panel.
+- **Panel**: translucent parchment card (`rgba(245, 238, 219, 0.82)` with
+  12px `backdrop-filter` blur + saturate). **Anchored bottom-left**
+  (`align-items: flex-end; justify-content: flex-start; margin: 0 0 3vh 3vw`),
+  width `min(560px, 90vw)`, max-height 82vh — so the splash art dominates the
+  upper-right of the screen rather than being covered. Black-on-cream
+  typography stays legible against any backdrop tone thanks to the blur.
 - **Hero**: 96px portrait + `Civ Name` (display font) + leader name + stance
   pills (Status · Rel score + label · Truce until Tn).
 - **Messages**: scrollable thread of `MessageCard`s with sent/received
