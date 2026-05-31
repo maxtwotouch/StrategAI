@@ -8,3 +8,5 @@ htmlcov/
 *.egg-info/
 .DS_Store
 .env
+
+checkpoints-samples/*

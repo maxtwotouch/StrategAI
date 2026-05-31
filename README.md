@@ -142,6 +142,8 @@ StrategAI includes a multi-agent system to assist with development across all su
 - **Integration Tester**: Validate cross-project contracts and integration points
 - **Backend Specialist**: Game engine, LLM integration, API design
 - **Frontend Specialist**: Next.js UI, state management, asset integration
+- **Report Writer**: Write IEEE academic report sections, create figure descriptions, add citations
+- **Oral Presentation**: Prepare 7-8 minute presentation, create slide outlines, practice Q&A
 
 ### Subproject Agents
 
