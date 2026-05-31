@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import secrets
@@ -457,6 +458,29 @@ async def lifespan(app: FastAPI):
         logger.info("Background tile engine initialized (comfyui mode)")
     else:
         logger.warning("Background tile engine: ComfyUI unreachable, background_tile endpoints will return 503")
+
+    # ── Model warmup ────────────────────────────────────────────────
+    # Preload Flux2 Klein DiT weights into ComfyUI GPU VRAM so the
+    # first user request doesn't pay the 30-120s cold-start penalty.
+    # Runs as a background task — the server serves requests while
+    # models load.
+    if (
+        lb is not None
+        and lb_reachable
+        and settings.comfyui.warmup_enabled
+    ):
+        async def _run_warmup() -> None:
+            try:
+                node = await lb._select_node()
+                ok, _ = await node.client.warmup(
+                    settings.comfyui.warmup_workflow
+                )
+                if ok:
+                    logger.info("ComfyUI model warmup completed successfully")
+            except Exception as exc:
+                logger.warning("Model warmup skipped: %s", exc)
+
+        asyncio.create_task(_run_warmup())
 
     logger.info(
         "Application started.  Modes: %s",

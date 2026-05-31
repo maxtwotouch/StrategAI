@@ -45,6 +45,13 @@ class ComfyUISettings(BaseModel):
     health_check_interval: int = Field(default=30, gt=0, description="Seconds between re-pinging unhealthy nodes")
     max_retries: int = Field(default=3, ge=0, description="Max nodes to try per generation before failing")
 
+    # Model warmup — submit a minimal generation at startup to preload
+    # Flux2 Klein DiT weights into GPU VRAM, avoiding cold-start latency
+    # on the first user request.
+    warmup_enabled: bool = True
+    warmup_timeout: int = Field(default=120, ge=10, le=600)  # seconds
+    warmup_workflow: str = Field(default="background_tile")  # simplest workflow
+
     def get_urls(self) -> list[str]:
         """Return the list of ComfyUI server URLs to connect to.
 

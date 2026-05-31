@@ -48,6 +48,9 @@ def _is_retryable(exc: BaseException) -> bool:
     # RuntimeError("...did not complete successfully") → timeout / dead node
     if isinstance(exc, RuntimeError) and "did not complete successfully" in str(exc):
         return True
+    # Retry 5xx server errors on a different node
+    if isinstance(exc, httpx.HTTPStatusError):
+        return 500 <= exc.response.status_code < 600
     return False
 
 

@@ -29,6 +29,12 @@ comfyui:
   timeout: 300
   health_check_interval: 30
   max_retries: 3
+  # Model warmup: submit a minimal generation at startup to preload DiT
+  # weights into GPU VRAM.  Disable if your ComfyUI instance has
+  # insufficient VRAM for an extra generation.
+  warmup_enabled: true
+  warmup_timeout: 120
+  warmup_workflow: "background_tile"
 
 # ---- Paths (all relative to project root) -----------------------------
 paths:

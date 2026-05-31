@@ -114,6 +114,10 @@ class ComfyUIClient:
             self._http = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=httpx.Timeout(self.timeout, connect=15.0),
+                limits=httpx.Limits(
+                    max_connections=20,
+                    max_keepalive_connections=10,
+                ),
             )
         return self._http
 
@@ -130,12 +134,76 @@ class ComfyUIClient:
                     self._http = httpx.AsyncClient(
                         base_url=self.base_url,
                         timeout=httpx.Timeout(self.timeout, connect=15.0),
+                        limits=httpx.Limits(
+                            max_connections=20,
+                            max_keepalive_connections=10,
+                        ),
                     )
         return self._http
 
     # ------------------------------------------------------------------
     #  Public high-level API
     # ------------------------------------------------------------------
+
+    async def warmup(self, warmup_workflow: str | None = None) -> tuple[bool, str | None]:
+        """Submit a minimal dummy generation to preload DiT models into VRAM.
+
+        Uses the simplest workflow (background_tile by default) with a
+        trivial prompt to trigger Flux2 Klein model loading.  Returns
+        ``(True, prompt_id)`` on success, ``(False, None)`` on failure.
+
+        The returned ``prompt_id`` can be used to cancel the warmup prompt
+        after models are loaded (they stay cached in VRAM).
+        """
+        from src import config as config_mod
+
+        if warmup_workflow is None:
+            warmup_workflow = "background_tile"
+
+        workflow_path = os.path.join(
+            config_mod.settings.workflow_dir,
+            f"{warmup_workflow}.json"
+        )
+        if not os.path.isfile(workflow_path):
+            logger.warning("Warmup workflow not found: %s", workflow_path)
+            return False, None
+
+        timeout = getattr(
+            config_mod.settings.comfyui, 'warmup_timeout', 120
+        )
+
+        logger.info(
+            "Starting ComfyUI model warmup with %s (timeout=%ds) ...",
+            warmup_workflow, timeout,
+        )
+        try:
+            img = await asyncio.wait_for(
+                self.generate(
+                    workflow_path,
+                    positive_prompt="solid black background",
+                    seed=0,
+                ),
+                timeout=timeout,
+            )
+            logger.info(
+                "ComfyUI model warmup complete — %dx%d image generated",
+                img.width, img.height,
+            )
+            return True, None
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Model warmup timed out after %ds — "
+                "first user request will pay cold-start cost",
+                timeout,
+            )
+            return False, None
+        except Exception as exc:
+            logger.warning(
+                "Model warmup failed: %s — "
+                "first user request will pay cold-start cost",
+                exc,
+            )
+            return False, None
 
     async def generate(
         self,
@@ -316,7 +384,7 @@ class ComfyUIClient:
 
         try:
             body = resp.json()
-        except (UnicodeDecodeError, UnicodeError):
+        except (UnicodeDecodeError, UnicodeError, json.JSONDecodeError):
             # Fallback: force UTF-8 decode then parse JSON manually.
             # Prevents charset_normalizer UTF-32-BE false positives
             # (observed with some ComfyUI error responses behind Cloudflare CDN).
@@ -376,7 +444,7 @@ class ComfyUIClient:
         resp.raise_for_status()
         try:
             return resp.json()
-        except (UnicodeDecodeError, UnicodeError):
+        except (UnicodeDecodeError, UnicodeError, json.JSONDecodeError):
             return json.loads(resp.content.decode("utf-8", errors="replace"))
 
     async def download_image(
@@ -426,7 +494,7 @@ class ComfyUIClient:
             resp.raise_for_status()
             try:
                 body = resp.json()
-            except (UnicodeDecodeError, UnicodeError):
+            except (UnicodeDecodeError, UnicodeError, json.JSONDecodeError):
                 body = json.loads(resp.content.decode("utf-8", errors="replace"))
             running = body.get("queue_running", [])
             pending = body.get("queue_pending", [])
