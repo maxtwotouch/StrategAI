@@ -58,7 +58,8 @@ INF-3600/
 │   │       ├── diplomacy.py         stances, messages, truces
 │   │       ├── research.py          TECHS dict + UNIT_TECH_REQUIREMENTS
 │   │       ├── improvements.py      farm/mine/road work orders
-│   │       ├── score.py             victory score formula
+│   │       ├── city_names.py        deterministic civ-specific city names
+│   │       ├── victory.py           score / domination victory formula
 │   │       ├── openai_goals.py      LLM-backed goal source for AI civs
 │   │       ├── operations.py        Intent → Goal lowering
 │   │       ├── turn_resolver.py     AI turn orchestration
@@ -85,7 +86,7 @@ INF-3600/
     │   ├── hex.ts             coordinate math + glyph tables
     │   ├── turnEvents.ts      diff-driven event log
     │   ├── assetApi.ts        asset service client
-    │   ├── assetManifest.ts   resolver + cache
+    │   ├── assetManifest.ts   per-game asset resolver
     │   ├── assetMapping.ts    game taxonomy → asset enums
     │   ├── leaderMapping.ts   deterministic leader profiles
     │   └── useAudio.ts        intro/ambient music + mute toggle

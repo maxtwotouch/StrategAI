@@ -67,17 +67,6 @@ UNIT_BUILD_COST: dict[UnitType, int] = {
 }
 
 
-UNIT_UPKEEP: dict[UnitType, int] = {
-    UnitType.SETTLER: 1,
-    UnitType.WARRIOR: 1,
-    UnitType.SCOUT: 1,
-    UnitType.WORKER: 1,
-    UnitType.ARCHER: 1,
-    UnitType.HORSEMAN: 2,
-    UnitType.SWORDSMAN: 2,
-}
-
-
 @dataclass(frozen=True, slots=True)
 class BuildItem:
     kind: BuildKind

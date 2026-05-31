@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SquareMap } from "@/components/SquareMap";
-import { generateStructure } from "@/lib/assetApi";
+import { absoluteAssetUrl, listLeaders } from "@/lib/assetApi";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
 import {
   CIV_COLORS,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/hex";
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
-import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, cityStructureFor } from "@/lib/assetMapping";
+import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, STRUCTURE_CATEGORIES } from "@/lib/assetMapping";
 import { buildCustomLeaderParams } from "@/lib/leaderMapping";
 import { useAudio } from "@/lib/useAudio";
 
@@ -65,6 +65,15 @@ function randomSeed(): number {
 
 function placedStructureKey(cityId: number, category: string, q: number, r: number): string {
   return `${cityId}:${category}:${tileKey(q, r)}`;
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
 }
 
 const TECHS: TechDef[] = [
@@ -130,19 +139,6 @@ const BUILDABLE_UNITS: BuildableUnit[] = [
   { id: "swordsman", label: "Swordsman", cost: 30, requires: "iron_working" },
 ];
 
-// Asset-API structure categories the player can place in their cities by
-// spending gold. Each grants STRUCTURE_PRODUCTION_BONUS production for that
-// city (the backend is the source of truth — these mirror it for display).
-const STRUCTURE_CATEGORIES: ReadonlyArray<{
-  id: string;
-  label: string;
-  hint: string;
-}> = [
-  { id: "production", label: "Production Hall", hint: "Workshop, forge, mill" },
-  { id: "fortification", label: "Fortification", hint: "Walls, keep, gatehouse" },
-  { id: "housing", label: "Housing District", hint: "Townhouse, longhouse, manor" },
-  { id: "sacred", label: "Sacred Site", hint: "Temple, shrine, cathedral" },
-];
 const STRUCTURE_GOLD_COST = 15;
 const STRUCTURE_PRODUCTION_BONUS = 2;
 
@@ -202,6 +198,8 @@ export default function HomePage() {
   const [assets, setAssets] = useState<AssetManifest | null>(null);
   const [placedStructureAssets, setPlacedStructureAssets] = useState<Record<string, string>>({});
   const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
+  const [loadingSplashUrls, setLoadingSplashUrls] = useState<string[]>([]);
+  const [loadingSplashIndex, setLoadingSplashIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(false);
   const [showSovereign, setShowSovereign] = useState(false);
   const { muted, toggleMute, startIntro, playNarration, startAmbient } = useAudio();
@@ -217,8 +215,11 @@ export default function HomePage() {
   };
   const prevStateRef = useRef<GameStateDTO | null>(null);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingSplashRunRef = useRef(0);
 
   const loadGame = async (nextSetup: Setup) => {
+    const splashRun = loadingSplashRunRef.current + 1;
+    loadingSplashRunRef.current = splashRun;
     setBusy(true);
     setError(null);
     setHasStarted(true);
@@ -226,6 +227,8 @@ export default function HomePage() {
     setAssets(null);
     setPlacedStructureAssets({});
     setAssetProgress(null);
+    setLoadingSplashUrls([]);
+    setLoadingSplashIndex(0);
     setIntroDismissed(false);
     introNarratedRef.current = false;
     setIntroNarrationStatus("idle");
@@ -239,6 +242,20 @@ export default function HomePage() {
     setActiveConversationCivId(null);
     setBannerEvents(null);
     setEventLog([]);
+    void listLeaders()
+      .then((leaders) => {
+        if (loadingSplashRunRef.current !== splashRun) return;
+        const urls = shuffled(
+          leaders
+            .map((leader) => leader.splash_url)
+            .filter((url): url is string => Boolean(url))
+            .map(absoluteAssetUrl),
+        );
+        setLoadingSplashUrls(urls);
+      })
+      .catch(() => {
+        if (loadingSplashRunRef.current === splashRun) setLoadingSplashUrls([]);
+      });
     try {
       const next = await api.createGame(
         nextSetup.radius,
@@ -257,10 +274,10 @@ export default function HomePage() {
       // has met them. state.civs is filtered by fog of war and only contains
       // discovered civs, which is the wrong set for pre-generation.
       const roster = next.civ_roster.length > 0 ? next.civ_roster : next.civs;
-      const civs: CivInput[] = roster.map((c) => ({
-        civId: c.id,
-        leaderName: c.leader_name,
-      }));
+      const civs: CivInput[] = roster.map((c) => {
+        const base: CivInput = { civId: c.id, leaderName: c.leader_name };
+        return c.is_human ? { ...base, customLeaderParams: humanCustomParams } : base;
+      });
       const leaders: CivInput[] = roster.map((c) => {
         const base: CivInput = { civId: c.id, leaderName: c.leader_name };
         return c.is_human ? { ...base, customLeaderParams: humanCustomParams } : base;
@@ -285,6 +302,7 @@ export default function HomePage() {
     } catch (e: unknown) {
       setError(formatError(e));
       setHasStarted(false);
+      setLoadingSplashUrls([]);
     } finally {
       setBusy(false);
       setAssetProgress(null);
@@ -304,6 +322,14 @@ export default function HomePage() {
     const t = setTimeout(() => setError(null), 5000);
     return () => clearTimeout(t);
   }, [error]);
+
+  useEffect(() => {
+    if (!hasStarted || state || loadingSplashUrls.length <= 1) return;
+    const timer = setInterval(() => {
+      setLoadingSplashIndex((index) => (index + 1) % loadingSplashUrls.length);
+    }, 2600);
+    return () => clearInterval(timer);
+  }, [hasStarted, loadingSplashUrls.length, state]);
 
   useEffect(() => {
     return () => {
@@ -677,18 +703,13 @@ export default function HomePage() {
       setState(next);
 
       const key = placedStructureKey(cityId, category, q, r);
-      if (assets) {
-        const city = next.cities.find((candidate) => candidate.id === cityId);
-        const leaderName =
-          next.civ_roster.find((civ) => civ.id === city?.owner)?.leader_name ??
-          humanCiv.leader_name;
-        generateStructure(cityStructureFor(leaderName, category))
-          .then((url) => {
-            setPlacedStructureAssets((current) => ({ ...current, [key]: url }));
-          })
-          .catch(() => {
-            // Keep the placed gameplay structure; the map will use its fallback marker.
-          });
+      const city = next.cities.find((candidate) => candidate.id === cityId);
+      const preloadedUrl =
+        city && assets?.structures[city.owner]?.[category]
+          ? assets.structures[city.owner][category]
+          : undefined;
+      if (preloadedUrl) {
+        setPlacedStructureAssets((current) => ({ ...current, [key]: preloadedUrl }));
       }
     } catch (e: unknown) {
       setError(formatError(e));
@@ -916,10 +937,26 @@ export default function HomePage() {
   }
 
   if (!state) {
+    const loadingSplashUrl =
+      loadingSplashUrls.length > 0
+        ? loadingSplashUrls[loadingSplashIndex % loadingSplashUrls.length]
+        : null;
     return (
       <main className="start-screen">
+        {loadingSplashUrl && (
+          <div
+            key={loadingSplashUrl}
+            className="loading-slideshow"
+            style={{ backgroundImage: `url(${loadingSplashUrl})` }}
+          />
+        )}
         <div className="start-screen__veil" />
         <section className="start-screen__panel start-screen__panel--loading">
+          {loadingSplashUrls.length > 0 && (
+            <div className="loading-slideshow__caption">
+              Sovereigns from prior campaigns
+            </div>
+          )}
           <div className="spinner" />
           <p className="start-screen__copy">
             Surveying the land, placing the first capitals, and opening the campaign map.
@@ -1308,24 +1345,22 @@ export default function HomePage() {
                 />
               </div>
             )}
-            <div className="list-stack scroll-list">
+            <div className="tech-choice-grid">
               {availableTechs.length === 0 ? (
                 <EmptyCopy>No available technologies. Expand prerequisites or finish the current research.</EmptyCopy>
               ) : (
                 availableTechs.map((tech) => (
                   <button
                     key={tech.id}
-                    className="list-row"
+                    className="tech-choice"
                     onClick={() => chooseResearch(tech.id)}
                     disabled={busy || !isHumanTurn || humanCiv?.researching === tech.id}
                   >
-                    <span className="tech-label">
-                      <span className="tech-label__emoji" aria-hidden="true">
-                        {TECH_EMOJIS[tech.id] ?? "✦"}
-                      </span>
-                      <span>{tech.name}</span>
+                    <span className="tech-choice__icon" aria-hidden="true">
+                      {TECH_EMOJIS[tech.id] ?? "✦"}
                     </span>
-                    <span>{tech.cost}</span>
+                    <span className="tech-choice__name">{tech.name}</span>
+                    <span className="tech-choice__cost">{tech.cost}</span>
                   </button>
                 ))
               )}

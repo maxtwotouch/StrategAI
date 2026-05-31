@@ -983,7 +983,9 @@ export function SquareMap(props: StrategyMapProps) {
               const { x, y } = hexToPixel({ q: structure.q, r: structure.r });
               const color = CIV_COLORS[structure.owner % CIV_COLORS.length];
               const assetKey = `${structure.city_id}:${structure.category}:${key}`;
-              const rawBuildingUrl = props.placedStructureAssets?.[assetKey];
+              const rawBuildingUrl =
+                props.placedStructureAssets?.[assetKey] ??
+                props.assets?.structures?.[structure.owner]?.[structure.category];
               const buildingUrl =
                 rawBuildingUrl && !failedHrefs.has(rawBuildingUrl)
                   ? rawBuildingUrl
@@ -1033,25 +1035,45 @@ export function SquareMap(props: StrategyMapProps) {
               const key = tileKey(city.q, city.r);
               const { x, y } = hexToPixel({ q: city.q, r: city.r });
               const color = CIV_COLORS[city.owner % CIV_COLORS.length];
+              const rawCityUrl =
+                props.assets?.structures?.[city.owner]?.housing ??
+                props.assets?.structures?.[city.owner]?.production;
+              const cityUrl =
+                rawCityUrl && !failedHrefs.has(rawCityUrl) ? rawCityUrl : undefined;
               return (
                 <g key={key + ":city"}>
-                  <rect
-                    x={x - half + 2}
-                    y={y - half + 4}
-                    width={TILE_SIZE - 4}
-                    height={TILE_SIZE - 6}
-                    fill={color}
-                    stroke="#0a0f14"
-                    strokeWidth={strokeWidth}
-                  />
-                  <rect
-                    x={x - half + 2}
-                    y={y - half + 4}
-                    width={TILE_SIZE - 4}
-                    height={2.5}
-                    fill="#fff"
-                    fillOpacity={0.22}
-                  />
+                  {cityUrl ? (
+                    <image
+                      href={cityUrl}
+                      x={x - half}
+                      y={y - half}
+                      width={TILE_SIZE}
+                      height={TILE_SIZE}
+                      preserveAspectRatio="none"
+                      style={{ imageRendering: "pixelated" }}
+                      onError={() => markFailed(cityUrl)}
+                    />
+                  ) : (
+                    <>
+                      <rect
+                        x={x - half + 2}
+                        y={y - half + 4}
+                        width={TILE_SIZE - 4}
+                        height={TILE_SIZE - 6}
+                        fill={color}
+                        stroke="#0a0f14"
+                        strokeWidth={strokeWidth}
+                      />
+                      <rect
+                        x={x - half + 2}
+                        y={y - half + 4}
+                        width={TILE_SIZE - 4}
+                        height={2.5}
+                        fill="#fff"
+                        fillOpacity={0.22}
+                      />
+                    </>
+                  )}
                   <text
                     x={x}
                     y={y + half + TILE_SIZE * 0.2}

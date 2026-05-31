@@ -17,9 +17,10 @@ structure / leader art.
 |---|---|
 | [docs/GAMEPLAY.md](docs/GAMEPLAY.md) | Every mechanic: setup, civs, terrain, units (stats + costs), cities (yields + growth), production queue, buildings + gold-purchased structures, the 21-tech tree, workers/improvements, combat, diplomacy, turn flow, victory. |
 | [docs/UI_GUIDE.md](docs/UI_GUIDE.md) | Frontend lifecycle (Start → Load → Intro → War Room), layout breakdown of every panel and overlay (city drawer, diplomatic audience, sovereign portrait), map rendering layers, audio plumbing. |
-| [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md) | Contract with the asset service, taxonomy mapping, manifest resolver, cache strategy, graceful fallback, smoke test. |
+| [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md) | Contract with the asset service, taxonomy mapping, manifest resolver, no-cache policy, graceful fallback, smoke test. |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Prerequisites, backend + frontend setup, env vars, tests, common workflows, where to hook new things in. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Original backend architecture write-up (engine layers, deterministic state, LLM goal source). |
+| [docs/REPORT_HANDOFF.md](docs/REPORT_HANDOFF.md) | Concise project summary and source map for AI agents writing reports about what has been implemented. |
 | [GAME_BACKLOG.md](GAME_BACKLOG.md) | Outstanding game-design work. |
 | [TIER1_PLAN.md](TIER1_PLAN.md) | Tier-1 mechanics implementation record (shipped). |
 | [planning.md](planning.md) | Original concept doc. |

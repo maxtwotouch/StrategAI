@@ -23,7 +23,7 @@ frontend/
 │   ├── hex.ts            grid math + TERRAIN/UNIT/IMPROVEMENT glyph tables
 │   ├── turnEvents.ts     diff prev/next GameState → TurnEvent[]
 │   ├── assetApi.ts       asset service client (POST /leader, etc.)
-│   ├── assetManifest.ts  resolveManifest() + per-game cache
+│   ├── assetManifest.ts  resolveManifest() per-game asset resolver
 │   ├── assetMapping.ts   game taxonomy → asset enums (units, structures, elevation)
 │   ├── leaderMapping.ts  deterministic leader → enum/description map
 │   └── useAudio.ts       intro swell + ambient bed, mute toggle, fades
@@ -83,10 +83,10 @@ intro screen is dismissed.
 
 ```
 ┌─ topbar ──────────────────────────────────────────────────────────────────┐
-│ EmpireBadge (clickable→Sovereign overlay) │ Metrics │ Audio · Global/Local │
-│  ┌────┐ Civ Name                          │ Sci 12  │ 🔊  ┌─────┬─────┐    │
-│  │img│ Leader Name                        │ Gold 47 │     │GLOB │LOCAL│    │
-│  └────┘ Next objective hint               │ Cult 8  │     └─────┴─────┘    │
+│ EmpireBadge (clickable→Sovereign overlay) │ Metrics │ Audio · Turn box     │
+│  ┌────┐ Civ Name                          │ Sci 12  │ speaker icon         │
+│  │img│ Leader Name                        │ Gold 47 │ Turn 14              │
+│  └────┘ Next objective hint               │ Cult 8  │ [End Turn]           │
 │                                           │ Score   │     Turn 14          │
 │                                           │ Cities  │     [End Turn]       │
 ├───────────┬─────────────────────────────────┬───────────────────────────────┤
@@ -113,19 +113,20 @@ intro screen is dismissed.
 
 - **Empire Badge** (left). Click anywhere on it → opens the **Sovereign
   Portrait Overlay**. The badge shows the human civ's profile portrait if the
-  manifest resolved one; otherwise falls back to the civ's first initial in
-  the gold hex seal.
+  manifest resolved one; otherwise falls back to the civ's first initial in a
+  large faction-color circular seal.
 - **Metrics**. Science (total), Gold (with `+net/turn` delta), Culture,
   Score (vs threshold), Cities (count).
-- **Audio toggle**. `🔊` / `🔇`. Persists in `localStorage` under
-  `inf3600:audioMuted`.
-- **Map mode toggle**. `Global` ignores fog; `Local` shows visible-tile fog.
+- **Audio toggle**. A compact SVG speaker control with unmuted/muted states.
+  Persists in `localStorage` under `inf3600:audioMuted`.
 - **Turn box**. Turn counter, "Your Move" / "{Civ} Acting" label, **End Turn**.
 
 ### Left rail
 
-- **Minimap**. A canvas thumbnail of the map; tinted by terrain, brighter for
-  visible tiles, with a focus dot on the selected unit/city.
+- **Minimap**. A compact grid thumbnail of the explored map; tinted by
+  terrain, brighter for visible tiles, with a focus outline on the selected
+  unit/city. It is capped to a small centered footprint so it does not push the
+  rail downward.
 - **Selection panel**. When a unit is selected: stats, owner, action buttons
   (Found City for Settlers, Build Improvement for Workers, Clear).
 
@@ -176,12 +177,13 @@ layered `<g>` groups (bottom-up):
    `tile_owner`.
 7. **Reachable highlight** — when a unit is selected, a 1-tile yellow tint on
    adjacent tiles.
-8. **Cities** — building image (faction-color ring) when art is available;
-   otherwise a colored card. Name label below.
-9. **Units** — sprite + faction-color dot anchor when art is available;
+8. **Placed structures** — purchased structure art on the tile where the
+   player dropped it; fallback is a compact colored building marker.
+9. **Cities** — city center marker with faction-color styling and name label.
+10. **Units** — sprite + faction-color dot anchor when art is available;
    otherwise the colored rect + glyph. Selection ring above; work-order
    improvement badge below.
-10. **Hover/highlight outlines** + transparent **hit zones** that own all
+11. **Hover/highlight outlines** + transparent **hit zones** that own all
     pointer events.
 
 ### Interactions
@@ -224,8 +226,9 @@ Contains:
   it's not your turn or a request is in flight.
 - **Structures** — current gold display, then the 4 asset-API categories
   (Production Hall / Fortification / Housing District / Sacred Site) as
-  buy-rows. Disabled state shows `✓ Built` when owned, or the price when you
-  can't afford it.
+  draggable buy-rows. Drag an enabled row onto an empty tile inside that city's
+  borders to purchase/place it. Disabled state shows `✓ Built` when owned, or
+  the price when you can't afford it.
 - **Buildings** (collapsible details) — list of completed queue-built
   buildings (Granary, Library, etc.).
 
@@ -315,8 +318,8 @@ every `run()` action wrapper in `page.tsx`. Events feed both:
 - The **banner** above the map — top 4 events for 4.5s.
 - The **Chronicle** at the bottom — keeps the last 80 events.
 
-Kinds include `combat`, `diplomacy`, `production`, `growth`, `research`,
-`exploration`, `bankruptcy`, etc. (the full list lives in `turnEvents.ts`).
+Kinds include city founding, completed research, lost units, met civilizations,
+stance changes, and received messages. The full list lives in `turnEvents.ts`.
 
 ---
 

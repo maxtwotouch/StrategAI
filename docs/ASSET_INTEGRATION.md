@@ -3,8 +3,9 @@
 The game pulls generative pixel-art assets — terrain tiles, unit sprites,
 city buildings, terrain elevation overlays, leader splash + profile — from a
 separate **Medieval Pixel Art Image Service** (`TopDownMedievalPixelArt-Prod`).
-This document covers the contract, the resolver, the cache, and the graceful-
-fallback behavior so the game stays playable when the service is degraded.
+This document covers the contract, the resolver, the no-cache policy, and the
+graceful-fallback behavior so the game stays playable when the service is
+degraded.
 
 For the game-side mechanics see [GAMEPLAY.md](GAMEPLAY.md); for UI surfaces
 see [UI_GUIDE.md](UI_GUIDE.md).
@@ -101,9 +102,10 @@ settler, worker              → settler
 
 **Per-civ unique sprites.** The resolver fans out across **every civ × every
 service unit type** (so 4 civs × 4 types = 16 POSTs per game start), passing a
-culture-flavored description so each civilization's units look distinct.
-`unitDescriptionFor(apiType, culture)` prepends a culture word (e.g.
-`"an East Asian imperial"`, `"a Nordic Viking"`) to the base unit description.
+civ-specific description so each civilization's units look distinct.
+`unitDescriptionFor(apiType, culture, leaderName)` combines the gameplay unit
+role with that civ's materials, kit, and visual motifs. The human player's
+custom culture is passed through this same path.
 The manifest stores units as `Record<civId, Record<gameUnitType, url>>`, and
 `SquareMap` looks up `assets.units[unit.owner]?.[unit.type]` so each civ's
 units render with their own sprite even when they happen to be the same
@@ -117,17 +119,11 @@ rendered on top of the base terrain tile. Each entry holds a `category`,
 
 ### City structures (`assetMapping.ts:cityStructureFor`)
 
-Per-leader structure style for the city marker. Keyed by `leader_name`:
-
-```
-Genghis Khan    → slavic_timber
-Cleopatra       → moorish
-Mahatma Gandhi  → mediterranean
-fallback        → anglo_saxon_stone
-```
-
-Combined with `category: "housing"`, `condition: "pristine"`, `scale: "medium"`,
-plus a static description.
+Structure prompts are also civ-specific. `cityStructureFor(leaderName, category,
+culture)` keeps the gameplay category clear (`production`, `fortification`,
+`housing`, `sacred`) while adding per-civ style, materials, silhouette, and
+motifs. Descriptions are capped before POSTing so they stay inside the
+structure API's request limits.
 
 ### Leader portraits (`leaderMapping.ts`)
 
@@ -157,7 +153,7 @@ resolveManifest({ gameId, terrains, civs, leaders }, { onProgress }) ──┐
        distinctTerrains   = unique(terrains) ∩ TERRAIN_TO_TILE_TYPE
        elevationTerrains  = unique(terrains) ∩ ELEVATION_TERRAINS
        apiUnitTypes       = unique(values(UNIT_TYPE_MAP))     // = 4
-       civs               // for /structure AND per-civ /unit batches
+       civs               // for per-civ /unit and per-category /structure batches
        leaders            // for /leader (splash+profile)
 
 3.  Fetch leader pool once:    listLeaders()  GET /leader
@@ -169,7 +165,9 @@ resolveManifest({ gameId, terrains, civs, leaders }, { onProgress }) ──┐
                                   mapLimit(apiUnitTypes, 2) so up to
                                   civs × 2 unit POSTs are in flight at once
                                   (descriptions are culture-flavored per civ)
-       structureWork  limit 2   → POST /structure           × civs
+       structureWork           → per civ in parallel, each civ runs
+                                  mapLimit(structure categories, 2)
+                                  so each category gets distinct art
        leaderWork     limit 2   → POST /leader splash → POST /leader profile
                                   (per civ; falls back to pool on POST failure)
 
@@ -188,8 +186,7 @@ on the ComfyUI side.
 Each per-asset call is wrapped in `try/catch`. **Failures don't break the
 manifest**; they just leave the corresponding key unset, and the renderer
 falls back to its built-in surface. After the full fan-out, the manifest is
-returned even if half the batches failed — only "totally empty" manifests are
-not cached, so a transient outage doesn't freeze a broken state.
+returned even if half the batches failed.
 
 ### Progress reporting
 
@@ -206,8 +203,10 @@ interface AssetManifest {
   gameId: number;
   terrain:    Record<string, string>;          // gameTerrain    → tile URL
   elevation:  Record<string, string>;          // gameTerrain    → overlay URL
-  units:      Record<string, string>;          // gameUnitType   → sprite URL
-  structures: Record<number, string>;          // civId          → building URL
+  units:      Record<number, Record<string, string>>;
+                                               // civId → gameUnitType → sprite URL
+  structures: Record<number, Record<string, string>>;
+                                               // civId → category → building URL
   leaders:    Record<number, LeaderAssets>;    // civId          → { splash, profile }
 }
 ```
@@ -265,8 +264,8 @@ The frontend is built to look reasonable in every degraded state.
 - `elevation[…]` missing → no relief overlay; base terrain renders alone.
 - `units[…]` missing → `SquareMap` falls back to the colored rect + glyph for
   that unit type.
-- `structures[…]` missing → the colored city card renders instead of the
-  building image.
+- `structures[civId][category]` missing → placed structures render with the
+  built-in compact building marker.
 - `leaders[civId]` empty → portraits in the badge and drawers fall back to
   the first letter of the civ name in a faction-color shape.
 
@@ -325,7 +324,6 @@ Open DevTools console + Network tab, click Begin Campaign:
 
 1. **Console** prints one of:
    - `[assetManifest] Resolving game N: X tiles, Y civs, Z leaders → POSTing to asset service…` (fetches firing)
-   - `[assetManifest] Cache hit for game N — no new fetches.` (clear cache)
    - `[assetManifest] NEXT_PUBLIC_ASSET_API_URL is empty — skipping all asset fetches.` (restart `next dev`)
 2. **Network → filter `stixxert`** (or whatever your host is) shows every
    actual HTTP request with status + duration. You'll see the resolver fan-out
@@ -361,7 +359,7 @@ are needed.
 | Topic | File |
 |---|---|
 | Asset service client | `frontend/lib/assetApi.ts` |
-| Resolver + cache | `frontend/lib/assetManifest.ts` |
+| Resolver | `frontend/lib/assetManifest.ts` |
 | Game-side mappings | `frontend/lib/assetMapping.ts` |
 | Leader mapping (deterministic + custom) | `frontend/lib/leaderMapping.ts` |
 | Manifest consumption | `frontend/components/SquareMap.tsx` + `frontend/app/page.tsx` (empire badge, sovereign overlay, diplomatic audience) |

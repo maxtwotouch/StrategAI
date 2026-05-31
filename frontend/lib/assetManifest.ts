@@ -30,6 +30,7 @@ import {
   generateBackgroundTile,
   generateLeaderProfile,
   generateLeaderSplash,
+  generateStructure,
   generateTerrainFeature,
   generateUnit,
   listLeaders,
@@ -37,7 +38,9 @@ import {
 import { leaderParamsFor } from "@/lib/leaderMapping";
 import {
   ELEVATION_TERRAINS,
+  STRUCTURE_CATEGORY_IDS,
   UNIT_TYPE_MAP,
+  cityStructureFor,
   unitDescriptionFor,
 } from "@/lib/assetMapping";
 
@@ -72,7 +75,9 @@ export interface AssetManifest {
   // civ id → game unit type → south-facing sprite URL.
   // Each civ gets its own per-culture variant of the four API unit types.
   units: Record<number, Record<string, string>>;
-  structures: Record<number, string>; // legacy: no longer pre-generated
+  // civ id -> structure category -> image URL.
+  // Pre-generated during loading so drag/drop placement renders immediately.
+  structures: Record<number, Record<string, string>>;
   leaders: Record<number, LeaderAssets>; // civ id → portrait/splash URLs
 }
 
@@ -149,6 +154,7 @@ export async function resolveManifest(
     distinctTerrains.length +
     elevationTerrains.length +
     civs.length * apiUnitTypes.length + // per-civ unit sprites
+    civs.length * STRUCTURE_CATEGORY_IDS.length + // per-civ structure sprites
     leaders.length;
   let done = 0;
   const tick = () => options.onProgress?.((done += 1), total);
@@ -157,7 +163,7 @@ export async function resolveManifest(
   const terrain: Record<string, string> = {};
   const elevation: Record<string, string> = {};
   const unitsByCiv: Record<number, Record<string, string>> = {};
-  const structures: Record<number, string> = {};
+  const structures: Record<number, Record<string, string>> = {};
   const leaderAssets: Record<number, LeaderAssets> = {};
 
   // Each civ's culture comes from either the player-authored custom params
@@ -205,7 +211,7 @@ export async function resolveManifest(
         try {
           apiUrls[apiType] = await generateUnit(
             apiType,
-            unitDescriptionFor(apiType, culture),
+            unitDescriptionFor(apiType, culture, civ.leaderName),
             options.signal,
           );
         } catch {
@@ -219,6 +225,27 @@ export async function resolveManifest(
         if (url) civUrls[gameType] = url;
       }
       if (Object.keys(civUrls).length > 0) unitsByCiv[civ.civId] = civUrls;
+    }),
+  );
+
+  const structureWork = Promise.all(
+    civs.map(async (civ) => {
+      const categoryUrls: Record<string, string> = {};
+      await mapLimit(STRUCTURE_CATEGORY_IDS, 2, async (category) => {
+        try {
+          categoryUrls[category] = await generateStructure(
+            cityStructureFor(civ.leaderName, category, cultureFor(civ)),
+            options.signal,
+          );
+        } catch {
+          // No sprite -> renderer falls back to the built-in city/structure marker.
+        } finally {
+          tick();
+        }
+      });
+      if (Object.keys(categoryUrls).length > 0) {
+        structures[civ.civId] = categoryUrls;
+      }
     }),
   );
 
@@ -286,6 +313,7 @@ export async function resolveManifest(
     terrainWork,
     elevationWork,
     unitWork,
+    structureWork,
     leaderWork,
   ]);
 
