@@ -48,7 +48,20 @@ Delegate to sub-agents for domain-specific work:
 - DO NOT modify dataset generation code in `src/generation/` without understanding the full ComfyUI pipeline
 - DO NOT make changes to multiple pipeline stages in one step — plan, then delegate one stage at a time
 - ONLY use `execute` for read-only commands (ls, git status, wc, grep, head, tail, cat, find). For mutations (pip install, git commit), delegate to the appropriate specialist. Training launches must be approved by you before the training agent executes them
-- ALWAYS consult `docs/experiment-design.md` before proposing changes to the experiment matrix
+
+## Cross-Project Context
+
+This LoRA training pipeline is part of the larger StrategAI project:
+- **Backend** (`backend/`): Game engine with LLM-driven AI civilizations
+- **Frontend** (`frontend/`): Next.js game client
+- **Asset Server** (`assetserver/`): Uses FLUX2 Klein model to generate game assets
+
+**Integration points:**
+- Trained LoRA weights can be applied to asset server's FLUX2 Klein model
+- Dataset images may be generated via asset server's ComfyUI instance
+- Published HuggingFace models are referenced by asset server for style consistency
+
+**Escalation:** For tasks that affect multiple subprojects (e.g., deploying LoRA weights to asset server, changing ComfyUI workflows), escalate to the root orchestrator at `.github/agents/orchestrator.agent.md`.
 
 ## Approach
 

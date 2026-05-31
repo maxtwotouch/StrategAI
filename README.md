@@ -122,6 +122,55 @@ testing playbook.
 
 ---
 
+## AI Agent System
+
+StrategAI includes a multi-agent system to assist with development across all subprojects. The system supports both **GitHub Copilot** and **Claude Code** harnesses.
+
+### Quick Reference
+
+| Harness | Format | Location |
+|---------|--------|----------|
+| **GitHub Copilot** | `.agent.md` files | `.github/agents/` (root + subprojects) |
+| **Claude Code** | `AGENTS.md` files | Root + each subproject |
+
+### Root-Level Agents
+
+- **Orchestrator**: Cross-project coordination, multi-subproject features
+- **Planner**: Create implementation plans, break down complex features, coordinate modifications
+- **AI Showcase**: Generate reports and presentations highlighting AI/ML aspects
+- **Research**: Read-only codebase exploration and data flow tracing
+- **Integration Tester**: Validate cross-project contracts and integration points
+- **Backend Specialist**: Game engine, LLM integration, API design
+- **Frontend Specialist**: Next.js UI, state management, asset integration
+
+### Subproject Agents
+
+Each subproject has specialized agents:
+- **Backend** (3 agents): Orchestrator, Game Engine, LLM Integration
+- **Frontend** (2 agents): Orchestrator, UI Engineer
+- **Asset Server** (11 agents): Full specialist coverage
+- **Dataset/Training** (5 agents): Training, dataset, publishing, code quality
+
+### Documentation
+
+- **Agent system details**: [`.github/agents/README.md`](.github/agents/README.md)
+- **Project context**: `AGENTS.md` files in root and each subproject
+- **Architecture diagram**: See `.github/agents/README.md` for delegation patterns
+
+### Usage Examples
+
+**GitHub Copilot**:
+```
+@Orchestrator Add a new unit type across backend, frontend, and asset server
+```
+
+**Claude Code**:
+```
+Use the Orchestrator agent to coordinate adding a new unit type
+```
+
+---
+
 ## License
 
 TBD.
