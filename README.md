@@ -1,128 +1,127 @@
 # StrategAI
 
-StrategAI is a Civilization-style strategy game prototype with a deterministic
-Python engine, a FastAPI backend, and a Next.js frontend. The backend owns game
-state, rules, AI goal execution, and HTTP APIs. The frontend renders the game
-map and player controls.
+A Civilization-style strategy game where rival civs are driven by LLM-backed
+goals. Deterministic Python game engine, FastAPI backend, Next.js + SVG
+frontend, and an external generative pixel-art service for tile / unit /
+structure / leader art.
+
+> **Need to read just one thing?** Start with **[docs/GAMEPLAY.md](docs/GAMEPLAY.md)**
+> for the game itself, or **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** to get
+> it running.
+
+---
+
+## Documentation
+
+| Guide | What's in it |
+|---|---|
+| [docs/GAMEPLAY.md](docs/GAMEPLAY.md) | Every mechanic: setup, civs, terrain, units (stats + costs), cities (yields + growth), production queue, buildings + gold-purchased structures, the 21-tech tree, workers/improvements, combat, diplomacy, turn flow, victory. |
+| [docs/UI_GUIDE.md](docs/UI_GUIDE.md) | Frontend lifecycle (Start → Load → Intro → War Room), layout breakdown of every panel and overlay (city drawer, diplomatic audience, sovereign portrait), map rendering layers, audio plumbing. |
+| [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md) | Contract with the asset service, taxonomy mapping, manifest resolver, cache strategy, graceful fallback, smoke test. |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Prerequisites, backend + frontend setup, env vars, tests, common workflows, where to hook new things in. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Original backend architecture write-up (engine layers, deterministic state, LLM goal source). |
+| [GAME_BACKLOG.md](GAME_BACKLOG.md) | Outstanding game-design work. |
+| [TIER1_PLAN.md](TIER1_PLAN.md) | Tier-1 mechanics implementation record (shipped). |
+| [planning.md](planning.md) | Original concept doc. |
+
+---
+
+## Quick Start
+
+```bash
+# backend
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.api.main:app --reload --port 8000
+
+# frontend (in another terminal)
+cd frontend
+npm install
+echo 'NEXT_PUBLIC_API_URL=http://localhost:8000' > .env.local
+# (optional) NEXT_PUBLIC_ASSET_API_URL=https://… to get generated art
+npm run dev
+
+# open the game
+open http://localhost:3000
+```
+
+The game is fully playable without the asset service — it falls back to flat
+colors + glyph rendering, and the start-screen leader inputs work as game
+metadata even when no art can be fetched.
+
+---
 
 ## Repository Layout
 
-```text
-.
-├── backend/              FastAPI app, game engine, tests, and scripts
-│   ├── app/api/          HTTP routes, schemas, action validation, game store
-│   ├── app/engine/       Pure game rules and turn-resolution logic
-│   ├── scripts/          Headless playthrough utilities
-│   └── tests/            Pytest suite
-├── frontend/             Next.js app and Pixi-based map UI
-├── ARCHITECTURE.md       Detailed backend architecture notes
-├── GAME_BACKLOG.md       Game design and implementation backlog
-└── TIER1_PLAN.md         Planning notes for the current milestone
+```
+INF-3600/
+├── README.md                this file
+├── docs/                    ARCHITECTURE · GAMEPLAY · UI_GUIDE · ASSET_INTEGRATION · DEVELOPMENT
+├── scripts/
+│   └── asset_api_smoke.py   stdlib smoke test for the asset service
+├── backend/
+│   ├── app/
+│   │   ├── api/             FastAPI routes + Pydantic schemas
+│   │   └── engine/          pure, immutable rules layer
+│   ├── scripts/             headless playthrough runner
+│   └── tests/               pytest suite
+└── frontend/
+    ├── app/                 Next.js App Router (page.tsx, layout.tsx, globals.css)
+    ├── components/          SquareMap and its types
+    ├── lib/                 game + asset clients, manifest resolver, audio hook
+    ├── public/audio/        drop intro.mp3 / ambient.mp3 here for music
+    └── .env.example         env shape reference
 ```
 
-## Prerequisites
+---
 
-- Python 3.11 or newer
-- Node.js 20 or newer
-- npm
+## Stack
 
-## Environment
+| Layer | Tech |
+|---|---|
+| Game engine | Python 3.11+, frozen dataclasses, pure functional state transitions |
+| Backend HTTP | FastAPI, Pydantic, in-memory store, OpenAI tool-use for AI civs |
+| Frontend | Next.js 15 (App Router), React 19, TypeScript strict, SVG-rendered map |
+| Generative art | External Medieval Pixel Art service (Flux2 Klein via ComfyUI) |
+| Audio | `HTMLAudioElement` with a small `useAudio` hook (intro swell + ambient bed + mute toggle) |
 
-The backend can use OpenAI for AI-generated strategic goals. Create a root
-`.env` file if you want that integration enabled:
+---
+
+## Testing
 
 ```bash
-touch .env
+# backend (pytest)
+cd backend && .venv/bin/python -m pytest
+
+# frontend (tsc + production build)
+cd frontend && npm run typecheck && npm run build
+
+# external asset service smoke (optional, hits the live host)
+python3 scripts/asset_api_smoke.py --fast
 ```
 
-Add:
+See [docs/DEVELOPMENT.md §5](docs/DEVELOPMENT.md#5-testing) for the full
+testing playbook.
 
-```bash
-OPENAI_API_KEY=sk-your-key-here
-```
+---
 
-Do not commit `.env`.
+## Status & Known Issues
 
-## Run The Backend
+- **Asset service generation** — the `/leader` pipeline works end-to-end;
+  five other families (`/background_tile`, `/unit`, `/structure`, `/terrain`,
+  `/object`) currently return HTTP 400 with a UTF-32-BE codec error.
+  Documented in [docs/ASSET_INTEGRATION.md §10](docs/ASSET_INTEGRATION.md#10-known-issues-with-the-live-asset-service).
+  The frontend handles the failures gracefully — game stays playable, map
+  renders with color fills until the server-side fix lands.
+- **Playthrough test flakiness** — `tests/test_playthrough.py::test_playthrough_with_generated_map`
+  intermittently fails with a city-capture move error. Pre-existing and
+  unrelated to recent work; tracked in the backlog.
+- **No automated CI** — manual checks before opening a PR (see
+  [docs/DEVELOPMENT.md §8](docs/DEVELOPMENT.md#8-ci--quality)).
 
-From the repository root:
+---
 
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn app.main:app --reload
-```
+## License
 
-The API runs at:
-
-```text
-http://localhost:8000
-```
-
-Health check:
-
-```text
-http://localhost:8000/health
-```
-
-## Run The Frontend
-
-In a second terminal, from the repository root:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open:
-
-```text
-http://localhost:3000
-```
-
-By default, the frontend talks to the backend at `http://localhost:8000`. To use
-a different backend URL, create `frontend/.env.local`:
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-Restart the frontend dev server after changing `.env.local`.
-
-## Tests And Checks
-
-Backend:
-
-```bash
-cd backend
-source .venv/bin/activate
-pytest
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm run typecheck
-npm run build
-```
-
-## Useful Scripts
-
-Run a headless backend playthrough:
-
-```bash
-cd backend
-source .venv/bin/activate
-python scripts/run_playthrough.py
-```
-
-## More Documentation
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) explains the backend engine, API boundary,
-  and AI goal execution model.
-- [GAME_BACKLOG.md](GAME_BACKLOG.md) tracks planned gameplay work.
-- [TIER1_PLAN.md](TIER1_PLAN.md) captures the current milestone plan.
+TBD.
