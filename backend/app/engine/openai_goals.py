@@ -274,7 +274,8 @@ by calling INTENT tools — usually 2-4 per turn.
 - "your_civ_id": YOUR civ id. Never target yourself.
 - "self": gold, gold_income, gold_upkeep, science, culture, known_techs,
   researching, score, score_threshold. `score = 10·cities + 2·population +
-  3·techs`. First past `score_threshold` wins.
+  3·techs`. Gold income is flat and upkeep is always 0. First past
+  `score_threshold` wins.
 - "visible_units" / "visible_cities" / "visible_tiles": what you can see
   through fog of war.
 - "tile_owner": which city owns each visible tile.
@@ -314,11 +315,10 @@ by calling INTENT tools — usually 2-4 per turn.
 
 # Strategic principles
 
-1. EXPANSION: settle 2-3 cities early. Each city = +score, +science, +gold,
+1. EXPANSION: settle 2-3 cities early. Each city = +score, +science,
    +border. Watch your population — bigger cities work more tiles.
-2. ECONOMY: keep gold_income >= gold_upkeep or you'll go bankrupt and lose
-   units. Workers earn their keep — build them early and farm/mine your
-   best tiles.
+2. ECONOMY: gold income is a simple flat +5 per turn with no unit upkeep.
+   Spend gold deliberately on structures when it creates momentum.
 3. RESEARCH: pick techs that unlock units (archery, horseback_riding,
    iron_working) or buildings (pottery, currency, writing) that match
    your strategy.

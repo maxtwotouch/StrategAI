@@ -67,17 +67,6 @@ UNIT_BUILD_COST: dict[UnitType, int] = {
 }
 
 
-UNIT_UPKEEP: dict[UnitType, int] = {
-    UnitType.SETTLER: 1,
-    UnitType.WARRIOR: 1,
-    UnitType.SCOUT: 1,
-    UnitType.WORKER: 1,
-    UnitType.ARCHER: 1,
-    UnitType.HORSEMAN: 2,
-    UnitType.SWORDSMAN: 2,
-}
-
-
 @dataclass(frozen=True, slots=True)
 class BuildItem:
     kind: BuildKind
@@ -165,6 +154,14 @@ class City:
         return 10 * self.population
 
 
+@dataclass(frozen=True, slots=True)
+class CityStructure:
+    city_id: int
+    owner: int
+    category: str
+    location: Hex
+
+
 class DiplomaticStance(str, Enum):
     PEACE = "peace"
     WAR = "war"
@@ -195,6 +192,7 @@ class GameState:
     civs: tuple[Civilization, ...]
     cities: tuple[City, ...]
     units: tuple[Unit, ...]
+    structures: tuple[CityStructure, ...] = ()
     seed: int = 0
     current_civ_idx: int = 0
     diplomacy: dict[tuple[int, int], DiplomaticStance] = field(default_factory=dict)

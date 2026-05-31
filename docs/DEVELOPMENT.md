@@ -49,24 +49,31 @@ INF-3600/
 │   │   │   └── game_factory.py  civ roster + map gen wiring
 │   │   └── engine/            pure-functional rules layer
 │   │       ├── models.py            frozen dataclasses + UNIT_STATS etc.
-│   │       ├── production.py        city tick / yields
-│   │       ├── buildings.py         building catalog + bonuses
-│   │       ├── combat.py            attack resolution + terrain mods
-│   │       ├── movement.py          move validation + healing
-│   │       ├── city_founding.py
-│   │       ├── borders.py           culture-driven border growth
-│   │       ├── diplomacy.py         stances, messages, truces
-│   │       ├── research.py          TECHS dict + UNIT_TECH_REQUIREMENTS
-│   │       ├── improvements.py      farm/mine/road work orders
-│   │       ├── score.py             victory score formula
-│   │       ├── openai_goals.py      LLM-backed goal source for AI civs
+│   │       ├── intents.py           dataclass intent types used by AI
 │   │       ├── operations.py        Intent → Goal lowering
+│   │       ├── executor.py          Goal → validated Action runner
+│   │       ├── human_source.py      human player's action-source adapter
+│   │       ├── openai_goals.py      LLM-backed goal source for AI civs
 │   │       ├── turn_resolver.py     AI turn orchestration
 │   │       ├── playthrough.py       end-to-end runner used in tests
 │   │       ├── directives.py        QueueProduction / CancelProduction /
 │   │       │                        PurchaseStructure / StartResearch
+│   │       ├── production.py        city tick / yields
+│   │       ├── economy.py           gold per turn, no-upkeep rules
+│   │       ├── buildings.py         building catalog + bonuses
+│   │       ├── city_founding.py     settler founding rules
+│   │       ├── city_names.py        deterministic civ-specific city names
+│   │       ├── starting_positions.py civ placement on generated maps
+│   │       ├── borders.py           culture-driven border growth
+│   │       ├── fog_of_war.py        per-civ visible-tile computation
+│   │       ├── combat.py            attack resolution + terrain mods
+│   │       ├── movement.py          move validation + healing
+│   │       ├── diplomacy.py         stances, messages, truces, met_civs
+│   │       ├── research.py          TECHS dict + UNIT_TECH_REQUIREMENTS
+│   │       ├── improvements.py      farm/mine/road work orders
+│   │       ├── victory.py           score victory formula
 │   │       ├── serialize.py         GameState → DTO
-│   │       ├── map_generator.py
+│   │       ├── map_generator.py     procedural map generator
 │   │       ├── terrain.py           passability + biome rules
 │   │       └── hex.py               coordinate math
 │   ├── scripts/
@@ -85,7 +92,7 @@ INF-3600/
     │   ├── hex.ts             coordinate math + glyph tables
     │   ├── turnEvents.ts      diff-driven event log
     │   ├── assetApi.ts        asset service client
-    │   ├── assetManifest.ts   resolver + cache
+    │   ├── assetManifest.ts   per-game asset resolver
     │   ├── assetMapping.ts    game taxonomy → asset enums
     │   ├── leaderMapping.ts   deterministic leader profiles
     │   └── useAudio.ts        intro/ambient music + mute toggle
@@ -294,19 +301,18 @@ cd ../frontend && npm run typecheck && npm run build
 
 ## 9. Useful Console + Shell Snippets
 
-### Browser console — asset manifest cache
+### Browser console — env + state inspection
+
+The asset manifest is no longer persisted (see
+[ASSET_INTEGRATION.md §6](ASSET_INTEGRATION.md#6-no-caching)), so cache
+clearing is rarely needed. Useful checks:
 
 ```js
-// inspect
-Object.keys(localStorage).filter(k => k.startsWith("inf3600:"));
-
-// clear all
-Object.keys(localStorage)
-  .filter(k => k.startsWith("inf3600:assetManifest:"))
-  .forEach(k => localStorage.removeItem(k));
-
 // see what env was inlined
 console.log("ASSET URL:", process.env.NEXT_PUBLIC_ASSET_API_URL);
+
+// confirm no stale manifests linger from an earlier release
+Object.keys(localStorage).filter(k => k.startsWith("inf3600:"));
 ```
 
 ### Shell — list which dev processes are running

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import actions, games, turns
+from app.api.routers import actions, audio, games, turns
 
 app = FastAPI(title="AI Civilization Backend", version="0.0.1")
 
@@ -23,3 +23,4 @@ def health() -> dict[str, str]:
 app.include_router(games.router)
 app.include_router(actions.router)
 app.include_router(turns.router)
+app.include_router(audio.router)

@@ -57,6 +57,15 @@ def test_get_unknown_game_returns_404(client: TestClient):
     assert r.status_code == 404
 
 
+def test_intro_narration_requires_openai_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    r = client.post("/audio/intro", json={"text": "An empire rises."})
+    assert r.status_code == 503
+    assert r.json()["detail"] == "OPENAI_API_KEY is not configured"
+
+
 def test_advance_turn_increments_counter(client: TestClient):
     created = client.post("/games", json={"radius": 3, "seed": 2}).json()
     r = client.post(f"/games/{created['id']}/turn")

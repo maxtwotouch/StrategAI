@@ -3,8 +3,9 @@
 The game pulls generative pixel-art assets — terrain tiles, unit sprites,
 city buildings, terrain elevation overlays, leader splash + profile — from a
 separate **Medieval Pixel Art Image Service** (`TopDownMedievalPixelArt-Prod`).
-This document covers the contract, the resolver, the cache, and the graceful-
-fallback behavior so the game stays playable when the service is degraded.
+This document covers the contract, the resolver, the no-cache policy, and the
+graceful-fallback behavior so the game stays playable when the service is
+degraded.
 
 For the game-side mechanics see [GAMEPLAY.md](GAMEPLAY.md); for UI surfaces
 see [UI_GUIDE.md](UI_GUIDE.md).
@@ -28,6 +29,21 @@ returns `null` immediately — the game renders with built-in colors, glyphs,
 and letter-initial portraits. No asset requests are made.
 
 A `frontend/.env.example` shows the expected shape.
+
+### Same-origin proxy (CORS shield)
+
+POST and JSON GET calls from the browser route through a Next.js API route at
+**`/api/asset/[...path]`** (`frontend/app/api/asset/[...path]/route.ts`) which
+forwards server-to-server to `NEXT_PUBLIC_ASSET_API_URL`. The browser only
+ever talks to its own origin, so CORS is never a factor — including when the
+upstream returns 5xx (typical CORS gotcha: error responses don't include
+`Access-Control-Allow-Origin` headers, and browsers report that as a CORS
+failure even though the real problem is the 5xx).
+
+**PNG fetches do not go through the proxy.** `<img src>` and SVG
+`<image href>` aren't CORS-restricted for display, so `absoluteAssetUrl()`
+still returns direct `https://…/assets/{uuid}.png` URLs — no extra Next.js
+hop on every map tile.
 
 ---
 
@@ -73,10 +89,9 @@ hills | mountain | tundra | snow → stone
 desert                          → sand
 ```
 
-### Units (`assetMapping.ts:UNIT_TYPE_MAP`)
+### Units (`assetMapping.ts:UNIT_TYPE_MAP` + `unitDescriptionFor`)
 
-7 game units collapse onto 4 service types; the resolver POSTs once per
-distinct service type then expands the URL back across every game type.
+7 game units collapse onto 4 service types:
 
 ```
 warrior, swordsman, horseman → warrior
@@ -85,8 +100,16 @@ scout                        → scout
 settler, worker              → settler
 ```
 
-`assetMapping.ts:UNIT_DESCRIPTION` carries a 20+ char description per service
-type that satisfies the API's validation.
+**Per-civ unique sprites.** The resolver fans out across **every civ × every
+service unit type** (so 4 civs × 4 types = 16 POSTs per game start), passing a
+civ-specific description so each civilization's units look distinct.
+`unitDescriptionFor(apiType, culture, leaderName)` combines the gameplay unit
+role with that civ's materials, kit, and visual motifs. The human player's
+custom culture is passed through this same path.
+The manifest stores units as `Record<civId, Record<gameUnitType, url>>`, and
+`SquareMap` looks up `assets.units[unit.owner]?.[unit.type]` so each civ's
+units render with their own sprite even when they happen to be the same
+gameplay type.
 
 ### Elevation overlays (`assetMapping.ts:ELEVATION_TERRAINS`)
 
@@ -96,17 +119,11 @@ rendered on top of the base terrain tile. Each entry holds a `category`,
 
 ### City structures (`assetMapping.ts:cityStructureFor`)
 
-Per-leader structure style for the city marker. Keyed by `leader_name`:
-
-```
-Genghis Khan    → slavic_timber
-Cleopatra       → moorish
-Mahatma Gandhi  → mediterranean
-fallback        → anglo_saxon_stone
-```
-
-Combined with `category: "housing"`, `condition: "pristine"`, `scale: "medium"`,
-plus a static description.
+Structure prompts are also civ-specific. `cityStructureFor(leaderName, category,
+culture)` keeps the gameplay category clear (`production`, `fortification`,
+`housing`, `sacred`) while adding per-civ style, materials, silhouette, and
+motifs. Descriptions are capped before POSTing so they stay inside the
+structure API's request limits.
 
 ### Leader portraits (`leaderMapping.ts`)
 
@@ -132,31 +149,35 @@ resolveManifest({ gameId, terrains, civs, leaders }, { onProgress }) ──┐
                                                                        │
 1.  assetApiConfigured() ──── false ──► return null  ◄─── NEXT_PUBLIC_… unset
                                                                        │
-2.  loadCachedManifest(gameId) ──── hit ──► return cached            ◄─┘
-                                                                  
-3.  Compute work items:
+2.  Compute work items:                                              ◄─┘
        distinctTerrains   = unique(terrains) ∩ TERRAIN_TO_TILE_TYPE
        elevationTerrains  = unique(terrains) ∩ ELEVATION_TERRAINS
        apiUnitTypes       = unique(values(UNIT_TYPE_MAP))     // = 4
-       civs               // for /structure
+       civs               // for per-civ /unit and per-category /structure batches
        leaders            // for /leader (splash+profile)
 
-4.  Fetch leader pool once:    listLeaders()  GET /leader
+3.  Fetch leader pool once:    listLeaders()  GET /leader
 
-5.  Run all batches concurrently via mapLimit():
+4.  Run all batches concurrently via mapLimit():
        terrainWork    limit 4   → POST /background_tile     × distinctTerrains
        elevationWork  limit 2   → POST /terrain             × elevationTerrains
-       unitWork       limit 2   → POST /unit                × apiUnitTypes (4)
-       structureWork  limit 2   → POST /structure           × civs
+       unitWork                 → per civ in parallel, each civ runs
+                                  mapLimit(apiUnitTypes, 2) so up to
+                                  civs × 2 unit POSTs are in flight at once
+                                  (descriptions are culture-flavored per civ)
+       structureWork           → per civ in parallel, each civ runs
+                                  mapLimit(structure categories, 2)
+                                  so each category gets distinct art
        leaderWork     limit 2   → POST /leader splash → POST /leader profile
                                   (per civ; falls back to pool on POST failure)
 
-6.  Stitch units: for each gameType, units[gameType] = apiUnitUrls[mappedType].
-
-7.  Build the manifest object, save to localStorage if anything resolved.
-
-8.  Return manifest to loadGame() → setAssets(manifest).
+5.  Build the manifest object and return it to loadGame() → setAssets(manifest).
 ```
+
+There is **no caching layer** — every game start (and every page refresh that
+triggers a new game) re-resolves from the asset service. This keeps the game
+honest about backend restarts that reuse a `gameId`: stale URLs from a
+previous deploy can never linger in `localStorage`.
 
 `mapLimit(items, limit, worker)` is a small concurrency-limited iterator —
 keeps in-flight requests under control even when the asset server is GPU-bound
@@ -165,8 +186,7 @@ on the ComfyUI side.
 Each per-asset call is wrapped in `try/catch`. **Failures don't break the
 manifest**; they just leave the corresponding key unset, and the renderer
 falls back to its built-in surface. After the full fan-out, the manifest is
-returned even if half the batches failed — only "totally empty" manifests are
-not cached, so a transient outage doesn't freeze a broken state.
+returned even if half the batches failed.
 
 ### Progress reporting
 
@@ -183,8 +203,10 @@ interface AssetManifest {
   gameId: number;
   terrain:    Record<string, string>;          // gameTerrain    → tile URL
   elevation:  Record<string, string>;          // gameTerrain    → overlay URL
-  units:      Record<string, string>;          // gameUnitType   → sprite URL
-  structures: Record<number, string>;          // civId          → building URL
+  units:      Record<number, Record<string, string>>;
+                                               // civId → gameUnitType → sprite URL
+  structures: Record<number, Record<string, string>>;
+                                               // civId → category → building URL
   leaders:    Record<number, LeaderAssets>;    // civId          → { splash, profile }
 }
 ```
@@ -196,47 +218,37 @@ service base URL.
 
 ---
 
-## 6. Caching
+## 6. No Caching
 
-### Per-game `localStorage` cache
-
-Key format:
-
-```
-inf3600:assetManifest:{hostTag}:{gameId}
-```
-
-- `hostTag` is derived from `NEXT_PUBLIC_ASSET_API_URL` (lowercased, host part,
-  non-alphanumerics replaced). **Swapping asset servers automatically
-  invalidates older entries** — no stale URLs from the previous host can leak
-  into the new session.
-- `gameId` comes from the backend's `state.id`. Each `createGame` returns a
-  fresh id (monotonic per backend lifetime), so each game start gets a unique
-  art set within the same host.
+The asset manifest is **not persisted**. Every game start hits the asset
+service fresh. Earlier iterations cached the manifest in `localStorage` keyed
+by `{hostTag}:{gameId}`, but that masked a real problem: when the backend
+restarted and reused a `gameId`, the cache served URLs the asset server had
+since rotated out — and that looked identical to "the resolver never fired."
+The performance win of skipping fetches at game start (a few seconds behind
+the load screen) wasn't worth that hazard.
 
 ### What happens on:
 
-- **New game.** Backend assigns a new `gameId`. Cache miss → full resolution.
-- **Reload of the same game.** Same `gameId`. Cache hit → instant manifest
-  reuse, zero network requests.
-- **Backend restarts and `gameId` collides.** Different `hostTag` would
-  invalidate; same `hostTag` + same id would reuse stale URLs. The host tag
-  doesn't protect this scenario — clear `localStorage` if you're seeing
-  stale art after backend resets.
+- **New game.** Full resolution every time.
+- **Page refresh during a game.** Lost React state forces the user back to
+  the start screen; the next Begin Campaign creates a new game and a new
+  resolution.
+- **Backend restart that reuses a `gameId`.** Doesn't matter — there's nothing
+  cached to reuse.
+
+`lib/assetManifest.ts` includes a one-off `localStorage` housekeeping block
+that wipes `inf3600:assetManifest:*` entries left over from the cached era.
+Safe to delete after a release or two.
 
 ### Browser-console helpers
 
 ```js
-// list every cached manifest
-Object.keys(localStorage).filter(k => k.startsWith("inf3600:assetManifest:"));
-
-// nuke them all
-Object.keys(localStorage)
-  .filter(k => k.startsWith("inf3600:assetManifest:"))
-  .forEach(k => localStorage.removeItem(k));
-
 // verify the env var made it into the bundle
 console.log(process.env.NEXT_PUBLIC_ASSET_API_URL);
+
+// confirm no stale manifests linger (should always be empty now)
+Object.keys(localStorage).filter(k => k.startsWith("inf3600:assetManifest:"));
 ```
 
 ---
@@ -252,8 +264,8 @@ The frontend is built to look reasonable in every degraded state.
 - `elevation[…]` missing → no relief overlay; base terrain renders alone.
 - `units[…]` missing → `SquareMap` falls back to the colored rect + glyph for
   that unit type.
-- `structures[…]` missing → the colored city card renders instead of the
-  building image.
+- `structures[civId][category]` missing → placed structures render with the
+  built-in compact building marker.
 - `leaders[civId]` empty → portraits in the badge and drawers fall back to
   the first letter of the civ name in a faction-color shape.
 
@@ -312,7 +324,6 @@ Open DevTools console + Network tab, click Begin Campaign:
 
 1. **Console** prints one of:
    - `[assetManifest] Resolving game N: X tiles, Y civs, Z leaders → POSTing to asset service…` (fetches firing)
-   - `[assetManifest] Cache hit for game N — no new fetches.` (clear cache)
    - `[assetManifest] NEXT_PUBLIC_ASSET_API_URL is empty — skipping all asset fetches.` (restart `next dev`)
 2. **Network → filter `stixxert`** (or whatever your host is) shows every
    actual HTTP request with status + duration. You'll see the resolver fan-out
@@ -322,24 +333,28 @@ Open DevTools console + Network tab, click Begin Campaign:
 
 ## 10. Known Issues with the Live Asset Service
 
-(As of this writing — see the commit history of the asset repo for current
-status.)
+(See the commit history of the asset repo for current status.)
 
-- **`POST /background_tile`, `/unit`, `/structure`, `/terrain`, `/object`
-  return HTTP 400** with `{"detail": "'utf-32-be' codec can't decode bytes
-  in position 8-11: code point not in range(0x110000)"}`. Reproducible across
-  request shapes; not a client encoding issue. The math: bytes 8-11 of
-  `{"tile_type":"grass"}` are ASCII `tile` = `0x7469_6C65` which exceeds
-  Unicode's `0x110000` cap. Something on the server is calling
-  `.decode("utf-32-be")` on raw UTF-8 JSON bytes in those routes. The
-  `/leader` pipeline doesn't go through that code path and is unaffected.
-- **Profile generation is rare in the existing leader pool.** All current
-  pool leaders have `profile_url: null`. Until the splash→profile chain
-  succeeds for at least one civ, portrait-shaped surfaces (empire badge,
-  drawer/audience avatars) keep falling back to initials.
-
-Tracked in the bug report; once the server is redeployed, no client changes
-are needed.
+- **Splash → profile chaining is intermittent.** `POST /leader` with
+  `asset_type: "splash"` is healthy and returns real cinematic art. The
+  chained `asset_type: "profile"` request (img2img off the splash) sometimes
+  returns HTTP 500. The resolver catches that silently and keeps the splash;
+  every portrait surface (empire badge, audience hero, diplomatic ribbon,
+  rival avatars) then reads `profileUrl ?? splashUrl` and renders a
+  face-biased crop (`object-position: center 20%`) of the splash instead of
+  letter-initials.
+- **Past upstream codec bug — now circumvented end-to-end.** Earlier in this
+  project's life the non-leader generation routes (`/background_tile`,
+  `/unit`, `/structure`, `/terrain`, `/object`) returned HTTP 400 with
+  `'utf-32-be' codec can't decode bytes …` on every request, plus 5xx
+  responses that lacked CORS headers (which the browser surfaces as a
+  generic "CORS policy" failure). Both classes of issue are now neutralized
+  by the same-origin proxy at `/api/asset/[...path]`: it strips the
+  browser's `Accept-Encoding` so upstream always sends plain JSON, and 5xx
+  errors are forwarded with the proxy's own `Access-Control-Allow-Origin:
+  *` headers so the browser sees a real status code instead of a CORS
+  error. The bug is documented historically here in case anyone investigates
+  the upstream code path; runtime impact on the game UI is zero.
 
 ---
 
@@ -348,7 +363,7 @@ are needed.
 | Topic | File |
 |---|---|
 | Asset service client | `frontend/lib/assetApi.ts` |
-| Resolver + cache | `frontend/lib/assetManifest.ts` |
+| Resolver | `frontend/lib/assetManifest.ts` |
 | Game-side mappings | `frontend/lib/assetMapping.ts` |
 | Leader mapping (deterministic + custom) | `frontend/lib/leaderMapping.ts` |
 | Manifest consumption | `frontend/components/SquareMap.tsx` + `frontend/app/page.tsx` (empire badge, sovereign overlay, diplomatic audience) |

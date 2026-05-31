@@ -62,7 +62,6 @@ persona prompt that feeds the LLM goal source — see
 | Resources | `wheat`, `cattle`, `fish`, `iron`, `horses`, `coal`, `gems`, `silk`, `spices` (tile bonuses). |
 | Rivers | Boolean on a tile — boosts defense for any unit standing on it. |
 | Fog of war | Tiles not currently in any of your unit/city sight radii are dimmed. The frontend caches "explored" tiles separately so you can still see the terrain you've discovered, even when fogged. |
-| Map views | **Local** (default, fog visible) vs **Global** (debug/overview, ignores fog). Toggle in the topbar. |
 
 ### Passable vs impassable
 
@@ -98,11 +97,10 @@ Stats live in `UNIT_STATS` and `UNIT_BUILD_COST` (`backend/app/engine/models.py`
 - **Attack** — click an adjacent enemy unit (requires `war` stance — peace
   attacks are rejected with an explanatory toast).
 
-### Upkeep
+### Gold
 
-Every unit costs gold per turn (`UNIT_UPKEEP` in `models.py`). All current
-units cost 1 gold/turn. Run out of gold → **bankruptcy** disbands the oldest
-non-settler unit and clamps gold to 0. The event surfaces in the Chronicle.
+Every civilization gains a flat **+5 gold per turn**. Units have no upkeep,
+and there is no bankruptcy disbanding.
 
 ### Healing rate (per turn, when not acting)
 
@@ -120,6 +118,7 @@ class City:
   health, max_health (20),
   buildings: frozenset[BuildingType],
   purchased_structures: frozenset[str],
+  structures: tuple[CityStructure, ...] on GameState,
   production_queue: tuple[BuildItem, ...],
   border_radius (1 → 2 → 3),
   culture_stored,
@@ -136,7 +135,7 @@ For each city, accumulated from worked tiles + base yields + building bonuses
 | **Food** | `2 + Σ worked-tile food + city_food_bonus(buildings)` | Surplus feeds growth: when `food_stored ≥ 10 × population`, population grows by 1 and `food_stored` resets to 0. |
 | **Production** | `1 + Σ worked-tile production + city_production_bonus(buildings) + 2 × len(purchased_structures)` | Drains into queue head each turn until item completes. |
 | **Culture** | `1 + Σ culture bonuses` | Accumulates in `culture_stored`. Border ring grows at thresholds — see below. |
-| **Gold** | Σ tile gold yields + market bonuses − unit upkeep. | Pooled across civ, not per-city. |
+| **Gold** | Flat +5 gold per civilization per turn. Tile/market gold is still serialized for inspection, but the web economy currently uses the flat rule. | Pooled across civ, not per-city. |
 | **Science** | 2 per city + library bonus. | Pooled across civ. |
 
 ### Border growth (culture)
@@ -198,23 +197,30 @@ Defined in `backend/app/engine/buildings.py`.
 
 Queue them via the **Build Order** list in the City Drawer.
 
-### B. Gold-purchased structures (instant)
+### B. Gold-purchased structures (drag-and-drop placement)
 
 A separate mechanism introduced for the asset-API integration. Categories
-mirror the asset service's `StructureCategory` so the city is visually
-represented by a real generated building.
+mirror the asset service's `StructureCategory`. These are not queue-built
+buildings; they are instant gold purchases placed onto a map tile.
 
 | Category | Asset-API style | Gold cost | Effect |
 |---|---|---:|---|
-| Production | workshop / forge / mill | 80 | +2 production/turn |
-| Fortification | walls / keep / gatehouse | 80 | +2 production/turn (visual differentiator) |
-| Housing | townhouse / longhouse / manor | 80 | +2 production/turn |
-| Sacred | temple / shrine / cathedral | 80 | +2 production/turn |
+| Production | workshop / forge / mill | 15 | +2 production/turn |
+| Fortification | walls / keep / gatehouse | 15 | +2 production/turn (visual differentiator) |
+| Housing | townhouse / longhouse / manor | 15 | +2 production/turn |
+| Sacred | temple / shrine / cathedral | 15 | +2 production/turn |
 
-Per city you can buy **one of each category** (max 4). Buy from the
-**Structures** section in the City Drawer; the row is disabled when you can't
-afford it or already own it. See `purchased_structures: frozenset[str]` on
-`City` and `_purchase_structure` in `backend/app/engine/directives.py`.
+Per city you can buy **one of each category** (max 4). Drag a structure row
+from the **Structures** section in the City Drawer onto a passable, empty tile
+inside that city's borders. The backend validates the drop target and stores a
+`CityStructure(city_id, owner, category, location)` in `GameState.structures`.
+The city also records the owned category in `purchased_structures` so the
+production bonus can be computed as `2 × len(purchased_structures)`.
+
+Invalid drops are rejected if the tile is outside the city's borders,
+impassable, already has a city/unit/structure, or the category is already
+owned by that city. See `_purchase_structure` in
+`backend/app/engine/directives.py`.
 
 ---
 
@@ -342,9 +348,11 @@ composer's tone dropdown.
 
 ### Diplomatic Audience (frontend)
 
-Clicking a rival leader in the right-rail "Other Leaders" panel opens a
-full-screen Diplomatic Audience overlay backed by the rival's splash art.
-See [UI_GUIDE.md](UI_GUIDE.md#diplomatic-audience).
+Clicking a leader avatar in the **Diplomatic Ribbon** on the right edge of
+the map opens a full-screen Diplomatic Audience overlay backed by the
+rival's splash art. See
+[UI_GUIDE.md §4.1](UI_GUIDE.md#41-diplomatic-ribbon-met-leader-portraits-on-the-map)
+and [UI_GUIDE.md §5 Diplomatic Audience](UI_GUIDE.md#diplomatic-audience-full-screen-overlay).
 
 ---
 
@@ -372,7 +380,7 @@ also enforces turn ownership on the API boundary.
 ## 13. Victory
 
 Score-based. Default threshold is **200** (`state.score_threshold`).
-`civ.score` is updated each turn via `compute_score(state)` —
+`civ.score` is calculated by `backend/app/engine/victory.py:civ_score` —
 roughly: `population × 3 + technologies × 6 + cities × 5 + cultural standing`.
 
 First civ to cross the threshold wins; the UI shows a "you reached the goal"
@@ -395,7 +403,7 @@ see `GAME_BACKLOG.md`.)
 | Diplomacy | `backend/app/engine/diplomacy.py` |
 | Tech tree | `backend/app/engine/research.py` |
 | Improvements | `backend/app/engine/improvements.py` |
-| Score | `backend/app/engine/score.py` |
+| Score | `backend/app/engine/victory.py` |
 | LLM goal source | `backend/app/engine/openai_goals.py` |
 | Turn orchestration | `backend/app/engine/turn_resolver.py`, `playthrough.py` |
 | Directives (queue, research, structures) | `backend/app/engine/directives.py` |

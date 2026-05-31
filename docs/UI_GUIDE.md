@@ -23,7 +23,7 @@ frontend/
 │   ├── hex.ts            grid math + TERRAIN/UNIT/IMPROVEMENT glyph tables
 │   ├── turnEvents.ts     diff prev/next GameState → TurnEvent[]
 │   ├── assetApi.ts       asset service client (POST /leader, etc.)
-│   ├── assetManifest.ts  resolveManifest() + per-game cache
+│   ├── assetManifest.ts  resolveManifest() per-game asset resolver
 │   ├── assetMapping.ts   game taxonomy → asset enums (units, structures, elevation)
 │   ├── leaderMapping.ts  deterministic leader → enum/description map
 │   └── useAudio.ts       intro swell + ambient bed, mute toggle, fades
@@ -83,10 +83,10 @@ intro screen is dismissed.
 
 ```
 ┌─ topbar ──────────────────────────────────────────────────────────────────┐
-│ EmpireBadge (clickable→Sovereign overlay) │ Metrics │ Audio · Global/Local │
-│  ┌────┐ Civ Name                          │ Sci 12  │ 🔊  ┌─────┬─────┐    │
-│  │img│ Leader Name                        │ Gold 47 │     │GLOB │LOCAL│    │
-│  └────┘ Next objective hint               │ Cult 8  │     └─────┴─────┘    │
+│ EmpireBadge (clickable→Sovereign overlay) │ Metrics │ Audio · Turn box     │
+│  ┌────┐ Civ Name                          │ Sci 12  │ speaker icon         │
+│  │img│ Leader Name                        │ Gold 47 │ Turn 14              │
+│  └────┘ Next objective hint               │ Cult 8  │ [End Turn]           │
 │                                           │ Score   │     Turn 14          │
 │                                           │ Cities  │     [End Turn]       │
 ├───────────┬─────────────────────────────────┬───────────────────────────────┤
@@ -98,12 +98,12 @@ intro screen is dismissed.
 │ Selection │  │   wheel to zoom         │    │  available techs              │
 │  unit     │  │   click tile to act     │    │                               │
 │  actions  │  │                         │    │ Cities list                   │
-│  improve  │  │   hover → terrain       │    │  click row → open City Drawer │
-│  found    │  │   readout overlay       │    │                               │
-│           │  └─────────────────────────┘    │ Other Leaders                 │
-│           │  Turn Chronicle banner          │  click row → Diplo Audience   │
+│  improve  │  │   diplomatic ribbon →   │    │  click row → open City Drawer │
+│  found    │  │     met-leader avatars  │    │                               │
+│           │  │     on right edge       │    │ Standings                     │
+│           │  └─────────────────────────┘    │  goal score + per-civ progress│
+│           │  Turn Chronicle banner          │                               │
 │           │  (briefly during turn changes)  │                               │
-│           │                                 │ Standings                     │
 ├───────────┴─────────────────────────────────┴───────────────────────────────┤
 │                            Chronicle (events log)                            │
 └───────────────────────────────────────────────────────────────────────────┘
@@ -113,19 +113,20 @@ intro screen is dismissed.
 
 - **Empire Badge** (left). Click anywhere on it → opens the **Sovereign
   Portrait Overlay**. The badge shows the human civ's profile portrait if the
-  manifest resolved one; otherwise falls back to the civ's first initial in
-  the gold hex seal.
+  manifest resolved one; otherwise falls back to the civ's first initial in a
+  large faction-color circular seal.
 - **Metrics**. Science (total), Gold (with `+net/turn` delta), Culture,
   Score (vs threshold), Cities (count).
-- **Audio toggle**. `🔊` / `🔇`. Persists in `localStorage` under
-  `inf3600:audioMuted`.
-- **Map mode toggle**. `Global` ignores fog; `Local` shows visible-tile fog.
+- **Audio toggle**. A compact SVG speaker control with unmuted/muted states.
+  Persists in `localStorage` under `inf3600:audioMuted`.
 - **Turn box**. Turn counter, "Your Move" / "{Civ} Acting" label, **End Turn**.
 
 ### Left rail
 
-- **Minimap**. A canvas thumbnail of the map; tinted by terrain, brighter for
-  visible tiles, with a focus dot on the selected unit/city.
+- **Minimap**. A compact grid thumbnail of the explored map; tinted by
+  terrain, brighter for visible tiles, with a focus outline on the selected
+  unit/city. It is capped to a small centered footprint so it does not push the
+  rail downward.
 - **Selection panel**. When a unit is selected: stats, owner, action buttons
   (Found City for Settlers, Build Improvement for Workers, Clear).
 
@@ -144,10 +145,11 @@ The map plus two overlays:
   are met. Click a tech to start researching it.
 - **Cities list**. Compact rows (name + capital ★ + `pop · queue head`). Click
   a row to open the City Drawer; the active city row is highlighted.
-- **Other Leaders**. Compact rows for each met rival: portrait or initial,
-  civ name, stance + relationship + truce badge + unread inbox count. Click
-  to open the Diplomatic Audience.
 - **Standings**. The score table; your row is bolded.
+
+The "Other Leaders" right-rail panel that used to live here has been replaced
+by the **Diplomatic Ribbon** floating on the map (see §4.1 below). Met-leader
+interaction now happens entirely on the map surface.
 
 ### Chronicle (bottom)
 
@@ -176,12 +178,13 @@ layered `<g>` groups (bottom-up):
    `tile_owner`.
 7. **Reachable highlight** — when a unit is selected, a 1-tile yellow tint on
    adjacent tiles.
-8. **Cities** — building image (faction-color ring) when art is available;
-   otherwise a colored card. Name label below.
-9. **Units** — sprite + faction-color dot anchor when art is available;
+8. **Placed structures** — purchased structure art on the tile where the
+   player dropped it; fallback is a compact colored building marker.
+9. **Cities** — city center marker with faction-color styling and name label.
+10. **Units** — sprite + faction-color dot anchor when art is available;
    otherwise the colored rect + glyph. Selection ring above; work-order
    improvement badge below.
-10. **Hover/highlight outlines** + transparent **hit zones** that own all
+11. **Hover/highlight outlines** + transparent **hit zones** that own all
     pointer events.
 
 ### Interactions
@@ -200,6 +203,35 @@ layered `<g>` groups (bottom-up):
 
 The defensive guard in `onTileClick` (and the explicit owner check in
 `onUnitClick`) prevents accidentally commanding rival units.
+
+### 4.1 Diplomatic Ribbon (met-leader portraits on the map)
+
+Civ-style vertical column of leader portraits pinned to the **right edge of
+the map area**, below the zoom/Recenter HUD. Lives inside `.map-frame` as
+absolutely-positioned siblings of the SVG, defined in `app/page.tsx` and
+styled by `.leader-ribbon*` rules in `globals.css`.
+
+For each met civ:
+- **56px circle** (44px on viewports ≤ 1100px) with the leader's profile or
+  splash art (`object-position: center 20%` biases the crop toward the face
+  region of cinematic splashes).
+- Faction color as the background fallback when no art is loaded yet.
+- **Ring border colored by the diplomatic relationship** (red → hostile,
+  gold → neutral, green → friendly) using the same `relationshipColor` palette
+  the audience uses for its pills.
+- A small **stance dot** in the bottom-right reinforces the ring color (which
+  can be hard to read over dark splash crops).
+- **Dashed gold halo** when a truce is active.
+- **Gold count pill** at the top-right for unread inbox messages from that
+  civ.
+- **Active outline** when the Diplomatic Audience is open with that civ.
+
+Interaction: click an avatar → `setActiveConversationCivId(civ.id)` → opens
+the Diplomatic Audience. Hover gets a `title=` tooltip with name + leader
+name + stance + relationship + truce/inbox counts.
+
+The ribbon animates in (`leader-ribbon-fade-in`, 320ms) when it first appears
+and each avatar lifts slightly on hover.
 
 ---
 
@@ -224,8 +256,9 @@ Contains:
   it's not your turn or a request is in flight.
 - **Structures** — current gold display, then the 4 asset-API categories
   (Production Hall / Fortification / Housing District / Sacred Site) as
-  buy-rows. Disabled state shows `✓ Built` when owned, or the price when you
-  can't afford it.
+  draggable buy-rows. Drag an enabled row onto an empty tile inside that city's
+  borders to purchase/place it. Disabled state shows `✓ Built` when owned, or
+  the price when you can't afford it.
 - **Buildings** (collapsible details) — list of completed queue-built
   buildings (Granary, Library, etc.).
 
@@ -234,15 +267,21 @@ right: 0; width: min(420px, 100vw)`. Slides via `transform: translateX`.
 
 ### Diplomatic Audience (full-screen overlay)
 
-Replaces the older slide-in drawer. Opens when a row in the right-rail
-**Other Leaders** panel is clicked.
+Replaces the older slide-in drawer. Opens by clicking a leader avatar in the
+**Diplomatic Ribbon** on the map edge.
 
 Visual:
-- **Backdrop**: the rival's splash art at full bleed, dimmed via radial
-  + linear gradients for legibility. If no splash is resolved yet, a dark
-  gradient still backs the panel.
-- **Panel**: centered parchment card (`rgba(245, 238, 219, 0.95)` with backdrop
-  blur). Black-on-cream typography.
+- **Backdrop**: the rival's splash art at full bleed. A radial vignette is
+  biased to the right (`ellipse at 68% 40%`) so the brightest spot of the
+  lighting lands on the exposed portion of the splash; the panel side gets a
+  gentle darken to anchor it. If no splash is resolved yet, a dark gradient
+  still backs the panel.
+- **Panel**: translucent parchment card (`rgba(245, 238, 219, 0.82)` with
+  12px `backdrop-filter` blur + saturate). **Anchored bottom-left**
+  (`align-items: flex-end; justify-content: flex-start; margin: 0 0 3vh 3vw`),
+  width `min(560px, 90vw)`, max-height 82vh — so the splash art dominates the
+  upper-right of the screen rather than being covered. Black-on-cream
+  typography stays legible against any backdrop tone thanks to the blur.
 - **Hero**: 96px portrait + `Civ Name` (display font) + leader name + stance
   pills (Status · Rel score + label · Truce until Tn).
 - **Messages**: scrollable thread of `MessageCard`s with sent/received
@@ -315,8 +354,8 @@ every `run()` action wrapper in `page.tsx`. Events feed both:
 - The **banner** above the map — top 4 events for 4.5s.
 - The **Chronicle** at the bottom — keeps the last 80 events.
 
-Kinds include `combat`, `diplomacy`, `production`, `growth`, `research`,
-`exploration`, `bankruptcy`, etc. (the full list lives in `turnEvents.ts`).
+Kinds include city founding, completed research, lost units, met civilizations,
+stance changes, and received messages. The full list lives in `turnEvents.ts`.
 
 ---
 

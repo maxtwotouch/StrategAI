@@ -10,6 +10,11 @@
 
 const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_API_URL ?? "").replace(/\/+$/, "");
 
+// All POST / generation calls route through this Next.js API route. The proxy
+// (app/api/asset/[...path]/route.ts) forwards to the asset server server-to-
+// server, which sidesteps browser CORS checks for JSON API calls.
+const PROXY_PREFIX = "/api/asset";
+
 export type BackgroundTileType = "water" | "grass" | "sand" | "stone" | "dirt";
 
 interface BackgroundTileResponse {
@@ -24,8 +29,10 @@ export function assetApiConfigured(): boolean {
   return ASSET_BASE_URL.length > 0;
 }
 
-// Turn a service-relative URL ("/assets/x.png") into an absolute one the
-// browser can load. Absolute URLs are passed through untouched.
+// Turn a service-relative URL ("/assets/x.png") into a direct image URL the
+// browser can render in <img> and SVG <image>. Image display is not blocked by
+// CORS, and keeping PNGs direct avoids routing high-volume map tile loads
+// through the Next.js API proxy.
 export function absoluteAssetUrl(url: string): string {
   if (!url) return url;
   if (/^https?:\/\//i.test(url)) return url;
@@ -37,7 +44,7 @@ async function postJson<T>(
   body: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(`${ASSET_BASE_URL}${path}`, {
+  const res = await fetch(`${PROXY_PREFIX}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -132,7 +139,7 @@ export async function listLeaders(
 ): Promise<ExistingLeader[]> {
   if (!assetApiConfigured()) return [];
   try {
-    const res = await fetch(`${ASSET_BASE_URL}/leader`, { signal });
+    const res = await fetch(`${PROXY_PREFIX}/leader`, { signal });
     if (!res.ok) return [];
     return (await res.json()) as ExistingLeader[];
   } catch {

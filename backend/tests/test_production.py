@@ -38,7 +38,7 @@ def test_city_accumulates_food_and_production():
     state = _base_state(city)
     new_state = process_cities(state)
     new_city = new_state.cities[0]
-    # Grassland: food=2. base food=2. upkeep 1*pop(1)=1. net food +3 → 3.
+    # Grassland: food=2. base food=2. population consumes 1. net food +3 → 3.
     # Grassland: production=0. base production=1. net prod +1 → 1.
     assert new_city.food_stored == 3
     assert new_city.production_stored == 1

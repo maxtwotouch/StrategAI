@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SquareMap } from "@/components/SquareMap";
+import { absoluteAssetUrl, listLeaders } from "@/lib/assetApi";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
 import {
   CIV_COLORS,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/hex";
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
-import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS } from "@/lib/assetMapping";
+import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, STRUCTURE_CATEGORIES } from "@/lib/assetMapping";
 import { buildCustomLeaderParams } from "@/lib/leaderMapping";
 import { useAudio } from "@/lib/useAudio";
 
@@ -27,7 +28,29 @@ type Setup = {
   culture: string;
   leaderDescription: string;
 };
-type MapViewMode = "global" | "local";
+
+function AudioGlyph({ muted }: { muted: boolean }) {
+  return (
+    <svg
+      className="audio-toggle__icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        className="audio-toggle__speaker"
+        d="M4.5 9.25h3.35l5.05-4.2v13.9l-5.05-4.2H4.5z"
+      />
+      {!muted && (
+        <>
+          <path className="audio-toggle__wave" d="M15.5 8.1c1.1.9 1.7 2.25 1.7 3.9s-.6 3-1.7 3.9" />
+          <path className="audio-toggle__wave audio-toggle__wave--outer" d="M18 5.8c1.75 1.55 2.75 3.75 2.75 6.2S19.75 16.65 18 18.2" />
+        </>
+      )}
+      {muted && <path className="audio-toggle__slash" d="M16.2 8.1l4.1 7.8M20.3 8.1l-4.1 7.8" />}
+    </svg>
+  );
+}
 
 type TechDef = {
   id: string;
@@ -38,6 +61,19 @@ type TechDef = {
 
 function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
+}
+
+function placedStructureKey(cityId: number, category: string, q: number, r: number): string {
+  return `${cityId}:${category}:${tileKey(q, r)}`;
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
 }
 
 const TECHS: TechDef[] = [
@@ -63,6 +99,29 @@ const TECHS: TechDef[] = [
   { id: "astronomy", name: "Astronomy", cost: 130, prerequisites: ["mathematics", "sailing"] },
 ];
 
+const TECH_EMOJIS: Record<string, string> = {
+  agriculture: "🌾",
+  pottery: "🏺",
+  mining: "⛏️",
+  fishing: "🎣",
+  archery: "🏹",
+  animal_husbandry: "🐎",
+  trapping: "🪤",
+  bronze_working: "🛡️",
+  sailing: "⛵",
+  wheel: "🛞",
+  masonry: "🧱",
+  writing: "📜",
+  horseback_riding: "🐴",
+  currency: "🪙",
+  calendar: "🗓️",
+  iron_working: "⚒️",
+  mathematics: "📐",
+  construction: "🏗️",
+  philosophy: "🧠",
+  astronomy: "🔭",
+};
+
 type BuildableUnit = {
   id: string;
   label: string;
@@ -80,20 +139,7 @@ const BUILDABLE_UNITS: BuildableUnit[] = [
   { id: "swordsman", label: "Swordsman", cost: 30, requires: "iron_working" },
 ];
 
-// Asset-API structure categories the player can place in their cities by
-// spending gold. Each grants STRUCTURE_PRODUCTION_BONUS production for that
-// city (the backend is the source of truth — these mirror it for display).
-const STRUCTURE_CATEGORIES: ReadonlyArray<{
-  id: string;
-  label: string;
-  hint: string;
-}> = [
-  { id: "production", label: "Production Hall", hint: "Workshop, forge, mill" },
-  { id: "fortification", label: "Fortification", hint: "Walls, keep, gatehouse" },
-  { id: "housing", label: "Housing District", hint: "Townhouse, longhouse, manor" },
-  { id: "sacred", label: "Sacred Site", hint: "Temple, shrine, cathedral" },
-];
-const STRUCTURE_GOLD_COST = 80;
+const STRUCTURE_GOLD_COST = 15;
 const STRUCTURE_PRODUCTION_BONUS = 2;
 
 const IMPROVEMENT_OPTIONS = [
@@ -112,6 +158,16 @@ const MESSAGE_KINDS = [
   { id: "accept_alliance", label: "Accept Alliance" },
   { id: "reject", label: "Reject" },
 ];
+
+function buildIntroNarration(civName: string, leaderName: string): string {
+  return [
+    `In the long silence before empire, the people of ${civName} gathered beneath strange stars and dreamed of dominion.`,
+    `Now, beneath the hand of ${leaderName}, their first banners rise against the darkness of an unclaimed world.`,
+    "Stone will answer to your will. Rivers will carry your name. Enemies yet unborn will learn to fear the sound of your drums.",
+    "Found the capital. Send forth the scouts. Claim knowledge, gold, and steel before the rival thrones awaken.",
+    "For from one fragile settlement may rise an empire whose shadow falls across the ages.",
+  ].join(" ");
+}
 
 export default function HomePage() {
   const [state, setState] = useState<GameStateDTO | null>(null);
@@ -137,14 +193,21 @@ export default function HomePage() {
   const [activeCityId, setActiveCityId] = useState<number | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [chronicleCollapsed, setChronicleCollapsed] = useState(false);
-  const [mapViewMode, setMapViewMode] = useState<MapViewMode>("local");
   const [bannerEvents, setBannerEvents] = useState<TurnEvent[] | null>(null);
   const [eventLog, setEventLog] = useState<TurnEvent[]>([]);
   const [assets, setAssets] = useState<AssetManifest | null>(null);
+  const [placedStructureAssets, setPlacedStructureAssets] = useState<Record<string, string>>({});
   const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
+  const [loadingSplashUrls, setLoadingSplashUrls] = useState<string[]>([]);
+  const [loadingSplashIndex, setLoadingSplashIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(false);
   const [showSovereign, setShowSovereign] = useState(false);
-  const { muted, toggleMute, startIntro, startAmbient } = useAudio();
+  const { muted, toggleMute, startIntro, playNarration, startAmbient } = useAudio();
+  const introNarratedRef = useRef(false);
+  const introNarrationUrlRef = useRef<string | null>(null);
+  const [introNarrationStatus, setIntroNarrationStatus] = useState<
+    "idle" | "generating" | "playing" | "unavailable"
+  >("idle");
 
   const dismissIntro = () => {
     setIntroDismissed(true);
@@ -152,15 +215,23 @@ export default function HomePage() {
   };
   const prevStateRef = useRef<GameStateDTO | null>(null);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingSplashRunRef = useRef(0);
 
   const loadGame = async (nextSetup: Setup) => {
+    const splashRun = loadingSplashRunRef.current + 1;
+    loadingSplashRunRef.current = splashRun;
     setBusy(true);
     setError(null);
     setHasStarted(true);
     setState(null);
     setAssets(null);
+    setPlacedStructureAssets({});
     setAssetProgress(null);
+    setLoadingSplashUrls([]);
+    setLoadingSplashIndex(0);
     setIntroDismissed(false);
+    introNarratedRef.current = false;
+    setIntroNarrationStatus("idle");
     setSelectedUnit(null);
     setHoveredTile(null);
     setPending(null);
@@ -169,9 +240,22 @@ export default function HomePage() {
     setMessageKind("chat");
     setMessageText("");
     setActiveConversationCivId(null);
-    setMapViewMode("local");
     setBannerEvents(null);
     setEventLog([]);
+    void listLeaders()
+      .then((leaders) => {
+        if (loadingSplashRunRef.current !== splashRun) return;
+        const urls = shuffled(
+          leaders
+            .map((leader) => leader.splash_url)
+            .filter((url): url is string => Boolean(url))
+            .map(absoluteAssetUrl),
+        );
+        setLoadingSplashUrls(urls);
+      })
+      .catch(() => {
+        if (loadingSplashRunRef.current === splashRun) setLoadingSplashUrls([]);
+      });
     try {
       const next = await api.createGame(
         nextSetup.radius,
@@ -186,11 +270,15 @@ export default function HomePage() {
         culture: nextSetup.culture,
         description: nextSetup.leaderDescription,
       });
-      const civs: CivInput[] = next.civs.map((c) => ({
-        civId: c.id,
-        leaderName: c.leader_name,
-      }));
-      const leaders: CivInput[] = next.civs.map((c) => {
+      // Use civ_roster so we resolve art for AI civs even before the human
+      // has met them. state.civs is filtered by fog of war and only contains
+      // discovered civs, which is the wrong set for pre-generation.
+      const roster = next.civ_roster.length > 0 ? next.civ_roster : next.civs;
+      const civs: CivInput[] = roster.map((c) => {
+        const base: CivInput = { civId: c.id, leaderName: c.leader_name };
+        return c.is_human ? { ...base, customLeaderParams: humanCustomParams } : base;
+      });
+      const leaders: CivInput[] = roster.map((c) => {
         const base: CivInput = { civId: c.id, leaderName: c.leader_name };
         return c.is_human ? { ...base, customLeaderParams: humanCustomParams } : base;
       });
@@ -214,6 +302,7 @@ export default function HomePage() {
     } catch (e: unknown) {
       setError(formatError(e));
       setHasStarted(false);
+      setLoadingSplashUrls([]);
     } finally {
       setBusy(false);
       setAssetProgress(null);
@@ -235,6 +324,14 @@ export default function HomePage() {
   }, [error]);
 
   useEffect(() => {
+    if (!hasStarted || state || loadingSplashUrls.length <= 1) return;
+    const timer = setInterval(() => {
+      setLoadingSplashIndex((index) => (index + 1) % loadingSplashUrls.length);
+    }, 2600);
+    return () => clearInterval(timer);
+  }, [hasStarted, loadingSplashUrls.length, state]);
+
+  useEffect(() => {
     return () => {
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
     };
@@ -251,6 +348,54 @@ export default function HomePage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [introDismissed, state]);
+
+  useEffect(() => {
+    return () => {
+      if (introNarrationUrlRef.current) {
+        URL.revokeObjectURL(introNarrationUrlRef.current);
+      }
+    };
+  }, []);
+
+  const playIntroNarration = useCallback(
+    async (civName: string, leaderName: string) => {
+      if (muted) {
+        setIntroNarrationStatus("idle");
+        return;
+      }
+      setIntroNarrationStatus("generating");
+      try {
+        const audio = await api.generateIntroNarration(
+          buildIntroNarration(civName, leaderName),
+        );
+        if (introNarrationUrlRef.current) {
+          URL.revokeObjectURL(introNarrationUrlRef.current);
+        }
+        const url = URL.createObjectURL(audio);
+        introNarrationUrlRef.current = url;
+        playNarration(url);
+        setIntroNarrationStatus("playing");
+      } catch {
+        setIntroNarrationStatus("unavailable");
+      }
+    },
+    [muted, playNarration],
+  );
+
+  useEffect(() => {
+    if (!state || introDismissed || introNarratedRef.current) return;
+    const civ = state.civs.find((c) => c.is_human);
+    const civName = civ?.name ?? setup.humanName;
+    const leaderName = setup.leaderName.trim() || civ?.leader_name || civName;
+    introNarratedRef.current = true;
+    void playIntroNarration(civName, leaderName);
+  }, [
+    introDismissed,
+    playIntroNarration,
+    setup.humanName,
+    setup.leaderName,
+    state,
+  ]);
 
   const humanCiv = useMemo(
     () => state?.civs.find((c) => c.is_human) ?? null,
@@ -287,10 +432,7 @@ export default function HomePage() {
     [state?.visible_tile_keys],
   );
 
-  const activeVisibleTiles = useMemo(
-    () => (mapViewMode === "global" ? new Set<string>() : visibleTiles),
-    [mapViewMode, visibleTiles],
-  );
+  const activeVisibleTiles = visibleTiles;
 
   useEffect(() => {
     if (messageTargetId !== null) return;
@@ -546,9 +688,34 @@ export default function HomePage() {
     await run(() => api.cancelBuild(state.id, humanCiv.id, cityId, index));
   };
 
-  const purchaseStructure = async (cityId: number, category: string) => {
+  const purchaseStructure = async (
+    cityId: number,
+    category: string,
+    q: number,
+    r: number,
+  ) => {
     if (!state || !humanCiv || !isHumanTurn) return;
-    await run(() => api.purchaseStructure(state.id, humanCiv.id, cityId, category));
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await api.purchaseStructure(state.id, humanCiv.id, cityId, category, q, r);
+      ingestEvents(next);
+      setState(next);
+
+      const key = placedStructureKey(cityId, category, q, r);
+      const city = next.cities.find((candidate) => candidate.id === cityId);
+      const preloadedUrl =
+        city && assets?.structures[city.owner]?.[category]
+          ? assets.structures[city.owner][category]
+          : undefined;
+      if (preloadedUrl) {
+        setPlacedStructureAssets((current) => ({ ...current, [key]: preloadedUrl }));
+      }
+    } catch (e: unknown) {
+      setError(formatError(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const startImprovement = async (unitId: number, improvement: string) => {
@@ -770,10 +937,26 @@ export default function HomePage() {
   }
 
   if (!state) {
+    const loadingSplashUrl =
+      loadingSplashUrls.length > 0
+        ? loadingSplashUrls[loadingSplashIndex % loadingSplashUrls.length]
+        : null;
     return (
       <main className="start-screen">
+        {loadingSplashUrl && (
+          <div
+            key={loadingSplashUrl}
+            className="loading-slideshow"
+            style={{ backgroundImage: `url(${loadingSplashUrl})` }}
+          />
+        )}
         <div className="start-screen__veil" />
         <section className="start-screen__panel start-screen__panel--loading">
+          {loadingSplashUrls.length > 0 && (
+            <div className="loading-slideshow__caption">
+              Sovereigns from prior campaigns
+            </div>
+          )}
           <div className="spinner" />
           <p className="start-screen__copy">
             Surveying the land, placing the first capitals, and opening the campaign map.
@@ -813,16 +996,37 @@ export default function HomePage() {
             <br />
             History will remember what is forged here.
           </p>
-          <button
-            type="button"
-            className="button-primary intro-screen__cta"
-            onClick={(e) => {
-              e.stopPropagation();
-              dismissIntro();
-            }}
-          >
-            Begin the Age
-          </button>
+          <div className="intro-screen__actions">
+            <button
+              type="button"
+              className="button-primary intro-screen__cta"
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissIntro();
+              }}
+            >
+              Begin the Age
+            </button>
+            <button
+              type="button"
+              className="intro-screen__replay"
+              onClick={(e) => {
+                e.stopPropagation();
+                void playIntroNarration(civName, leaderName);
+              }}
+            >
+              Replay Proclamation
+            </button>
+          </div>
+          <div className="intro-screen__narration">
+            {muted && "AI narration muted"}
+            {!muted && introNarrationStatus === "idle" && "AI narration ready"}
+            {!muted && introNarrationStatus === "generating" && "Generating AI voice..."}
+            {!muted && introNarrationStatus === "playing" &&
+              "AI-generated voice playing over campaign music"}
+            {!muted && introNarrationStatus === "unavailable" &&
+              "AI voice unavailable; check backend OPENAI_API_KEY"}
+          </div>
           <div className="intro-screen__hint">click backdrop · esc · enter · space</div>
         </section>
         {error && <div className="toast">{error}</div>}
@@ -840,15 +1044,25 @@ export default function HomePage() {
           title="View sovereign portrait"
         >
           <div className="empire-badge__seal" style={{ background: humanColor }}>
-            {humanCiv && assets?.leaders[humanCiv.id]?.profileUrl ? (
-              <img
-                className="leader-portrait__img"
-                src={assets.leaders[humanCiv.id].profileUrl}
-                alt={setup.leaderName || humanCiv.leader_name}
-              />
-            ) : (
-              humanCiv?.name?.slice(0, 1) ?? "A"
-            )}
+            {(() => {
+              if (!humanCiv) return "A";
+              // Prefer the square profile; if the server's profile stage
+              // failed, fall back to the splash so the badge still shows
+              // real art rather than an initial.
+              const portrait =
+                assets?.leaders[humanCiv.id]?.profileUrl ??
+                assets?.leaders[humanCiv.id]?.splashUrl;
+              if (portrait) {
+                return (
+                  <img
+                    className="leader-portrait__img"
+                    src={portrait}
+                    alt={setup.leaderName || humanCiv.leader_name}
+                  />
+                );
+              }
+              return humanCiv.name?.slice(0, 1) ?? "A";
+            })()}
           </div>
           <div className="empire-badge__copy">
             <div className="empire-badge__name">{humanCiv?.name ?? "Civilization"}</div>
@@ -888,24 +1102,8 @@ export default function HomePage() {
             aria-label={muted ? "Unmute music" : "Mute music"}
             aria-pressed={muted}
           >
-            {muted ? "🔇" : "🔊"}
+            <AudioGlyph muted={muted} />
           </button>
-          <div className="map-mode-toggle" role="tablist" aria-label="Map view mode">
-            <button
-              type="button"
-              className={`map-mode-toggle__button${mapViewMode === "global" ? " is-active" : ""}`}
-              onClick={() => setMapViewMode("global")}
-            >
-              Global
-            </button>
-            <button
-              type="button"
-              className={`map-mode-toggle__button${mapViewMode === "local" ? " is-active" : ""}`}
-              onClick={() => setMapViewMode("local")}
-            >
-              Local
-            </button>
-          </div>
           <div className="turn-box__meta">
             <span className="plate-label">Turn</span>
             <strong>{state.turn}</strong>
@@ -1018,12 +1216,75 @@ export default function HomePage() {
               humanCivId={humanCiv?.id ?? null}
               visibleTiles={activeVisibleTiles}
               assets={assets}
+              placedStructureAssets={placedStructureAssets}
               onTileClick={onTileClick}
               onTileHover={(q, r) =>
                 setHoveredTile(state.tiles.find((t) => t.q === q && t.r === r) ?? null)
               }
+              onStructureDrop={purchaseStructure}
               onUnitClick={onUnitClick}
             />
+
+            {otherCivs.length > 0 && (
+              <div
+                className="leader-ribbon"
+                role="toolbar"
+                aria-label="Diplomatic ribbon"
+              >
+                {otherCivs.map((civ) => {
+                  const stanceEntry = state.stances.find(
+                    (s) => s.other_civ_id === civ.id,
+                  );
+                  const stance = stanceEntry?.stance ?? "peace";
+                  const relationship = stanceEntry?.relationship ?? 0;
+                  const truceActive = stanceEntry?.truce_active ?? false;
+                  const inboxCount = inboxCounts.get(civ.id) ?? 0;
+                  const portrait =
+                    assets?.leaders[civ.id]?.profileUrl ??
+                    assets?.leaders[civ.id]?.splashUrl;
+                  const ringColor = relationshipColor(relationship);
+                  const factionColor = CIV_COLORS[civ.id % CIV_COLORS.length];
+                  const isActive = activeConversationCivId === civ.id;
+                  return (
+                    <button
+                      key={civ.id}
+                      type="button"
+                      className={`leader-ribbon__avatar${isActive ? " is-active" : ""}${truceActive ? " has-truce" : ""}`}
+                      onClick={() => setActiveConversationCivId(civ.id)}
+                      style={{
+                        background: factionColor,
+                        borderColor: ringColor,
+                      }}
+                      title={`${civ.name} · ${civ.leader_name}\n${capitalize(stance)} · ${relationship >= 0 ? "+" : ""}${relationship} ${relationshipLabel(relationship)}${truceActive ? " · Truce" : ""}${inboxCount > 0 ? ` · ${inboxCount} new` : ""}`}
+                    >
+                      {portrait ? (
+                        <img
+                          src={portrait}
+                          alt={`${civ.name} portrait`}
+                        />
+                      ) : (
+                        <span className="leader-ribbon__initial">
+                          {civ.name.slice(0, 1)}
+                        </span>
+                      )}
+                      <span
+                        className="leader-ribbon__stance"
+                        aria-hidden="true"
+                        style={{ background: ringColor }}
+                      />
+                      {inboxCount > 0 && (
+                        <span
+                          className="leader-ribbon__inbox"
+                          aria-label={`${inboxCount} unread message${inboxCount === 1 ? "" : "s"}`}
+                        >
+                          {inboxCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {bannerEvents && bannerEvents.length > 0 && (
               <div className="map-banner">
@@ -1084,19 +1345,22 @@ export default function HomePage() {
                 />
               </div>
             )}
-            <div className="list-stack scroll-list">
+            <div className="tech-choice-grid">
               {availableTechs.length === 0 ? (
                 <EmptyCopy>No available technologies. Expand prerequisites or finish the current research.</EmptyCopy>
               ) : (
                 availableTechs.map((tech) => (
                   <button
                     key={tech.id}
-                    className="list-row"
+                    className="tech-choice"
                     onClick={() => chooseResearch(tech.id)}
                     disabled={busy || !isHumanTurn || humanCiv?.researching === tech.id}
                   >
-                    <span>{tech.name}</span>
-                    <span>{tech.cost}</span>
+                    <span className="tech-choice__icon" aria-hidden="true">
+                      {TECH_EMOJIS[tech.id] ?? "✦"}
+                    </span>
+                    <span className="tech-choice__name">{tech.name}</span>
+                    <span className="tech-choice__cost">{tech.cost}</span>
                   </button>
                 ))
               )}
@@ -1134,53 +1398,6 @@ export default function HomePage() {
                 ))}
               </div>
             )}
-          </Panel>
-
-          <Panel label="Other Leaders" title={`${otherCivs.length} met`}>
-            <div className="leader-stack">
-              {otherCivs.length === 0 ? (
-                <EmptyCopy>No rival leaders discovered yet.</EmptyCopy>
-              ) : (
-                otherCivs.map((civ) => {
-                  const stanceEntry = state.stances.find(
-                    (item) => item.other_civ_id === civ.id,
-                  );
-                  const stance = stanceEntry?.stance ?? "peace";
-                  const relationship = stanceEntry?.relationship ?? 0;
-                  const truceActive = stanceEntry?.truce_active ?? false;
-                  const truceUntil = stanceEntry?.truce_until;
-                  const inboxCount = inboxCounts.get(civ.id) ?? 0;
-                  return (
-                    <button
-                      key={civ.id}
-                      type="button"
-                      className={`leader-row${activeConversationCivId === civ.id ? " is-active" : ""}`}
-                      onClick={() => setActiveConversationCivId(civ.id)}
-                    >
-                      <LeaderPortrait
-                        className="leader-row__portrait"
-                        name={civ.name}
-                        color={CIV_COLORS[civ.id % CIV_COLORS.length]}
-                        url={assets?.leaders[civ.id]?.profileUrl}
-                      />
-                      <span className="leader-row__body">
-                        <strong>{civ.name}</strong>
-                        <span>
-                          {capitalize(stance)}
-                          {" · "}
-                          <span style={{ color: relationshipColor(relationship) }}>
-                            {relationship >= 0 ? "+" : ""}
-                            {relationship} {relationshipLabel(relationship)}
-                          </span>
-                          {truceActive ? ` · Truce T${truceUntil}` : ""}
-                          {inboxCount > 0 ? ` · ${inboxCount} new` : ""}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
           </Panel>
 
           <Panel label="Standings" title={`Goal · ${state.score_threshold}`}>
@@ -1330,7 +1547,10 @@ export default function HomePage() {
                   className="leader-row__portrait diplomacy-audience__portrait"
                   name={activeConversationCiv.name}
                   color={CIV_COLORS[activeConversationCiv.id % CIV_COLORS.length]}
-                  url={assets?.leaders[activeConversationCiv.id]?.profileUrl}
+                  url={
+                    assets?.leaders[activeConversationCiv.id]?.profileUrl ??
+                    assets?.leaders[activeConversationCiv.id]?.splashUrl
+                  }
                 />
                 <div className="diplomacy-audience__heading">
                   <div className="plate-label">Diplomatic Audience</div>
@@ -1568,14 +1788,27 @@ export default function HomePage() {
                       key={cat.id}
                       type="button"
                       className="list-row"
-                      onClick={() => purchaseStructure(activeCity.id, cat.id)}
+                      draggable={!disabled}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(
+                          "application/x-city-structure",
+                          JSON.stringify({
+                            cityId: activeCity.id,
+                            category: cat.id,
+                          }),
+                        );
+                      }}
+                      onClick={() =>
+                        setError("Drag a structure onto an empty tile inside this city's borders.")
+                      }
                       disabled={disabled}
                       title={
                         owned
                           ? "Already built in this city"
                           : !canAfford
                             ? `Need ${STRUCTURE_GOLD_COST} gold`
-                            : "Place this structure"
+                            : "Drag onto an empty tile inside this city's borders"
                       }
                     >
                       <span>
@@ -1780,6 +2013,7 @@ function MiniMap({
       className="minimap"
       style={{
         gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${height}, minmax(0, 1fr))`,
       }}
     >
       {Array.from({ length: width * height }, (_, index) => {

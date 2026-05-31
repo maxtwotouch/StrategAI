@@ -82,6 +82,14 @@ class CityOut(BaseModel):
     worked_tiles: list[dict[str, int]] = Field(default_factory=list)
 
 
+class CityStructureOut(BaseModel):
+    city_id: int
+    owner: int
+    category: str
+    q: int
+    r: int
+
+
 class CivOut(BaseModel):
     id: int
     name: str
@@ -134,6 +142,20 @@ class TileOwnerOut(BaseModel):
     city_id: int
 
 
+class CivRosterEntry(BaseModel):
+    """Minimal civ identity used for asset pre-generation.
+
+    Includes every civ regardless of whether the human has met them, so the
+    frontend can pre-resolve leader / structure / unit art at game start. Does
+    not leak any gameplay state — name, leader name, and id only.
+    """
+
+    id: int
+    name: str
+    leader_name: str
+    is_human: bool
+
+
 class GameStateOut(BaseModel):
     id: int
     turn: int
@@ -141,7 +163,9 @@ class GameStateOut(BaseModel):
     map_radius: int
     tiles: list[TileOut]
     civs: list[CivOut]
+    civ_roster: list[CivRosterEntry] = Field(default_factory=list)
     cities: list[CityOut]
+    structures: list[CityStructureOut] = Field(default_factory=list)
     units: list[UnitOut]
     known_civ_ids: list[int]
     messages: list[MessageOut]
@@ -207,6 +231,7 @@ def city_to_out(c: City) -> CityOut:
         max_health=c.max_health,
         is_capital=c.is_capital,
         buildings=sorted(b.value for b in c.buildings),
+        purchased_structures=sorted(c.purchased_structures),
         production_queue=[item.id for item in c.production_queue],
         border_radius=c.border_radius,
         culture_stored=c.culture_stored,
@@ -214,6 +239,16 @@ def city_to_out(c: City) -> CityOut:
             ({"q": h.q, "r": h.r} for h in c.worked_tiles),
             key=lambda d: (d["q"], d["r"]),
         ),
+    )
+
+
+def structure_to_out(s) -> CityStructureOut:
+    return CityStructureOut(
+        city_id=s.city_id,
+        owner=s.owner,
+        category=s.category,
+        q=s.location.q,
+        r=s.location.r,
     )
 
 
@@ -337,11 +372,25 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
             if coord in explored
         ],
         civs=[civ_to_out(c, state) for c in state.civs if c.id in visible_civ_ids],
+        civ_roster=[
+            CivRosterEntry(
+                id=c.id,
+                name=c.name,
+                leader_name=c.leader_name,
+                is_human=c.is_human,
+            )
+            for c in state.civs
+        ],
         cities=[
             city_to_out(c)
             for c in state.cities
             if c.owner == human_civ.id or c.location in visible
         ] if human_civ is not None else [city_to_out(c) for c in state.cities],
+        structures=[
+            structure_to_out(s)
+            for s in state.structures
+            if human_civ is None or s.owner == human_civ.id or s.location in visible
+        ],
         units=[
             unit_to_out(u)
             for u in state.units
@@ -364,6 +413,10 @@ class CreateGameRequest(BaseModel):
     radius: int = Field(default=8, ge=1, le=20)
     seed: int = 0
     human_name: str = Field(default="Athens", min_length=1, max_length=40)
+
+
+class IntroNarrationRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1200)
 
 
 class MoveRequest(BaseModel):
@@ -410,6 +463,8 @@ class PurchaseStructureRequest(BaseModel):
     civ_id: int
     city_id: int
     category: str
+    q: int
+    r: int
 
 
 class MessageRequest(BaseModel):

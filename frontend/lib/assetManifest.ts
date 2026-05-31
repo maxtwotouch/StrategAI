@@ -1,10 +1,25 @@
-// Resolves the game's asset URLs once per game start and caches them.
+// Resolves the game's asset URLs on every game start.
 //
-// The service generates a fresh image per POST, so we resolve each asset
-// *type* once and reuse the URL. Resolution is keyed by gameId: a new game
-// gets a fresh look, while reloading the same game reuses the cached set.
-// When NEXT_PUBLIC_ASSET_API_URL is unset, resolution is a no-op (null) and
-// the game renders with its built-in colors and initials.
+// No persistent cache. Every `Begin Campaign` (and every page refresh that
+// triggers a new game) hits the asset service fresh, so backend restarts that
+// reuse a gameId can never serve stale URLs that the asset server has rotated
+// out. When NEXT_PUBLIC_ASSET_API_URL is unset, resolution is a no-op (null)
+// and the game renders with its built-in colors and initials.
+
+// One-time housekeeping: wipe any old localStorage entries from earlier
+// sessions when caching was still on, so they don't sit forever in users'
+// browsers. Safe to remove this block after one or two releases.
+if (typeof window !== "undefined") {
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("inf3600:assetManifest:")) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // localStorage unavailable — nothing to clean.
+  }
+}
 
 import {
   ApiUnitType,
@@ -23,6 +38,7 @@ import {
 import { leaderParamsFor } from "@/lib/leaderMapping";
 import {
   ELEVATION_TERRAINS,
+  STRUCTURE_CATEGORY_IDS,
   UNIT_TYPE_MAP,
   cityStructureFor,
   unitDescriptionFor,
@@ -56,8 +72,12 @@ export interface AssetManifest {
   gameId: number;
   terrain: Record<string, string>; // terrain key → base tile image URL
   elevation: Record<string, string>; // terrain key → relief overlay URL
-  units: Record<string, string>; // game unit type → south-facing sprite URL
-  structures: Record<number, string>; // civ id → city building URL
+  // civ id → game unit type → south-facing sprite URL.
+  // Each civ gets its own per-culture variant of the four API unit types.
+  units: Record<number, Record<string, string>>;
+  // civ id -> structure category -> image URL.
+  // Pre-generated during loading so drag/drop placement renders immediately.
+  structures: Record<number, Record<string, string>>;
   leaders: Record<number, LeaderAssets>; // civ id → portrait/splash URLs
 }
 
@@ -79,43 +99,6 @@ export interface ResolveInput {
 export interface ResolveOptions {
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
-}
-
-const CACHE_PREFIX = "inf3600:assetManifest:";
-
-// Cache key includes a short tag of the asset host so swapping the asset
-// server (or moving from "unset" to a real URL) invalidates older entries.
-// Without this, a re-used gameId picks up stale URLs that 404.
-function hostTag(): string {
-  if (typeof window === "undefined") return "ssr";
-  // process.env.NEXT_PUBLIC_ASSET_API_URL is inlined at build time.
-  const raw = (process.env.NEXT_PUBLIC_ASSET_API_URL ?? "").replace(/\/+$/, "");
-  return raw.replace(/^https?:\/\//i, "").replace(/[^a-z0-9]/gi, "_") || "local";
-}
-
-function cacheKey(gameId: number): string {
-  return `${CACHE_PREFIX}${hostTag()}:${gameId}`;
-}
-
-export function loadCachedManifest(gameId: number): AssetManifest | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(cacheKey(gameId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AssetManifest;
-    return parsed.gameId === gameId ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveManifest(manifest: AssetManifest): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(cacheKey(manifest.gameId), JSON.stringify(manifest));
-  } catch {
-    // localStorage full or unavailable — non-fatal; manifest stays in memory.
-  }
 }
 
 // Run an async worker over items with a bounded number in flight, so we don't
@@ -150,14 +133,10 @@ export async function resolveManifest(
 
   const { gameId, terrains, civs, leaders } = input;
 
-  const cached = loadCachedManifest(gameId);
-  if (cached) {
-    // eslint-disable-next-line no-console
-    console.info(
-      `[assetManifest] Cache hit for game ${gameId} — no new fetches. Clear with: localStorage.removeItem('${cacheKey(gameId)}')`,
-    );
-    return cached;
-  }
+  // No persistent cache — every Begin Campaign + every page refresh hits the
+  // asset service fresh. The original localStorage cache was masking stale
+  // URLs whenever the backend restarted and reused a gameId, and the speed
+  // win of skipping fetches doesn't outweigh that hazard.
   // eslint-disable-next-line no-console
   console.info(
     `[assetManifest] Resolving game ${gameId}: ${terrains.length} tiles, ${civs.length} civs, ${leaders.length} leaders → POSTing to asset service…`,
@@ -174,8 +153,8 @@ export async function resolveManifest(
   const total =
     distinctTerrains.length +
     elevationTerrains.length +
-    apiUnitTypes.length +
-    civs.length +
+    civs.length * apiUnitTypes.length + // per-civ unit sprites
+    civs.length * STRUCTURE_CATEGORY_IDS.length + // per-civ structure sprites
     leaders.length;
   let done = 0;
   const tick = () => options.onProgress?.((done += 1), total);
@@ -183,9 +162,15 @@ export async function resolveManifest(
 
   const terrain: Record<string, string> = {};
   const elevation: Record<string, string> = {};
-  const apiUnitUrls: Partial<Record<ApiUnitType, string>> = {};
-  const structures: Record<number, string> = {};
+  const unitsByCiv: Record<number, Record<string, string>> = {};
+  const structures: Record<number, Record<string, string>> = {};
   const leaderAssets: Record<number, LeaderAssets> = {};
+
+  // Each civ's culture comes from either the player-authored custom params
+  // (human) or the deterministic leader lookup (AI). Drives the per-civ
+  // unit-sprite description so each civilization has its own visual flavor.
+  const cultureFor = (civ: CivInput): string =>
+    civ.customLeaderParams?.culture ?? leaderParamsFor(civ.leaderName).culture;
 
   const terrainWork = mapLimit(distinctTerrains, 4, async (terrainKey) => {
     try {
@@ -213,32 +198,56 @@ export async function resolveManifest(
     }
   });
 
-  const unitWork = mapLimit(apiUnitTypes, 2, async (apiType) => {
-    try {
-      apiUnitUrls[apiType] = await generateUnit(
-        apiType,
-        unitDescriptionFor(apiType),
-        options.signal,
-      );
-    } catch {
-      // No sprite → renderer falls back to the colored glyph.
-    } finally {
-      tick();
-    }
-  });
+  // Per-civ unit sprites: each civilization generates its own four API types
+  // (warrior / archer / scout / settler) with a culture-flavored description.
+  // Runs all civs' batches in parallel, each batch with up to 2 sprites in
+  // flight to avoid hammering the asset server.
+  const unitWork = Promise.all(
+    civs.map(async (civ) => {
+      const culture = cultureFor(civ);
+      const civUrls: Record<string, string> = {};
+      const apiUrls: Partial<Record<ApiUnitType, string>> = {};
+      await mapLimit(apiUnitTypes, 2, async (apiType) => {
+        try {
+          apiUrls[apiType] = await generateUnit(
+            apiType,
+            unitDescriptionFor(apiType, culture, civ.leaderName),
+            options.signal,
+          );
+        } catch {
+          // No sprite → renderer falls back to the colored glyph.
+        } finally {
+          tick();
+        }
+      });
+      for (const [gameType, apiType] of Object.entries(UNIT_TYPE_MAP)) {
+        const url = apiUrls[apiType];
+        if (url) civUrls[gameType] = url;
+      }
+      if (Object.keys(civUrls).length > 0) unitsByCiv[civ.civId] = civUrls;
+    }),
+  );
 
-  const structureWork = mapLimit(civs, 2, async ({ civId, leaderName }) => {
-    try {
-      structures[civId] = await generateStructure(
-        cityStructureFor(leaderName),
-        options.signal,
-      );
-    } catch {
-      // No building art → cities render as the colored marker.
-    } finally {
-      tick();
-    }
-  });
+  const structureWork = Promise.all(
+    civs.map(async (civ) => {
+      const categoryUrls: Record<string, string> = {};
+      await mapLimit(STRUCTURE_CATEGORY_IDS, 2, async (category) => {
+        try {
+          categoryUrls[category] = await generateStructure(
+            cityStructureFor(civ.leaderName, category, cultureFor(civ)),
+            options.signal,
+          );
+        } catch {
+          // No sprite -> renderer falls back to the built-in city/structure marker.
+        } finally {
+          tick();
+        }
+      });
+      if (Object.keys(categoryUrls).length > 0) {
+        structures[civ.civId] = categoryUrls;
+      }
+    }),
+  );
 
   // Pull the existing leader catalog once so we can fall back to it when a
   // POST fails (e.g., upstream generation errors). Best-match by
@@ -308,29 +317,13 @@ export async function resolveManifest(
     leaderWork,
   ]);
 
-  // Expand the per-API-type unit sprites back onto every game unit type.
-  const units: Record<string, string> = {};
-  for (const [gameType, apiType] of Object.entries(UNIT_TYPE_MAP)) {
-    const url = apiUnitUrls[apiType];
-    if (url) units[gameType] = url;
-  }
-
   const manifest: AssetManifest = {
     gameId,
     terrain,
     elevation,
-    units,
+    units: unitsByCiv,
     structures,
     leaders: leaderAssets,
   };
-  // Only cache when something actually resolved — otherwise a transient outage
-  // would freeze an empty manifest and block retries on the next load.
-  const resolvedAny =
-    Object.keys(terrain).length > 0 ||
-    Object.keys(elevation).length > 0 ||
-    Object.keys(units).length > 0 ||
-    Object.keys(structures).length > 0 ||
-    Object.keys(leaderAssets).length > 0;
-  if (resolvedAny) saveManifest(manifest);
   return manifest;
 }

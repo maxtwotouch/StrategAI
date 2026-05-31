@@ -17,9 +17,10 @@ structure / leader art.
 |---|---|
 | [docs/GAMEPLAY.md](docs/GAMEPLAY.md) | Every mechanic: setup, civs, terrain, units (stats + costs), cities (yields + growth), production queue, buildings + gold-purchased structures, the 21-tech tree, workers/improvements, combat, diplomacy, turn flow, victory. |
 | [docs/UI_GUIDE.md](docs/UI_GUIDE.md) | Frontend lifecycle (Start → Load → Intro → War Room), layout breakdown of every panel and overlay (city drawer, diplomatic audience, sovereign portrait), map rendering layers, audio plumbing. |
-| [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md) | Contract with the asset service, taxonomy mapping, manifest resolver, cache strategy, graceful fallback, smoke test. |
+| [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md) | Contract with the asset service, taxonomy mapping, manifest resolver, no-cache policy, graceful fallback, smoke test. |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Prerequisites, backend + frontend setup, env vars, tests, common workflows, where to hook new things in. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Original backend architecture write-up (engine layers, deterministic state, LLM goal source). |
+| [docs/REPORT_HANDOFF.md](docs/REPORT_HANDOFF.md) | Concise project summary and source map for AI agents writing reports about what has been implemented. |
 | [GAME_BACKLOG.md](GAME_BACKLOG.md) | Outstanding game-design work. |
 | [TIER1_PLAN.md](TIER1_PLAN.md) | Tier-1 mechanics implementation record (shipped). |
 | [planning.md](planning.md) | Original concept doc. |
@@ -108,12 +109,16 @@ testing playbook.
 
 ## Status & Known Issues
 
-- **Asset service generation** — the `/leader` pipeline works end-to-end;
-  five other families (`/background_tile`, `/unit`, `/structure`, `/terrain`,
-  `/object`) currently return HTTP 400 with a UTF-32-BE codec error.
-  Documented in [docs/ASSET_INTEGRATION.md §10](docs/ASSET_INTEGRATION.md#10-known-issues-with-the-live-asset-service).
-  The frontend handles the failures gracefully — game stays playable, map
-  renders with color fills until the server-side fix lands.
+- **Asset service is reached through a Next.js same-origin proxy** at
+  `/api/asset/[...path]`. The browser only talks to its own origin, so CORS
+  is never a factor — even when the upstream is degraded and would otherwise
+  return a 5xx response without `Access-Control-Allow-Origin` headers. See
+  [docs/ASSET_INTEGRATION.md §1](docs/ASSET_INTEGRATION.md#1-configuration).
+- **The leader profile pipeline is the asset service's only remaining
+  trouble spot.** `POST /leader` (splash) is healthy; the chained profile
+  stage occasionally returns HTTP 500. The frontend catches that silently
+  and falls back to the splash, cropped via `object-position: center 20%`,
+  so the empire badge and portrait surfaces still show real art.
 - **Playthrough test flakiness** — `tests/test_playthrough.py::test_playthrough_with_generated_map`
   intermittently fails with a city-capture move error. Pre-existing and
   unrelated to recent work; tracked in the backlog.

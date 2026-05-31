@@ -53,7 +53,6 @@ def _unit(uid: int, owner: int, loc: Hex, health: int | None = None, utype: Unit
 
 
 def _civs(*ids: int) -> tuple[Civilization, ...]:
-    # Seed with enough gold to absorb a turn of upkeep without bankrupting.
     return tuple(
         Civilization(id=i, name=f"C{i}", leader_name=f"L{i}", is_human=(i == 0), gold=20)
         for i in ids

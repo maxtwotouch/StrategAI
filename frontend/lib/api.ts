@@ -46,6 +46,13 @@ export type CityDTO = {
   worked_tiles: WorkedTileDTO[];
   purchased_structures: string[];
 };
+export type CityStructureDTO = {
+  city_id: number;
+  owner: number;
+  category: string;
+  q: number;
+  r: number;
+};
 export type CivDTO = {
   id: number;
   name: string;
@@ -94,6 +101,12 @@ export type StandingDTO = {
   name: string;
   score: number;
 };
+export type CivRosterEntryDTO = {
+  id: number;
+  name: string;
+  leader_name: string;
+  is_human: boolean;
+};
 export type GameStateDTO = {
   id: number;
   turn: number;
@@ -101,7 +114,11 @@ export type GameStateDTO = {
   map_radius: number;
   tiles: TileDTO[];
   civs: CivDTO[];
+  // Full civ identity list (every civ in the game, fog-of-war-independent).
+  // Used by the asset resolver to pre-generate art for civs not yet met.
+  civ_roster: CivRosterEntryDTO[];
   cities: CityDTO[];
+  structures: CityStructureDTO[];
   units: UnitDTO[];
   known_civ_ids: number[];
   messages: MessageDTO[];
@@ -127,6 +144,19 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`${res.status} ${res.statusText}: ${body}`);
   }
   return (await res.json()) as T;
+}
+
+async function reqBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+  }
+  return await res.blob();
 }
 
 export const api = {
@@ -175,10 +205,12 @@ export const api = {
     civ_id: number,
     city_id: number,
     category: string,
+    q: number,
+    r: number,
   ) =>
     req<GameStateDTO>(`/games/${id}/actions/purchase-structure`, {
       method: "POST",
-      body: JSON.stringify({ civ_id, city_id, category }),
+      body: JSON.stringify({ civ_id, city_id, category, q, r }),
     }),
   improve: (id: number, unit_id: number, improvement: string) =>
     req<GameStateDTO>(`/games/${id}/actions/improve`, {
@@ -195,5 +227,10 @@ export const api = {
     req<GameStateDTO>(`/games/${id}/actions/message`, {
       method: "POST",
       body: JSON.stringify({ from_civ_id, to_civ_id, kind, text }),
+    }),
+  generateIntroNarration: (text: string) =>
+    reqBlob("/audio/intro", {
+      method: "POST",
+      body: JSON.stringify({ text }),
     }),
 };
