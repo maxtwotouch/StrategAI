@@ -6,7 +6,7 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 
 **StrategAI** is a full-stack strategy game where:
 - **AI civilizations** are controlled by LLMs via OpenAI's tool-use API (strategic decision-making, diplomacy)
-- **Game assets** are generated on-demand using Diffusion Transformers (FLUX2 Klein 4B via ComfyUI)
+- **Game assets** are generated on-demand using Diffusion Transformers (FLUX2 Klein 4B Distilled via ComfyUI)
 - **Style adaptation** is achieved through LoRA fine-tuning on curated medieval pixel art
 
 ## Architecture
@@ -17,8 +17,8 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 |-----------|------|-----------|---------|
 | **Backend** | `backend/` | Python 3.11+, FastAPI, OpenAI API | Game engine (pure functional, frozen dataclasses), LLM-driven AI civs, REST API |
 | **Frontend** | `frontend/` | Next.js 15, React 19, TypeScript, SVG | Game UI, hex map rendering, asset integration, diplomacy chat |
-| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B | Generative pixel-art service (6 asset families, 33 endpoints) |
-| **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein |
+| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 33 endpoints) |
+| **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled |
 | **Docs** | `docs/` | Markdown | Architecture, gameplay, development, UI, asset integration guides |
 
 ### AI Technologies (Course Relevance)
@@ -27,7 +27,7 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 |-----------|-----------|----------|
 | **LLM-driven AI civs** | OpenAI tool-use API | `backend/app/engine/openai_goals.py` — 9 intent tools, per-leader personas, rolling memory |
 | **Diplomacy chat** | LLM with persistent conversation | `backend/app/engine/diplomacy.py` — free-form chat with AI leaders |
-| **Generative pixel art** | ComfyUI + FLUX2 Klein 4B (DiT) | `assetserver/src/` — 6 asset families, 3 generation modes |
+| **Generative pixel art** | ComfyUI + FLUX2 Klein 4B Distilled (DiT) | `assetserver/src/` — 6 asset families, 3 generation modes |
 | **Style adaptation** | LoRA fine-tuning | `dataset-gen-train/` — Ostris AI Toolkit, 6-experiment matrix |
 
 ### Inter-Service Contracts
@@ -35,7 +35,7 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 - **Frontend ↔ Backend**: REST API at `http://localhost:8000` — 14 endpoints (games, actions, turns). DTOs defined in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
 - **Frontend ↔ Asset Server**: Asset manifest resolution via `frontend/lib/assetManifest.ts` → `NEXT_PUBLIC_ASSET_API_URL`. POST endpoints for leader, unit, structure, terrain, background_tile. GET for asset files
 - **Backend ↔ Asset Server**: No direct contract — frontend mediates
-- **Asset Server ↔ Dataset/Training**: Shared ComfyUI infrastructure, shared FLUX2 Klein model, LoRA weights applied at inference time
+- **Asset Server ↔ Dataset/Training**: Shared ComfyUI infrastructure, shared FLUX2 Klein 4B Distilled model, LoRA weights applied at inference time
 
 ## Agent Roster
 

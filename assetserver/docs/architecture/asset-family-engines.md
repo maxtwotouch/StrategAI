@@ -271,7 +271,7 @@ Background tiles use `background_tile.json` — a dedicated workflow that differ
 
 | Type | Placeholder Colour | Prompt Essence |
 |------|-------------------|----------------|
-| `water` | Blue (60, 120, 200) | "top-down seamless repeating water ground texture" |
+| `water` | Blue (60, 120, 200) | "top-down seamless repeating water **surface** texture" |
 | `grass` | Green (80, 160, 60) | "top-down seamless repeating grass ground texture" |
 | `sand` | Tan (220, 200, 140) | "top-down seamless repeating sand ground texture" |
 | `stone` | Grey (140, 140, 140) | "top-down seamless repeating stone ground texture" |

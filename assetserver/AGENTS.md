@@ -1,6 +1,6 @@
 # Asset Server — AI Agent System
 
-This subproject contains the generative pixel-art service using ComfyUI + FLUX2 Klein 4B (DiT model).
+This subproject contains the generative pixel-art service using ComfyUI + FLUX2 Klein 4B Distilled (DiT model).
 
 ## Architecture
 
@@ -29,12 +29,12 @@ FastAPI microservice that generates top-down medieval pixel-art game assets on-d
 
 ## AI Technology (Course Relevance)
 
-**Diffusion Transformer (DiT)**: FLUX2 Klein 4B — a 4B parameter DiT model for image generation.
+**Diffusion Transformer (DiT)**: FLUX2 Klein 4B Distilled — a 4B parameter DiT model for image generation.
 
 **Key architectural decisions**:
 - **3 generation modes**: `comfyui` (real DiT inference), `static` (pre-made PNGs), `placeholder` (PIL-generated) — graceful degradation
 - **4-layer prompt assembly**: Workflow JSON → Jinja2 templates → enum injection maps → engine logic
-- **Positive prompts only**: FLUX2 Klein doesn't use negative prompts
+- **Positive prompts only**: FLUX2 Klein 4B Distilled doesn't use negative prompts
 - **LRU cache + atomic writes**: In-memory cache with temp file + `os.rename` for persistence
 - **Load balancing**: Multi-node ComfyUI support via `comfyui_loadbalancer.py`
 
@@ -94,7 +94,7 @@ python -m uvicorn src.main:app --reload --port 8001
 ## Cross-Project Context
 
 - **Frontend consumes**: Asset manifest via `NEXT_PUBLIC_ASSET_API_URL`, endpoints in `frontend/lib/assetManifest.ts`
-- **Dataset/Training shares**: ComfyUI infrastructure, FLUX2 Klein model, LoRA weights applied at inference
+- **Dataset/Training shares**: ComfyUI infrastructure, FLUX2 Klein 4B Distilled model, LoRA weights applied at inference
 - **Root orchestrator**: For cross-project tasks, delegate to root `.github/agents/orchestrator.agent.md`
 
 ## Documentation

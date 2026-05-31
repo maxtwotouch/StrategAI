@@ -1,4 +1,4 @@
-# Top-Down Medieval Pixel Art — FLUX.2 Klein LoRA
+# Top-Down Medieval Pixel Art — FLUX.2 Klein 4B Distilled LoRA
 
 A complete pipeline for generating curated top-down medieval pixel-art datasets and fine-tuning FLUX.2 Klein 4B LoRA adapters using the [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit).
 

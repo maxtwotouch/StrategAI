@@ -119,7 +119,7 @@ leader portraits use separate templates/workflows without this LoRA.
 ### C. ComfyUI Client & Load Balancer (`src/comfyui_client.py`, `src/comfyui_loadbalancer.py`)
 - **ComfyUIClient**: Async HTTP + WebSocket client handling the full lifecycle:
   image upload, workflow submission, progress polling, result download, and
-  health checks.  Workflow patching targets Flux2 Klein node types
+  health checks.  Workflow patching targets Flux2 Klein 4B Distilled node types
   (SamplerCustomAdvanced, EmptyFlux2LatentImage — no negative prompts).
 - **ComfyUILoadBalancer**: Multi-node proxy that duck-types `ComfyUIClient`
   across a pool of server nodes.  Node selection uses shortest-queue
@@ -157,7 +157,7 @@ leader portraits use separate templates/workflows without this LoRA.
 - **Independent pipeline**: Separate engine, registry, models, and endpoints
   from the main tile pipeline.
 - **Seamless ground textures**: Water, grass, sand, stone, dirt. Uses
-  `background_tile.json` workflow — Flux2 Klein without `<tdp>` LoRA.
+  `background_tile.json` workflow — Flux2 Klein 4B Distilled without `<tdp>` LoRA.
 - **Static fallback**: `StaticBackgroundTileEngine` resolves from `static_tiles/`.
 - **SQLite-backed**: `BackgroundTileRecord` with FK to `AssetRecord`.
 

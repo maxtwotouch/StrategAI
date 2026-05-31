@@ -19,8 +19,8 @@ Complete every item before exposing the service to the internet.
 
 ### Infrastructure
 
-- [ ] **ComfyUI server provisioned** — see [comfyui-setup-guide.md](comfyui-setup-guide.md) for step-by-step instructions. Flux2 Klein models must be loaded.
-- [ ] **GPU VRAM sufficient** — Flux2 Klein 4B requires ~8 GB VRAM at FP8. Ensure the ComfyUI host has adequate GPU memory.
+- [ ] **ComfyUI server provisioned** — see [comfyui-setup-guide.md](comfyui-setup-guide.md) for step-by-step instructions. Flux2 Klein 4B Distilled models must be loaded.
+- [ ] **GPU VRAM sufficient** — Flux2 Klein 4B Distilled requires ~8 GB VRAM at FP8. Ensure the ComfyUI host has adequate GPU memory.
 - [ ] **Disk space** — generated PNGs accumulate in `generated_assets/`. Monitor disk usage and set up a cleanup cron job if needed.
 - [ ] **Network connectivity** — the FastAPI server must be able to reach the ComfyUI server on its HTTP port (default 8188).
 
@@ -250,7 +250,7 @@ via Linux mmap — no contention).
 
 | Workflow | VRAM per instance | Max instances (96 GB) |
 |---|---|---|
-| Flux2 Klein 4B fp8 (txt2img) | ~14 GB (with headroom) | 6 (84 GB used, 12 GB free) |
+| Flux2 Klein 4B Distilled fp8 (txt2img) | ~14 GB (with headroom) | 6 (84 GB used, 12 GB free) |
 | Conservative estimate | ~14 GB | 5 (70 GB used, 26 GB free) |
 
 ### Using the Spawn Script
@@ -430,12 +430,12 @@ curl -s http://127.0.0.1:8000/health | jq .comfyui_nodes
 
 ## ComfyUI Setup Prerequisite
 
-The service **requires** a running ComfyUI server with Flux2 Klein models. See
+The service **requires** a running ComfyUI server with Flux2 Klein 4B Distilled models. See
 [docs/comfyui-setup-guide.md](comfyui-setup-guide.md) for full provisioning
 instructions.
 
 Quick checklist:
-- ComfyUI with Flux2 Klein native nodes (`UNETLoader`, `CLIPLoader`, `VAELoader`, `CFGGuider`, `Flux2Scheduler`, `KSamplerSelect`, `SamplerCustomAdvanced`, `EmptyFlux2LatentImage`, `SaveImage`)
+- ComfyUI with Flux2 Klein 4B Distilled native nodes (`UNETLoader`, `CLIPLoader`, `VAELoader`, `CFGGuider`, `Flux2Scheduler`, `KSamplerSelect`, `SamplerCustomAdvanced`, `EmptyFlux2LatentImage`, `SaveImage`)
 - Models: `flux-2-klein-4b-fp8.safetensors`, `qwen_3_4b.safetensors`, `flux2-vae.safetensors`
 - Custom nodes as specified in workflow JSONs (e.g., `LoraLoaderModelOnly` for `<tdp>` LoRA)
 - Automated setup available via `scripts/setup_comfyui.sh`

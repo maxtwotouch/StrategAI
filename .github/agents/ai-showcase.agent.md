@@ -36,12 +36,12 @@ The game features 3 AI civilizations (Mongolia/Genghis Khan, Egypt/Cleopatra, In
 
 **Location**: `assetserver/src/`
 
-A FastAPI microservice generates top-down medieval pixel-art game assets on-demand using ComfyUI + FLUX2 Klein 4B (a Diffusion Transformer / DiT model). 6 asset families (leader, structure, nature_object, character_sprite, background_tile, unit) with 33 REST endpoints.
+A FastAPI microservice generates top-down medieval pixel-art game assets on-demand using ComfyUI + FLUX2 Klein 4B Distilled (a Diffusion Transformer / DiT model). 6 asset families (leader, structure, nature_object, character_sprite, background_tile, unit) with 33 REST endpoints.
 
 **Key architectural decisions:**
 - **3 generation modes**: `comfyui` (real DiT inference), `static` (pre-made PNGs), `placeholder` (PIL-generated) — graceful degradation
 - **4-layer prompt assembly**: Workflow JSON → Jinja2 templates → enum injection maps → engine logic
-- **Positive prompts only**: FLUX2 Klein doesn't use negative prompts
+- **Positive prompts only**: FLUX2 Klein 4B Distilled doesn't use negative prompts
 - **LRU cache + atomic writes**: In-memory cache with temp file + `os.rename` for persistence
 - **Load balancing**: Multi-node ComfyUI support via `comfyui_loadbalancer.py`
 
@@ -56,13 +56,14 @@ A FastAPI microservice generates top-down medieval pixel-art game assets on-dema
 
 **Location**: `dataset-gen-train/`
 
-Fine-tunes FLUX2 Klein 4B on top-down medieval pixel-art style via LoRA (Low-Rank Adaptation). Uses Ostris AI Toolkit for training orchestration.
+Fine-tunes FLUX2 Klein 4B Distilled on top-down medieval pixel-art style via LoRA (Low-Rank Adaptation). Uses Ostris AI Toolkit for training orchestration.
 
 **Key architectural decisions:**
 - **6-experiment matrix**: 3 caption variants (detailed/minimal/ultra_minimal) × 2 rank levels (high/low)
 - **Trigger token**: `<tdp>` injected by Ostris toolkit at training time
 - **Curated dataset**: 100 images generated via ComfyUI, manually curated, with 3 caption variants
 - **Published dataset**: Available on HuggingFace (`stixxert/topdown-medieval-pixelart`)
+- **Published LoRA models**: Available on HuggingFace (`stixxert/strategai-topdown-medieval-style-lora`)
 
 **Supporting files:**
 - `dataset-gen-train/docs/experiment-design.md` — Master experiment design doc
@@ -86,7 +87,7 @@ Fine-tunes FLUX2 Klein 4B on top-down medieval pixel-art style via LoRA (Low-Ran
 |---------------|----------------|
 | Large Language Models | OpenAI tool-use API for AI civ strategic decisions |
 | Prompt Engineering | 4-layer prompt assembly for DiT image generation |
-| Diffusion Models (DiT) | FLUX2 Klein 4B for pixel-art generation |
+| Diffusion Models (DiT) | FLUX2 Klein 4B Distilled for pixel-art generation |
 | Fine-Tuning (LoRA) | Style adaptation via low-rank adaptation on curated dataset |
 | AI Agents | Multi-agent architecture (LLM civs with personas, memory, tool-use) |
 | Evaluation | 547+ tests across subprojects, coverage metrics |

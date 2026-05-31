@@ -1,6 +1,6 @@
 # StrategAI: Integrating Large Language Models and Diffusion Transformers for AI-Driven Strategy Game Development
 
-**Abstract**—This paper presents StrategAI, a full-stack strategy game that demonstrates practical integration of multiple generative AI technologies in a cohesive software system. The project combines Large Language Models (LLMs) for autonomous civilization management with Diffusion Transformers (DiTs) for on-demand asset generation, unified through a modern web architecture. Three AI civilizations, each controlled by GPT-4 via OpenAI's tool-use API, make strategic decisions through a novel intent-based abstraction layer that translates high-level goals into deterministic game actions. Concurrently, a self-hosted asset pipeline leverages FLUX.2 Klein 4B—a 4-billion parameter DiT model—to generate medieval pixel-art assets through a four-layer prompt architecture and three-stage leader portrait pipeline with identity preservation. A LoRA fine-tuning pipeline adapts the base model to a consistent top-down perspective using a curated 100-image dataset. The system demonstrates that consumer-grade GPUs (8-12 GB VRAM) can support both real-time LLM-driven gameplay and near-interactive asset generation (1.2-4 seconds per image), making advanced generative AI accessible for independent game development. We detail the architectural decisions, integration patterns, and engineering challenges encountered in building this multi-agent system, providing a reference implementation for future projects combining language models with visual generation.
+**Abstract**—This paper presents StrategAI, a full-stack strategy game that demonstrates practical integration of multiple generative AI technologies in a cohesive software system. The project combines Large Language Models (LLMs) for autonomous civilization management with Diffusion Transformers (DiTs) for on-demand asset generation, unified through a modern web architecture. Three AI civilizations, each controlled by GPT-4 via OpenAI's tool-use API, make strategic decisions through a novel intent-based abstraction layer that translates high-level goals into deterministic game actions. Concurrently, a self-hosted asset pipeline leverages FLUX.2 Klein 4B Distilled—a 4-billion parameter DiT model—to generate medieval pixel-art assets through a four-layer prompt architecture and three-stage leader portrait pipeline with identity preservation. A LoRA fine-tuning pipeline adapts the base model to a consistent top-down perspective using a curated 100-image dataset. The system demonstrates that consumer-grade GPUs (8-12 GB VRAM) can support both real-time LLM-driven gameplay and near-interactive asset generation (1.2-4 seconds per image), making advanced generative AI accessible for independent game development. We detail the architectural decisions, integration patterns, and engineering challenges encountered in building this multi-agent system, providing a reference implementation for future projects combining language models with visual generation.
 
 **Index Terms**—Large Language Models, Diffusion Transformers, Game AI, Asset Generation, LoRA Fine-Tuning, Tool Use, Multi-Agent Systems
 
@@ -20,7 +20,7 @@ Independent game developers face two fundamental challenges when attempting to i
 
 **Integration complexity**: Combining multiple AI systems requires careful architectural design to manage data flow, error handling, and graceful degradation. Most existing frameworks address single modalities in isolation.
 
-StrategAI demonstrates that these challenges can be overcome through thoughtful system design. By selecting appropriately-sized models (GPT-4 for reasoning, FLUX.2 Klein 4B for generation) and implementing robust fallback mechanisms, the system achieves real-time performance on consumer hardware while maintaining production-quality output.
+StrategAI demonstrates that these challenges can be overcome through thoughtful system design. By selecting appropriately-sized models (GPT-4 for reasoning, FLUX.2 Klein 4B Distilled for generation) and implementing robust fallback mechanisms, the system achieves real-time performance on consumer hardware while maintaining production-quality output.
 
 ### B. Contributions
 
@@ -70,7 +70,7 @@ Full fine-tuning of large diffusion models is computationally prohibitive for mo
 
 Several works have applied LoRA to game asset generation. PixelArt-LoRA [19] adapts Stable Diffusion for pixel art but focuses on side-view sprites. TopDown-LoRA [20] targets overhead perspectives but lacks the medieval aesthetic required for strategy games.
 
-Our approach differs in three ways: (1) we target FLUX.2 Klein 4B, a newer architecture with improved prompt adherence; (2) we systematically evaluate caption design through a six-experiment matrix; (3) we integrate the fine-tuned model into a production pipeline with automated asset generation.
+Our approach differs in three ways: (1) we target FLUX.2 Klein 4B Distilled, a newer architecture with improved prompt adherence; (2) we systematically evaluate caption design through a six-experiment matrix; (3) we integrate the fine-tuned model into a production pipeline with automated asset generation.
 
 ### D. Multi-Agent Systems
 
@@ -90,9 +90,9 @@ StrategAI follows a microservices architecture with four primary components: a P
 
 **Frontend** (Next.js 15, React 19, TypeScript): Renders the game state through an SVG-based hex map, manages user interactions, and coordinates asset loading from the asset server. Implements graceful fallback when generative assets are unavailable.
 
-**Asset Server** (Python 3.10+, FastAPI, ComfyUI): Generates pixel-art assets on-demand using FLUX.2 Klein 4B. Provides 35 REST endpoints across six asset families (structures, objects, terrain, units, background tiles, leaders) with three generation modes (comfyui, static, placeholder).
+**Asset Server** (Python 3.10+, FastAPI, ComfyUI): Generates pixel-art assets on-demand using FLUX.2 Klein 4B Distilled. Provides 35 REST endpoints across six asset families (structures, objects, terrain, units, background tiles, leaders) with three generation modes (comfyui, static, placeholder).
 
-**Training Pipeline** (Python 3.10+, Ostris AI Toolkit): Fine-tunes LoRA adapters for FLUX.2 Klein using a curated dataset of medieval pixel art. Produces model weights that enforce top-down perspective and pixel-art style.
+**Training Pipeline** (Python 3.10+, Ostris AI Toolkit): Fine-tunes LoRA adapters for FLUX.2 Klein 4B Distilled using a curated dataset of medieval pixel art. Produces model weights that enforce top-down perspective and pixel-art style.
 
 ### B. Data Flow
 
@@ -100,13 +100,13 @@ The system operates through three primary data flows:
 
 **Gameplay loop**: User actions → Backend API → Game engine state update → LLM decision-making (AI turns) → State serialization → Frontend rendering
 
-**Asset generation**: Frontend asset request → Asset server API → ComfyUI workflow execution → FLUX.2 Klein inference → Post-processing → Image storage → Frontend display
+**Asset generation**: Frontend asset request → Asset server API → ComfyUI workflow execution → FLUX.2 Klein 4B Distilled inference → Post-processing → Image storage → Frontend display
 
 **Model training**: Dataset curation → Caption generation → LoRA training → Model evaluation → Weight deployment to asset server
 
 ### C. Technology Stack Rationale
 
-**FLUX.2 Klein 4B** was selected over alternatives (Stable Diffusion XL, FLUX.2 Klein 9B) based on four criteria:
+**FLUX.2 Klein 4B Distilled** was selected over alternatives (Stable Diffusion XL, FLUX.2 Klein 9B) based on four criteria:
 
 1. **License**: Apache 2.0 enables commercial use without restrictions
 2. **VRAM requirement**: ~8.4 GB fits consumer GPUs (RTX 3070/4070)
@@ -247,11 +247,11 @@ This ensures that AI civilizations remain functional even when the LLM service e
 
 ## V. DIFFUSION TRANSFORMER ASSET PIPELINE
 
-The asset server generates pixel-art assets on-demand using FLUX.2 Klein 4B, a 4-billion parameter Diffusion Transformer. The pipeline implements a four-layer prompt architecture and supports six asset families with diverse technical requirements.
+The asset server generates pixel-art assets on-demand using FLUX.2 Klein 4B Distilled, a 4-billion parameter Diffusion Transformer. The pipeline implements a four-layer prompt architecture and supports six asset families with diverse technical requirements.
 
 ### A. Model Architecture
 
-FLUX.2 Klein 4B represents a shift from traditional U-Net diffusion models to transformer-based architectures:
+FLUX.2 Klein 4B Distilled represents a shift from traditional U-Net diffusion models to transformer-based architectures:
 
 **Diffusion Transformer (DiT)**: Replaces U-Net backbone with Vision Transformer operating on latent-space patches. Enables better scaling and improved prompt adherence.
 
@@ -265,7 +265,7 @@ The model requires four files totaling ~14.6 GB:
 - `flux-2-klein-4b-fp8.safetensors` (6 GB): DiT transformer weights
 - `qwen_3_4b.safetensors` (8 GB): Text encoder weights
 - `flux2-vae.safetensors` (320 MB): Variational autoencoder
-- `flux2_klein_4b_lora_000002400.safetensors` (250 MB): Top-down perspective LoRA
+- `detailed_high_1800.safetensors` (250 MB): Top-down medieval style LoRA (custom-trained)
 
 ### B. Four-Layer Prompt Architecture
 
@@ -279,7 +279,7 @@ Consistent asset generation requires systematic prompt construction. We implemen
 - Post-processing: Lanczos resize, image sharpening, background removal
 
 **Layer 2: Style templates** (prompt_templates.json):
-- Camera framing: "Front view overhead shot elevated shot medium shot"
+- Camera framing: "top-down view."
 - Quality tags: "Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing"
 - LoRA triggers: "<tdp>" token for top-down perspective
 - Format constraints: "Isolate on plain white background, centered single asset"
@@ -342,7 +342,7 @@ The system supports six asset families, each with specific technical requirement
 
 Each family supports three generation modes:
 
-**comfyui**: Full AI generation using FLUX.2 Klein
+**comfyui**: Full AI generation using FLUX.2 Klein 4B Distilled
 **static**: Pre-generated assets from filesystem
 **placeholder**: PIL-generated colored rectangles with text labels
 
@@ -428,7 +428,7 @@ Generated images require post-processing to meet asset specifications:
 
 ## VI. LORA FINE-TUNING FOR STYLE ADAPTATION
 
-While FLUX.2 Klein 4B provides strong base capabilities, achieving consistent top-down perspective and pixel-art style requires model adaptation. We implement a LoRA fine-tuning pipeline using a curated 100-image dataset.
+While FLUX.2 Klein 4B Distilled provides strong base capabilities, achieving consistent top-down perspective and pixel-art style requires model adaptation. We implement a LoRA fine-tuning pipeline using a curated 100-image dataset.
 
 ### A. LoRA Architecture
 
@@ -511,30 +511,7 @@ We evaluate the interaction between caption detail and LoRA rank through a 3×2 
 
 ### E. Training Pipeline
 
-The training pipeline consists of five stages:
-
-**1. Extract training set**:
-- Copy curated images to training directory
-- Generate caption sidecar files (.txt) with `[trigger]` placeholder
-- Ostris AI Toolkit replaces `[trigger]` with `<tdp>` at training time
-
-**2. Validate dataset**:
-- Check image-caption pairing
-- Verify image dimensions and format
-- Report dataset statistics
-
-**3. Derive caption variants**:
-- Generate detailed, minimal, and ultra-minimal captions from metadata
-- Create separate training directories for each variant
-
-**4. Sync validation prompts**:
-- Copy sample prompts from experiment design to training configs
-- Ensure consistent evaluation across experiments
-
-**5. Train LoRA adapters**:
-- Launch six training jobs (one per experiment)
-- Monitor training progress through sample generation
-- Save checkpoints every 200 steps
+The training pipeline automates dataset preparation and model fine-tuning through five stages: (1) extract training images with caption sidecar files containing `[trigger]` placeholders, (2) validate image-caption pairing and dataset statistics, (3) derive three caption variants (detailed/minimal/ultra-minimal) from metadata, (4) synchronize validation prompts across experiment configs, and (5) launch six parallel training jobs with checkpoint saves every 200 steps. The Ostris AI Toolkit replaces `[trigger]` with `<tdp>` at training time, ensuring the model learns to associate the trigger token with the top-down perspective constraint.
 
 ### F. Evaluation Methodology
 
@@ -556,23 +533,29 @@ Evaluation criteria:
 
 ### G. Results and Analysis
 
-Preliminary results suggest:
+Fig. 2 presents a qualitative comparison of the caption detail trade-off spectrum in a 2×4 layout: two prompt subjects (S1: watchtower, T3: boulder) evaluated across four conditions (base model without LoRA, ultra_low, minimal_high, detailed_high).
 
-**Detailed captions + high rank**: Excellent reproduction of specific features (crenellations, materials, architectural details) but limited generalization to modern objects. The model memorizes training patterns rather than learning abstract perspective concepts.
+![LoRA caption detail trade-off: 2×4 grid — rows: S1 watchtower, T3 boulder; columns: base model (unreliable perspective), ultra_low (strongest generalization), minimal_high (balanced), detailed_high (optimal — maximum architectural fidelity)](../dataset-gen-train/figures/report_figure.png)
 
-**Minimal captions + high rank**: Balanced performance with good perspective consistency and reasonable generalization. The model learns essential characteristics without overfitting to specific features.
+**Fig. 2.** Qualitative comparison of caption detail strategies in a 2×4 grid. Rows (subjects): S1 watchtower (in-distribution structure), T3 boulder (out-of-distribution nature object). Columns (conditions): base model (no LoRA), ultra_low, minimal_high, detailed_high. Base model without LoRA—text prompts alone ("top-down view.") provide unreliable perspective enforcement. LoRA variants provide consistent, reliable top-down perspective: ultra_low achieves strongest generalization but sacrifices detail; minimal_high achieves balanced detail reproduction and generalization; detailed_high achieves optimal in-distribution architectural fidelity with acceptable out-of-distribution generalization, making it the recommended variant for deployment.
 
-**Ultra-minimal captions + low rank**: Strongest generalization to out-of-distribution prompts, enforcing top-down perspective even for modern objects. However, limited ability to reproduce specific medieval features.
+**Key findings**: The detailed_high experiment (detailed captions, 50–100 words, high rank: linear=128, conv=64) achieves the best balance between architectural detail reproduction and practical deployment quality. In-distribution structures show crisp pixel-art styling with accurate architectural features (crenellations, timber framing, stone masonry) rendered at higher fidelity than any other variant, while out-of-distribution units maintain top-down perspective despite never appearing in training data. The ultra_low experiment (ultra-minimal captions, low rank) demonstrates stronger generalization to unseen asset types but sacrifices fine detail—structures appear less architecturally specific. The base model without LoRA fails to maintain consistent top-down perspective across all categories, confirming the necessity of fine-tuning.
 
-These results support the hypothesis that caption detail and LoRA rank interact significantly. Less detailed captions force the model to learn abstract concepts (perspective, style) rather than specific patterns, improving generalization at the cost of detail reproduction.
+**Style leakage**: To verify that the LoRA's influence is appropriately scoped to its intended domain, we evaluated all six variants against a trigger-free prompt depicting a modern red sports car. This probe tests whether medieval or pixel-art styling inappropriately "leaks" into semantically distant subject matter when no trigger token is present. Across all variants, the generated sports cars remain recognizably modern: no top-down perspective, crenellation-like details, or pixel-art quantization appear. The LoRA variants produce renderings comparable to the base model baseline, with only subtle differences in lighting and surface treatment attributable to the model's learned priors rather than medieval style transfer. This confirms that the `<tdp>` trigger token effectively gates style application—without it, the LoRA weights exert negligible influence on generation, even at full strength (1.0). A full grid comparing all seven rows (six variants plus base model) across multiple prompt subjects (S1, T3, and others) is provided in the model card (`figures/model_card_figure_7x4.png`).
+
+**Training dynamics**: Analysis of checkpoint progression reveals distinct under-training and over-training regimes. Early checkpoints (steps 500–1000) produce noisy outputs with inconsistent perspective and weak pixel-art styling. The sweet spot emerges around steps 1500–2000, where perspective consistency and style adherence peak. Beyond step 2200, some experiments exhibit overfitting artifacts: rigid repetition of training patterns, color palette collapse, and reduced compositional diversity. For example, detailed_high at step 2400 produces nearly identical watchtower layouts across different seeds, indicating memorization rather than learned abstraction.
+
+**Checkpoint selection**: Based on qualitative evaluation, detailed_high at step 1800 provides optimal performance for deployment—maximum in-distribution architectural fidelity with acceptable out-of-distribution generalization. The detailed captions (50–100 words) provide rich architectural descriptions (crenellations, timber framing, stone masonry) that the high-rank LoRA faithfully reproduces, while the high rank (linear=128, conv=64) gives sufficient model capacity to capture fine detail without the over-generalization seen in ultra variants. Critically, style leakage testing confirms that the LoRA is properly scoped: neither cinematic leader portraits nor modern objects (sports car) exhibit medieval or pixel-art influence when the `<tdp>` trigger is absent. This validates the trigger-token mechanism as an effective gating strategy for domain-specific LoRA adapters.
 
 ### H. Deployment
 
-The best-performing LoRA weights (minimal captions, high rank) are deployed to the asset server:
-- File: `flux2_klein_4b_lora_000002400.safetensors`
+Based on qualitative analysis, the detailed_high checkpoint at step 1800 is deployed to the asset server:
+- File: `detailed_high_1800.safetensors` (353 MB)
 - Strength: 1.0 (full LoRA influence)
-- Trigger: `<tdp>` token in prompt templates
+- Trigger: `<tdp>` token + "top-down view." angle phrase in prompt templates
 - Activation: Automatic for structures, objects, terrain, units
+
+This checkpoint provides maximum in-distribution architectural fidelity (medieval structures with crisp crenellations, timber framing, and stone masonry detail) while maintaining acceptable out-of-distribution generalization (units, modern objects) and avoiding overfitting artifacts observed in later training steps.
 
 ---
 
@@ -814,7 +797,7 @@ Generated assets demonstrate:
 
 **LLM cost**: GPT-4 API calls incur per-token costs (~$0.03 per AI turn at current prompt sizes). For extended gameplay, costs accumulate. Smaller models (GPT-4-mini) could reduce costs with some quality loss.
 
-**Model size constraints**: FLUX.2 Klein 4B was selected for VRAM efficiency, but larger models (FLUX.2 Klein 9B, Stable Diffusion 3) offer superior quality. The 4B model occasionally produces artifacts or inconsistent details.
+**Model size constraints**: FLUX.2 Klein 4B Distilled was selected for VRAM efficiency, but larger models (FLUX.2 Klein 9B, Stable Diffusion 3) offer superior quality. The 4B model occasionally produces artifacts or inconsistent details.
 
 **LoRA generalization**: The fine-tuned LoRA enforces top-down perspective but struggles with some asset types (complex machinery, modern objects). Additional training data or multi-LoRA composition could improve generalization.
 
@@ -958,7 +941,7 @@ The complete StrategAI codebase is available at: https://github.com/[username]/S
 
 The curated dataset is published on Hugging Face: https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart
 
-Trained LoRA weights are available at: https://huggingface.co/stixxert/topdown-medieval-pixelart
+Trained LoRA weights are available at: https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora
 
 ---
 

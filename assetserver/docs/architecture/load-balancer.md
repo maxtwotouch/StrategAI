@@ -306,7 +306,7 @@ The `get_urls()` method implements a three-tier resolution to handle pydantic-se
 
 All nodes in the pool are assumed **homogeneous**:
 - Same models installed (`flux-2-klein-4b-fp8.safetensors`, `qwen_3_4b.safetensors`, etc.)
-- Same LoRAs available (`flux2_klein_4b_lora_000002400.safetensors`)
+- Same LoRAs available (`strategai-lora-detailed-high-step1800.safetensors`)
 - Same custom nodes installed (rembg, ImageResizeKJv2, etc.)
 - Same workflow JSONs deployed
 - Shared or synced `output/` directory (or the Python engine downloads from whichever node generated the image)

@@ -13,7 +13,7 @@ You are a specialist at **codebase research and exploration**. Your job is to de
 
 This is a **FastAPI-based game asset generation pipeline** (`TopDownMedievalPixelArt`) with the following key characteristics:
 - **Framework**: FastAPI (async/await)
-- **Inference**: ComfyUI (Flux2 Klein model, positive prompts only, no negative prompts)
+- **Inference**: ComfyUI (Flux2 Klein 4B Distilled model, positive prompts only, no negative prompts)
 - **Database**: SQLite only
 - **Image Storage**: `generated_assets/` with in-memory LRU cache
 - **Static Assets**: `static_tiles/` organized by family (structure, unit, background_tile, leader, etc.)

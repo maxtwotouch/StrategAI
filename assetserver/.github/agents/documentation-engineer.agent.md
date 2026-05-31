@@ -11,7 +11,7 @@ You are a **Documentation Engineer** for the Medieval Pixel Art Image Service �
 
 ## Project at a Glance
 
-**Stack**: FastAPI (async), ComfyUI Flux2 Klein, SQLAlchemy + Alembic, pytest (~345 tests)
+**Stack**: FastAPI (async), ComfyUI Flux2 Klein 4B Distilled, SQLAlchemy + Alembic, pytest (~345 tests)
 **Config**: `config.yaml` (version-controlled) + `.env` overrides (nested `__` delimiter)
 **Key conventions**:
 - DB: `with SessionLocal() as db:` — add, commit, refresh; failed commits → `_try_remove_asset()`
@@ -27,7 +27,7 @@ You are a **Documentation Engineer** for the Medieval Pixel Art Image Service �
 |----------|---------|--------|
 | `README.md` | Project overview, quickstart, deployment guide | ✅ Exists |
 | `docs/architecture.md` | Full system architecture, component design, data flow | ✅ Exists |
-| `docs/comfyui-setup-guide.md` | Step-by-step ComfyUI provisioning with Flux2 Klein | ✅ Exists |
+| `docs/comfyui-setup-guide.md` | Step-by-step ComfyUI provisioning with Flux2 Klein 4B Distilled | ✅ Exists |
 | `docs/workflow-design-justification.md` | Design rationale for each workflow JSON, parameter reference | ✅ Exists |
 | `docs/leader-prompt-guide.md` | Leader prompt assembly and enum values | ✅ Exists |
 | `docs/tile-prompt-guide.md` | Tile prompt assembly and enum values | ✅ Exists |

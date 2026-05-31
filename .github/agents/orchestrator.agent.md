@@ -15,8 +15,8 @@ You are the **Root Orchestrator** for StrategAI — an INF-3600 Generative AI st
 |-----------|------|------|---------|
 | **Backend** | `backend/` | Python 3.11+, FastAPI, OpenAI API | Game engine (pure functional, frozen dataclasses), LLM-driven AI civs, REST API |
 | **Frontend** | `frontend/` | Next.js 15, React 19, TypeScript, SVG | Game UI, hex map rendering, asset integration, diplomacy chat |
-| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B | Generative pixel-art service (6 asset families, 33 endpoints) |
-| **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein on medieval pixel art |
+| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 33 endpoints) |
+| **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled on medieval pixel art |
 | **Docs** | `docs/` | Markdown | Architecture, gameplay, development, UI, asset integration guides |
 | **Scripts** | `scripts/` | Python | Smoke tests, utilities |
 
@@ -25,7 +25,7 @@ You are the **Root Orchestrator** for StrategAI — an INF-3600 Generative AI st
 - **Frontend ↔ Backend**: REST API at `http://localhost:8000` — 14 endpoints (games, actions, turns). DTOs defined in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
 - **Frontend ↔ Asset Server**: Asset manifest resolution via `frontend/lib/assetManifest.ts` → `NEXT_PUBLIC_ASSET_API_URL`. POST endpoints for leader, unit, structure, terrain, background_tile. GET for asset files
 - **Backend ↔ Asset Server**: No direct contract — frontend mediates
-- **Asset Server ↔ Dataset/Training**: Shared ComfyUI infrastructure, shared FLUX2 Klein model, LoRA weights applied at inference time
+- **Asset Server ↔ Dataset/Training**: Shared ComfyUI infrastructure, shared FLUX2 Klein 4B Distilled model, LoRA weights applied at inference time
 
 ## AI Technologies (Course Relevance)
 
@@ -33,7 +33,7 @@ You are the **Root Orchestrator** for StrategAI — an INF-3600 Generative AI st
 |-----------|-----------|-------|
 | **LLM-driven AI civs** | OpenAI tool-use API | `backend/app/engine/openai_goals.py` — 9 intent tools, per-leader personas, rolling memory |
 | **Diplomacy chat** | LLM with persistent conversation | `backend/app/engine/diplomacy.py` — free-form chat with AI leaders |
-| **Generative pixel art** | ComfyUI + FLUX2 Klein 4B (DiT) | `assetserver/src/` — 6 asset families, 3 generation modes |
+| **Generative pixel art** | ComfyUI + FLUX2 Klein 4B Distilled (DiT) | `assetserver/src/` — 6 asset families, 3 generation modes |
 | **Style adaptation** | LoRA fine-tuning | `dataset-gen-train/` — Ostris AI Toolkit, 6-experiment matrix |
 
 ## Role & Boundaries

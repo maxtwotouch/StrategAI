@@ -31,7 +31,7 @@ You are the **Oral Presentation** coach for StrategAI's INF-3600 exam. Your job 
 ### Slide 3: System Architecture (60 seconds)
 - **Four components**: Backend (Python/FastAPI), Frontend (Next.js), Asset Server (FastAPI/ComfyUI), Training Pipeline (Ostris AI Toolkit)
 - **Data flow**: User actions → Backend → LLM decisions → State updates → Frontend rendering → Asset generation
-- **Technology choices**: GPT-4 for reasoning, FLUX.2 Klein 4B for generation, ComfyUI for orchestration
+- **Technology choices**: GPT-4 for reasoning, FLUX.2 Klein 4B Distilled for generation, ComfyUI for orchestration
 
 ### Slide 4: LLM-Driven Strategic AI (90 seconds) ⭐
 - **Challenge**: LLMs excel at reasoning but struggle with spatial logic and numerical precision
@@ -43,7 +43,7 @@ You are the **Oral Presentation** coach for StrategAI's INF-3600 exam. Your job 
 - **Demo**: Show AI making strategic decisions in real-time
 
 ### Slide 5: Diffusion Transformer Asset Pipeline (90 seconds) ⭐
-- **Model**: FLUX.2 Klein 4B (4B parameters, 4-step inference, ~1.2s generation)
+- **Model**: FLUX.2 Klein 4B Distilled (4B parameters, 4-step inference, ~1.2s generation)
 - **Four-layer prompt architecture**:
   1. Workflow configuration (ComfyUI JSON)
   2. Style templates (camera framing, quality tags)
@@ -54,7 +54,7 @@ You are the **Oral Presentation** coach for StrategAI's INF-3600 exam. Your job 
 - **Demo**: Show asset generation in real-time
 
 ### Slide 6: LoRA Fine-Tuning (60 seconds) ⭐
-- **Goal**: Adapt FLUX.2 Klein to consistent top-down perspective
+- **Goal**: Adapt FLUX.2 Klein 4B Distilled to consistent top-down perspective
 - **Dataset**: 100 curated medieval pixel-art images
 - **Six-experiment matrix**: 3 caption detail levels × 2 LoRA ranks
 - **Key finding**: Less detailed captions improve generalization by forcing abstract concept learning
@@ -119,7 +119,7 @@ A: Full fine-tuning of a 4B parameter model requires ~100 GB VRAM and weeks of t
 A: This is a limitation - we currently use qualitative evaluation. Future work should implement FID (Fréchet Inception Distance) for distribution similarity, CLIP score for prompt adherence, and DINO similarity for identity preservation.
 
 **Q7: What course concepts did you apply?**
-A: Large Language Models (GPT-4 for strategic AI), Diffusion Models (FLUX.2 Klein for asset generation), Fine-Tuning (LoRA for style adaptation), Prompt Engineering (4-layer architecture), Multi-Agent Systems (heterogeneous AI civilizations), and Evaluation (test coverage, performance metrics).
+A: Large Language Models (GPT-4 for strategic AI), Diffusion Models (FLUX.2 Klein 4B Distilled for asset generation), Fine-Tuning (LoRA for style adaptation), Prompt Engineering (4-layer architecture), Multi-Agent Systems (heterogeneous AI civilizations), and Evaluation (test coverage, performance metrics).
 
 **Q8: How does the intent abstraction improve over direct LLM control?**
 A: Direct control would require the LLM to calculate hex distances, validate movement rules, and handle pathfinding - tasks it performs poorly. The intent abstraction lets the LLM focus on strategic reasoning ("Should I expand or consolidate?") while the engine handles tactical execution ("Which settler, which location?").

@@ -104,7 +104,7 @@
   "asset_id": "struct_fortification_a1b2c3",
   "seed": 1234567890,
   "generation_mode": "comfyui",
-  "prompt_used": "<tdp> Front view overhead shot...",
+  "prompt_used": "<tdp> top-down view...",
   "resolution": "128x128",
   "generation_time_ms": 2340
 }

@@ -42,7 +42,7 @@ The report follows this structure (target: 10-20 pages):
    - Intent resolution
    - Error handling
 6. **Diffusion Transformer Asset Pipeline** (2.5-3 pages)
-   - Model architecture (FLUX.2 Klein 4B)
+   - Model architecture (FLUX.2 Klein 4B Distilled)
    - Four-layer prompt architecture
    - Asset families and generation modes
    - Leader portrait pipeline

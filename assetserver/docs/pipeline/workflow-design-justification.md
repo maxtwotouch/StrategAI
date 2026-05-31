@@ -77,7 +77,7 @@ graph TD
 
 ### Why Split Model Loading?
 
-Flux2 Klein uses **split model loading** (`UNETLoader` + `CLIPLoader` + `VAELoader`) instead of `CheckpointLoaderSimple`. This is because:
+Flux2 Klein 4B Distilled uses **split model loading** (`UNETLoader` + `CLIPLoader` + `VAELoader`) instead of `CheckpointLoaderSimple`. This is because:
 
 1. **The UNet, text encoder, and VAE are separate files** — they can be updated/hot-swapped independently
 2. **Different quantization formats** — the UNet can use FP8, GGUF, or BF16 without affecting the text encoder or VAE
@@ -221,10 +221,10 @@ Structures, objects, terrain, units, and background tiles all share identical ge
 
 The `<tdp>` LoRA requires the **full trigger phrase** to activate:
 ```
-<tdp> Front view overhead shot elevated shot medium shot.
+<tdp> top-down view.
 ```
 
-The `<tdp>` token alone is insufficient — it must be immediately followed by "Front view overhead shot elevated shot medium shot." This exact phrasing must appear as the first words after `<tdp>` in every tile and unit prompt template. The current `config/prompt_templates.json` already has this correctly for structure/object/terrain. The unit template must be corrected — see the prompt template specification in Section 10.
+The `<tdp>` token alone is insufficient — it must be immediately followed by "top-down view." This exact phrasing must appear as the first words after `<tdp>` in every tile and unit prompt template. The current `config/prompt_templates.json` already has this correctly for structure/object/terrain. The unit template must be corrected — see the prompt template specification in Section 10.
 
 ---
 
@@ -248,7 +248,7 @@ The `<tdp>` token alone is insufficient — it must be immediately followed by "
 
 ### Why 1920×1088 and Not 1920×1080?
 
-Flux2 Klein requires dimensions to be **multiples of 64** for optimal performance. 1080 is not a multiple of 64 (1080/64 = 16.875). 1088 is (1088/64 = 17). Using 1080 would cause:
+Flux2 Klein 4B Distilled requires dimensions to be **multiples of 64** for optimal performance. 1080 is not a multiple of 64 (1080/64 = 16.875). 1088 is (1088/64 = 17). Using 1080 would cause:
 
 - Drastically increased generation time (documented in ComfyUI issue #11916)
 - Potential quality degradation from internal padding/scaling
@@ -335,7 +335,7 @@ At **0.85**, the model:
 - Provides enough creative freedom for the action scene to feel distinct from the splash
 - Higher than 0.60 risks losing character identity; lower than 0.60 restricts scene transformation
 
-This is the highest denoise that reliably preserves character consistency across the Flux2 Klein architecture.
+This is the highest denoise that reliably preserves character consistency across the Flux2 Klein 4B Distilled architecture.
 
 The leader_action workflow uses `ImageStitch` to combine two reference images
 side-by-side (single-leader actions supply a transparent placeholder for the
@@ -430,7 +430,7 @@ no-op in practice but serves as a safety guarantee.
 
 ### The Multiples-of-64 Constraint
 
-Flux2 Klein's UNet architecture processes images in patches. Non-aligned resolutions cause:
+Flux2 Klein 4B Distilled's UNet architecture processes images in patches. Non-aligned resolutions cause:
 
 1. **Padding overhead**: The model internally pads to the nearest multiple of 64, adding wasted computation
 2. **Performance degradation**: Documented in ComfyUI issue #11916 — non-aligned resolutions can **double** generation time
@@ -449,7 +449,7 @@ Flux2 Klein's UNet architecture processes images in patches. Non-aligned resolut
 
 Three reasons:
 
-1. **Quality ceiling**: Flux2 Klein at 1024×1024 produces significantly more coherent pixel art than at 128×128. The model has more "canvas" to work with for fine details, edge definition, and color variation.
+1. **Quality ceiling**: Flux2 Klein 4B Distilled at 1024×1024 produces significantly more coherent pixel art than at 128×128. The model has more "canvas" to work with for fine details, edge definition, and color variation.
 
 2. **LoRA activation**: The `<tdp>` pixel-art LoRA was trained to produce pixel-art aesthetics. At 128×128 native, the LoRA has only 16,384 pixels to work with — too few for meaningful pattern learning. At 1024×1024 (1,048,576 pixels), the LoRA can properly activate its learned pixel-art transformations.
 
@@ -519,10 +519,10 @@ Based on Black Forest Labs' official documentation and community best practices:
 The `<tdp>` pixel-art LoRA requires the **exact full trigger phrase** to activate:
 
 ```
-<tdp> Front view overhead shot elevated shot medium shot.
+<tdp> top-down view.
 ```
 
-**Critical:** `<tdp>` alone is insufficient. It must be immediately followed by "Front view overhead shot elevated shot medium shot." — no words or punctuation between them.
+**Critical:** `<tdp>` alone is insufficient. It must be immediately followed by "top-down view." — no words or punctuation between them.
 
 **Where it applies:**
 - ✅ Structure templates (`<tdp>` prefix)
@@ -545,7 +545,7 @@ This must be moved to `config/prompt_templates.json` with the full trigger:
 
 ```json
 "unit": {
-  "prefix": "<tdp> Front view overhead shot elevated shot medium shot. pixel art top-down 2d game character sprite, ",
+  "prefix": "<tdp> top-down view. pixel art top-down 2d game character sprite, ",
   "suffix": ", facing camera front view full frontal, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset"
 }
 ```

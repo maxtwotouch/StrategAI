@@ -1,0 +1,78 @@
+{
+  "prompts": [
+    {
+      "id": "S1",
+      "category": "structure",
+      "name": "watchtower",
+      "prompt": "<tdp> top-down view. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. A sturdy stone watchtower with crenellated battlements, narrow arrow slits, a wooden platform, and iron-reinforced gate, military functionality, cool medieval palette. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.",
+      "description": "In-distribution fortification structure",
+      "expected": "Strong top-down perspective, detailed military architecture"
+    },
+    {
+      "id": "S2",
+      "category": "structure",
+      "name": "watermill",
+      "prompt": "<tdp> top-down view. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. A medieval watermill with a large wooden wheel, millrace channel, timber frame, and grain storage, riverside setting, warm muted palette. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.",
+      "description": "In-distribution economic structure",
+      "expected": "Top-down perspective, watermill with wheel, timber construction"
+    },
+    {
+      "id": "U1",
+      "category": "unit",
+      "name": "knight",
+      "prompt": "<tdp> top-down view. pixel art top-down 2d game character sprite, a heavily armored knight with a broadsword and kite shield, plate armor with heraldic crest, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset",
+      "description": "Out-of-distribution melee unit (0% of training data)",
+      "expected": "Top-down character sprite, tests LoRA generalization to unseen asset types"
+    },
+    {
+      "id": "U2",
+      "category": "unit",
+      "name": "archer",
+      "prompt": "<tdp> top-down view. pixel art top-down 2d game character sprite, a hooded archer with a longbow and quiver of arrows, leather armor, forest green cloak, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset",
+      "description": "Out-of-distribution ranged unit",
+      "expected": "Top-down character sprite, different silhouette and materials from knight"
+    },
+    {
+      "id": "T1",
+      "category": "terrain",
+      "name": "hill",
+      "prompt": "<tdp> top-down view. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. A grassy hill with gentle slopes, scattered wildflowers, exposed rocky outcrops near the summit, and a winding dirt path, medium scale, earthy green and brown palette. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective, no floating objects.",
+      "description": "In-distribution terrain elevation (terrain in training data)",
+      "expected": "Top-down terrain feature with natural contours"
+    },
+    {
+      "id": "T2",
+      "category": "terrain",
+      "name": "oak_tree",
+      "prompt": "<tdp> top-down view. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. A large oak tree with thick gnarled trunk, dense spreading canopy of dark green foliage, exposed root system, and moss-covered base, large scale, deep forest green and bark brown palette. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective, no floating objects.",
+      "description": "In-distribution vegetation/terrain feature",
+      "expected": "Top-down tree canopy view with visible trunk and roots"
+    },
+    {
+      "id": "T3",
+      "category": "terrain",
+      "name": "boulder",
+      "prompt": "<tdp> top-down view. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. A large jagged boulder with rough granite texture, deep crevices, patches of lichen and moss, and scattered smaller rocks at its base, medium scale, cool grey and moss green palette. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective, no floating objects.",
+      "description": "In-distribution terrain feature (rock formation)",
+      "expected": "Top-down rock formation with texture detail"
+    },
+    {
+      "id": "L1",
+      "category": "style_leakage",
+      "name": "sports_car",
+      "prompt": "<tdp> top-down view. A modern red sports car, isolated on white background.",
+      "description": "Style leakage test - modern object with <tdp> trigger",
+      "expected": "Should show if LoRA leaks medieval/pixel style onto modern objects"
+    }
+  ],
+  "seed": 42,
+  "metadata": {
+    "purpose": "LoRA checkpoint evaluation across 3 asset categories",
+    "categories": {
+      "structure": "In-distribution (97% of training data)",
+      "unit": "Out-of-distribution (0% of training data, but has <tdp> trigger)",
+      "terrain": "In-distribution (3% of training data \u2014 vegetation and rock formations)",
+      "style_leakage": "Modern objects with <tdp> trigger to test style leakage"
+    }
+  }
+}

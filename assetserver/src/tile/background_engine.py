@@ -42,6 +42,19 @@ GAME_ASSET_SIZE = 128
 # Valid background tile types
 TILE_TYPES = {"water", "grass", "sand", "stone", "dirt"}
 
+# Surface-word mapping: water uses "surface" to avoid the contradictory
+# "water ground texture" phrasing; all other tile types are genuinely
+# ground surfaces and keep "ground".
+_SURFACE_MAP: dict[str, str] = {"water": "surface"}
+_SURFACE_DEFAULT = "ground"
+
+
+def _surface_for(tile_type: str) -> str:
+    """Return the appropriate surface word for a tile type."""
+    raw = getattr(tile_type, "value", tile_type)
+    return _SURFACE_MAP.get(raw, _SURFACE_DEFAULT)
+
+
 # Placeholder colour for each tile type
 _PLACEHOLDER_COLORS: dict[str, tuple[int, int, int, int]] = {
     "water": (60, 120, 200, 255),
@@ -121,7 +134,11 @@ class BackgroundTileEngine:
                 f"Unknown tile_type '{tile_type}'. Valid: {sorted(TILE_TYPES)}"
             )
 
-        prompt = _render("background_tile", tile_type=getattr(tile_type, 'value', tile_type))
+        prompt = _render(
+            "background_tile",
+            tile_type=getattr(tile_type, 'value', tile_type),
+            surface=_surface_for(tile_type),
+        )
         seed = seed if seed is not None else secrets.randbits(32)
         bg_tile_id = _generate_bg_tile_id(tile_type)
 
@@ -221,7 +238,11 @@ class StaticBackgroundTileEngine:
                 filename=filename,
                 bg_tile_id=bg_tile_id,
                 seed=seed,
-                prompt_used=_render("background_tile", tile_type=getattr(tile_type, 'value', tile_type)),
+                prompt_used=_render(
+                    "background_tile",
+                    tile_type=getattr(tile_type, 'value', tile_type),
+                    surface=_surface_for(tile_type),
+                ),
                 generation_mode="static",
                 elapsed_ms=0,
             )
@@ -286,7 +307,11 @@ class _PlaceholderBackgroundTileEngine:
             filename=filename,
             bg_tile_id=bg_tile_id,
             seed=seed,
-            prompt_used=_render("background_tile", tile_type=getattr(tile_type, 'value', tile_type)),
+            prompt_used=_render(
+                "background_tile",
+                tile_type=getattr(tile_type, 'value', tile_type),
+                surface=_surface_for(tile_type),
+            ),
             generation_mode="static",
             elapsed_ms=0,
         )

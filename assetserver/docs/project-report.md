@@ -36,7 +36,7 @@ This project makes the following contributions:
 
 2. **A structured prompt architecture using enums and templates** rather than free-form prompt strings. The four-layer assembly system (workflow JSON → prompt templates → enum injection maps → assembly logic) deliberately restricts client freedom in exchange for two properties critical to game development: (a) _zero prompt-engineering burden_ — clients send game-design concepts like `"fortification"` and `"desert"`, not raw diffusion-model prompts; and (b) _guaranteed style consistency_ — all style directives (camera framing, LoRA triggers, pixel-art quality tags) are locked in version-controlled JSON templates that no client request can override. This design rejects the conventional "pass-through" approach (where the API is a thin wrapper that forwards a raw prompt string to the model) in favour of a curated, domain-specific interface that dramatically lowers the adaptation barrier for game developers who are not prompt engineers.
 
-3. **A three-stage leader generation pipeline** (splash → profile → action) using Flux2 Klein's native image-editing capability for character identity preservation. The splash establishes a canonical visual identity; subsequent stages use img2img with calibrated denoise parameters to maintain recognisability while allowing composition changes.
+3. **A three-stage leader generation pipeline** (splash → profile → action) using Flux2 Klein 4B Distilled's native image-editing capability for character identity preservation. The splash establishes a canonical visual identity; subsequent stages use img2img with calibrated denoise parameters to maintain recognisability while allowing composition changes.
 
 4. **A Flux2 Klein 4B DiT workflow design** optimised for pixel-art game assets: split model loading (UNETLoader + CLIPLoader + VAELoader), BasicScheduler for rectified flow, FluxGuidance + CFGGuider for guidance control, LoRA-based pixel-art styling via the `<tdp>` trigger, Lanczos downscaling (1024→256), and rembg background removal.
 
@@ -52,7 +52,7 @@ This project makes the following contributions:
 
 **ComfyUI as inference backend.** ComfyUI (2023–2026) has become the de facto standard node-graph interface for Stable Diffusion and Flux-family models. Its advantages over programmatic libraries like HuggingFace diffusers include: visual workflow debugging, community-contributed custom nodes (rembg, PixelArtDetector, ImageResizeKJv2), hot-swappable model files without code changes, and a stable HTTP + WebSocket API suitable for microservice integration. This project uses ComfyUI exclusively as an inference backend — the web server never interacts with Python diffusion libraries directly.
 
-**Prompt engineering for pixel art.** The `<tdp>` (top-down pixel) LoRA trigger token approach, documented in the CivitAI community (2025), uses a LoRA fine-tuned on top-down pixel-art game sprites. The trigger phrase `<tdp> Front view overhead shot elevated shot medium shot` activates the LoRA's learned camera-angle and pixel-art transformations. This project adopts and validates this approach, finding it essential for producing consistent top-down perspective across all tile asset families.
+**Prompt engineering for pixel art.** The `<tdp>` (top-down pixel) LoRA trigger token approach, documented in the CivitAI community (2025), uses a LoRA fine-tuned on top-down pixel-art game sprites. The trigger phrase `<tdp> top-down view.` activates the LoRA's learned camera-angle and pixel-art transformations. This project adopts and validates this approach, finding it essential for producing consistent top-down perspective across all tile asset families.
 
 ---
 
@@ -171,7 +171,7 @@ Traditional latent diffusion models (LDMs) like Stable Diffusion XL use a convol
 - **Global context**: Self-attention operates over the entire latent sequence, enabling long-range coherence that benefits complex compositions.
 - **Text conditioning**: Cross-attention layers naturally integrate text embeddings from large language models (Qwen 3 4B in Flux2), providing stronger prompt adherence than CLIP-based conditioning in U-Net architectures.
 
-**Rectified flow formulation.** Flux2 Klein uses a rectified flow (Liu et al., 2023) rather than conventional DDPM/DDIM diffusion. In rectified flow, the forward process is a straight-line path from data to noise, and the reverse process follows the same trajectory. This formulation enables more efficient distillation — the 4-step distilled variant achieves comparable quality to 50-step base models by learning to correct the straight-path trajectory in fewer, larger steps.
+**Rectified flow formulation.** Flux2 Klein 4B Distilled uses a rectified flow (Liu et al., 2023) rather than conventional DDPM/DDIM diffusion. In rectified flow, the forward process is a straight-line path from data to noise, and the reverse process follows the same trajectory. This formulation enables more efficient distillation — the 4-step distilled variant achieves comparable quality to 50-step base models by learning to correct the straight-path trajectory in fewer, larger steps.
 
 **Distilled 4-step inference.** The Flux2 Klein 4B Distilled variant was trained via step distillation: a teacher model (50-step base) generates high-quality samples, and a student model (4-step) learns to match the teacher's output distribution in fewer steps. The `BasicScheduler` node with scheduler type `simple` applies the correct noise schedule for this distilled inference — a non-linear sigma distribution that concentrates the largest denoising steps early in the schedule.
 
@@ -200,7 +200,7 @@ The choice of image generation model is the single most consequential design dec
 
 3. **4-step inference speed.** At approximately 1.2 seconds per generation on an RTX 5090 (3–5 seconds on consumer GPUs), the distilled model makes interactive asset generation feasible. Compare to 35 seconds for the 9B base model — a ~12× speed difference that transforms the user experience from batch-processing to near-interactive.
 
-4. **Native image editing.** Flux2 Klein supports single-reference and multi-reference image editing natively — essential for the leader pipeline's identity-preserving img2img stages. With SDXL Turbo, VAE encoding of reference images would require manual latent-space manipulation with less reliable identity preservation.
+4. **Native image editing.** Flux2 Klein 4B Distilled supports single-reference and multi-reference image editing natively — essential for the leader pipeline's identity-preserving img2img stages. With SDXL Turbo, VAE encoding of reference images would require manual latent-space manipulation with less reliable identity preservation.
 
 5. **Qwen 3 4B text encoder.** The stronger text encoder provides superior prompt adherence compared to SDXL's CLIP-based encoder, which is critical for precise game asset descriptions (e.g., "a stone fortification with crenellated battlements, arrow slits, thick stone walls, in Norman Romanesque style").
 
@@ -215,9 +215,9 @@ The Flux2 Klein 4B deployment requires four model files, all loaded by ComfyUI f
 | `flux-2-klein-4b-fp8.safetensors` | ~6 GB | `models/unet/` | DiT transformer (FP8 quantized) — the denoising backbone | Black Forest Labs / HuggingFace |
 | `qwen_3_4b.safetensors` | ~8 GB | `models/clip/` | Qwen 3 4B text encoder — converts prompts to conditioning embeddings | Qwen / HuggingFace |
 | `flux2-vae.safetensors` | ~320 MB | `models/vae/` | Variational Autoencoder — compresses/decompresses between pixel space and latent space | Black Forest Labs / HuggingFace |
-| `flux2_klein_4b_lora_000002400.safetensors` | ~250 MB | `models/loras/` | Top-down pixel-art LoRA (`<tdp>` trigger) — enforces camera angle and pixel-art aesthetics | CivitAI community |
+| `strategai-lora-detailed-high-step1800.safetensors` | ~250 MB | `models/loras/` | Top-down medieval style LoRA (custom-trained) (`<tdp>` trigger) — enforces camera angle and pixel-art aesthetics | CivitAI community |
 
-> **⚠️ TODO — LoRA trigger token investigation:** The `<tdp>` LoRA (`flux2_klein_4b_lora_000002400.safetensors`, trained for 2,400 steps) is a community-created asset sourced, not an officially published model. Its trigger token `<tdp>` is baked into four of eight prompt templates and directly controls the pixel-art aesthetic of all tile and unit assets. Key unknowns requiring future investigation: (1) the exact training dataset and whether it includes sufficient top-down medieval assets specifically; (2) whether the `<tdp>` token is the optimal trigger or if a custom-trained LoRA on a curated medieval pixel-art dataset would produce superior style consistency; (3) the LoRA's long-term availability on CivitAI and the risk of link rot. See [§7.2](#72-future-work) for planned remediation.
+> **⚠️ TODO — LoRA trigger token investigation:** The `<tdp>` LoRA (`strategai-lora-detailed-high-step1800.safetensors`, trained for 2,400 steps) is a community-created asset sourced, not an officially published model. Its trigger token `<tdp>` is baked into four of eight prompt templates and directly controls the pixel-art aesthetic of all tile and unit assets. Key unknowns requiring future investigation: (1) the exact training dataset and whether it includes sufficient top-down medieval assets specifically; (2) whether the `<tdp>` token is the optimal trigger or if a custom-trained LoRA on a curated medieval pixel-art dataset would produce superior style consistency; (3) the LoRA's long-term availability on CivitAI and the risk of link rot. See [§7.2](#72-future-work) for planned remediation.
 
 **Total disk footprint**: ~14.6 GB for model weights. **Total VRAM at inference**: ~8.4 GB (models loaded in FP8 precision).
 
@@ -254,7 +254,7 @@ graph TD
 - **`FluxGuidance`**: The user-facing guidance control. Sets guidance strength applied to positive conditioning. Values range from 2.5 (background tiles — organic textures benefit from looser guidance) to 8.0 (leader profiles — strong identity preservation requires tight guidance).
 - **`CFGGuider`**: An internal wiring node connecting the model, positive conditioning (from FluxGuidance), and zeroed-out negative conditioning. Its `cfg` parameter is always **1.0** — this is an architectural requirement, not a tuning knob.
 
-**ConditioningZeroOut for negative conditioning.** Since Flux2 Klein does not support negative prompts, the `ConditioningZeroOut` node provides zeroed-out conditioning to the CFGGuider. This is a technical requirement of the Flux2 architecture — the CFGGuider expects both positive and negative conditioning inputs, even when negative conditioning is unused.
+**ConditioningZeroOut for negative conditioning.** Since Flux2 Klein 4B Distilled does not support negative prompts, the `ConditioningZeroOut` node provides zeroed-out conditioning to the CFGGuider. This is a technical requirement of the Flux2 architecture — the CFGGuider expects both positive and negative conditioning inputs, even when negative conditioning is unused.
 
 ### 3.5 The `txt2img.json` Workflow — Node-by-Node Walkthrough
 
@@ -356,12 +356,12 @@ Loads the VAE that will decode the denoised latent representation into pixel spa
 | Input | Value | Purpose |
 |-------|-------|---------|
 | `model` | `[connected to Node 1 output]` | Loaded UNet |
-| `lora_name` | `flux2_klein_4b_lora_000002400.safetensors` | The `<tdp>` pixel-art LoRA |
+| `lora_name` | `strategai-lora-detailed-high-step1800.safetensors` | Top-down medieval style LoRA (custom-trained) |
 | `strength_model` | `1.0` | LoRA weight (full strength) |
 
 Applies the `<tdp>` (top-down pixel) LoRA to the UNet at full strength. This LoRA was trained on top-down pixel-art game sprites and enforces: (a) top-down orthographic camera angle, (b) pixel-art edge treatment (hard edges, limited colour palette), and (c) medieval fantasy aesthetic. The LoRA is applied between the UNETLoader and the CFGGuider — it modifies the model weights before sampling begins.
 
-The `<tdp>` trigger token in the prompt activates the LoRA's learned transformations. The full trigger phrase `<tdp> Front view overhead shot elevated shot medium shot` must appear at the start of the prompt — the `<tdp>` token alone is insufficient.
+The `<tdp>` trigger token in the prompt activates the LoRA's learned transformations. The full trigger phrase `<tdp> top-down view.` must appear at the start of the prompt — the `<tdp>` token alone is insufficient.
 
 **This node is absent from leader workflows and the background_tile workflow.** Leaders use cinematic/painterly styles (no pixel-art LoRA), and background tiles are seamless textures that benefit from organic variation rather than pixel-art rigidity.
 
@@ -394,7 +394,7 @@ Decodes the 1024×1024 latent representation into a 1024×1024 pixel-space image
 |-------|-------|---------|
 | `conditioning` | `[connected to Node 4 output]` | Positive conditioning (zeroed for negative) |
 
-Zeroes the conditioning for the negative prompt input to CFGGuider. This is required because Flux2 Klein does not support negative prompts — the CFGGuider expects both positive and negative conditioning inputs, so the negative input is zeroed.
+Zeroes the conditioning for the negative prompt input to CFGGuider. This is required because Flux2 Klein 4B Distilled does not support negative prompts — the CFGGuider expects both positive and negative conditioning inputs, so the negative input is zeroed.
 
 ---
 
@@ -419,11 +419,11 @@ Internal wiring node — connects the model, positive conditioning, and zeroed n
 | `height` | `1024` | Generation canvas height |
 | `batch_size` | `1` | Single image per generation |
 
-Creates a blank 1024×1024 latent canvas. Flux2 Klein generates at this resolution natively — the 1024×1024 canvas provides 1,048,576 pixels for the LoRA to work with, producing coherent pixel-art patterns before downscaling.
+Creates a blank 1024×1024 latent canvas. Flux2 Klein 4B Distilled generates at this resolution natively — the 1024×1024 canvas provides 1,048,576 pixels for the LoRA to work with, producing coherent pixel-art patterns before downscaling.
 
-**Why 1024 and not 128?** Three reasons: (1) Flux2 Klein produces significantly more coherent outputs at 1024×1024 — the model has more "canvas" for fine details, edge definition, and colour variation; (2) the `<tdp>` LoRA was trained to produce pixel-art aesthetics and requires sufficient pixel count (≥1M) for meaningful pattern activation; (3) Lanczos downscaling from 1024→256 (4× reduction) naturally anti-aliases while preserving edge definition, producing crisp pixel-art results.
+**Why 1024 and not 128?** Three reasons: (1) Flux2 Klein 4B Distilled produces significantly more coherent outputs at 1024×1024 — the model has more "canvas" for fine details, edge definition, and colour variation; (2) the `<tdp>` LoRA was trained to produce pixel-art aesthetics and requires sufficient pixel count (≥1M) for meaningful pattern activation; (3) Lanczos downscaling from 1024→256 (4× reduction) naturally anti-aliases while preserving edge definition, producing crisp pixel-art results.
 
-**Multiples-of-64 constraint.** Flux2 Klein's UNet processes images in patches aligned to 64-pixel boundaries. Non-aligned resolutions cause internal padding, increasing generation time and potentially introducing edge artifacts (documented in ComfyUI issue #11916). 1024 ÷ 64 = 16 — perfectly aligned.
+**Multiples-of-64 constraint.** Flux2 Klein 4B Distilled's UNet processes images in patches aligned to 64-pixel boundaries. Non-aligned resolutions cause internal padding, increasing generation time and potentially introducing edge artifacts (documented in ComfyUI issue #11916). 1024 ÷ 64 = 16 — perfectly aligned.
 
 ---
 
@@ -489,7 +489,7 @@ Saves the final 256×256 game asset to ComfyUI's `output/` directory. The Python
 | `steps` | `4` | Distilled 4-step inference |
 | `denoise` | `1.0` | Full txt2img (no reference image) |
 
-Generates the sigma (noise level) schedule for the 4-step distilled inference. The `simple` scheduler matches Flux2 Klein's training distribution. `denoise: 1.0` indicates a full txt2img generation — starting from pure noise (sigma_max) and denoising to a clean image (sigma_min). For img2img workflows (leader profile/action), denoise is reduced to 0.85–0.90 to preserve reference image content.
+Generates the sigma (noise level) schedule for the 4-step distilled inference. The `simple` scheduler matches Flux2 Klein 4B Distilled's training distribution. `denoise: 1.0` indicates a full txt2img generation — starting from pure noise (sigma_max) and denoising to a clean image (sigma_min). For img2img workflows (leader profile/action), denoise is reduced to 0.85–0.90 to preserve reference image content.
 
 ---
 
@@ -565,7 +565,7 @@ graph TD
 
 Example (structure template):
 ```
-<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
+<tdp> top-down view. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. {inner}. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
 ```
 
 **Layer 3 — Enum Injection Maps** (`src/{leader,tile,unit}/prompts.py`): Rich prose descriptions for each enum value. When a client sends `category: "fortification"` and `style: "norman_romanesque"`, the injection maps translate these to:
@@ -591,7 +591,7 @@ A natural alternative to the four-layer system would be a "pass-through" API: ac
 
 This project deliberately rejects that model for three reasons grounded in the game development use case:
 
-**1. Prompt engineering is a specialised skill, not a game design skill.** Effective diffusion-model prompting requires knowledge of LoRA trigger tokens (`<tdp>`), camera framing vocabulary ("front view overhead shot elevated shot medium shot"), quality tags ("crisp pixel edges, no anti-aliasing, sharp blocky pixels"), format directives ("isolate on a plain white background"), and model-specific quirks (Flux2 Klein has no negative prompt support). Expecting a game designer — whose expertise is gameplay mechanics, narrative, and level design — to also master prompt engineering is an unreasonable adaptation burden. Our enum-based API accepts concepts the game designer already works with: `"fortification"` in `"desert"` biome during `"summer"`. The system translates these into model-optimised prose automatically.
+**1. Prompt engineering is a specialised skill, not a game design skill.** Effective diffusion-model prompting requires knowledge of LoRA trigger tokens (`<tdp>`), camera framing vocabulary ("top-down view."), quality tags ("crisp pixel edges, no anti-aliasing, sharp blocky pixels"), format directives ("isolate on a plain white background"), and model-specific quirks (Flux2 Klein 4B Distilled has no negative prompt support). Expecting a game designer — whose expertise is gameplay mechanics, narrative, and level design — to also master prompt engineering is an unreasonable adaptation burden. Our enum-based API accepts concepts the game designer already works with: `"fortification"` in `"desert"` biome during `"summer"`. The system translates these into model-optimised prose automatically.
 
 **2. Style consistency across hundreds of assets requires centralised control.** A game with 200 generated assets must look like they belong in the same world. If each asset is generated from a client-written free-form prompt, style drift is inevitable — one structure might be "pixel art" while another is "stylised illustration" because the client phrased the prompt differently. By locking all style directives in version-controlled JSON templates (`config/prompt_templates.json`), we guarantee that every asset passes through the same camera framing, the same quality tags, and the same format constraints. The client controls _what_ appears; the template controls _how_ it appears.
 
@@ -777,7 +777,7 @@ The unit prompt template uses the `<tdp>` trigger and specifies: "pixel art top-
 
 ### 4.4 Background Tile — Seamless Textures
 
-Background tiles are seamless repeating ground textures for game maps, served at 256×256. Five tile types are supported: `water`, `grass`, `sand`, `stone`, `dirt`.
+Background tiles are seamless repeating surface textures for game maps, served at 256×256. Five tile types are supported: `water`, `grass`, `sand`, `stone`, `dirt`. Land-based tile types (grass, sand, stone, dirt) use the word "ground" in their prompts; water uses "surface" to avoid semantically contradictory phrasing.
 
 The `background_tile.json` workflow differs from `txt2img.json` in several important ways:
 
@@ -785,7 +785,7 @@ The `background_tile.json` workflow differs from `txt2img.json` in several impor
 2. **No rembg (background removal)**: Textures fill the entire frame — there is no "foreground object" to isolate.
 3. **No ImageSharpen**: The downscale from 1024→256 is sufficient for texture crispness.
 4. **Lower guidance (2.5)**: Organic textures need looser guidance than discrete game assets. At guidance=3.5 (the txt2img default), the model over-adheres to rigid patterns, creating visible grid lines when tiled. 2.5 allows natural texture flow while maintaining coherence.
-5. **Prompt engineering for tiling**: The prompt template includes directives like "seamless repeating ground texture," "no borders, no centered composition, no empty space," "no disruptive features or objects touching the outermost pixel edges," and "consistent texture density across whole image."
+5. **Prompt engineering for tiling**: The prompt template includes directives like "seamless repeating {tile_type} {surface} texture" (where `{surface}` resolves to "ground" for land types and "surface" for water, avoiding the contradictory "water ground texture" phrasing), "no borders, no centered composition, no empty space," "no disruptive features or objects touching the outermost pixel edges," and "consistent texture density across whole image."
 
 ### 4.5 Placeholder Mode
 
@@ -1057,7 +1057,7 @@ Total end-to-end: approximately 2–36 seconds, dominated by ComfyUI queue wait 
 
 This project set out to answer a practical question: can a single consumer GPU running open-weight models serve as a complete game asset pipeline? The answer is a qualified **yes** — with careful engineering of the prompt architecture, workflow design, and API layer, the system produces consistent, style-coherent pixel-art assets across six categories at approximately 2–36 seconds per asset.
 
-The key technical contributions are: (1) a decoupled FastAPI ↔ ComfyUI architecture where the web server never loads model weights, enabling independent scaling of the API and inference tiers; (2) a four-layer prompt assembly system that rigorously separates style from content, making the system maintainable by non-programmers (a game designer can adjust all visual style by editing `config/prompt_templates.json`); (3) a three-stage leader pipeline using Flux2 Klein's native image-editing capability with calibrated denoise parameters, demonstrating that identity preservation across multiple generations is achievable without specialised face-consistency models; and (4) a comprehensive test suite of 547 tests validating the full stack, establishing that academic projects can — and should — achieve production-grade test coverage.
+The key technical contributions are: (1) a decoupled FastAPI ↔ ComfyUI architecture where the web server never loads model weights, enabling independent scaling of the API and inference tiers; (2) a four-layer prompt assembly system that rigorously separates style from content, making the system maintainable by non-programmers (a game designer can adjust all visual style by editing `config/prompt_templates.json`); (3) a three-stage leader pipeline using Flux2 Klein 4B Distilled's native image-editing capability with calibrated denoise parameters, demonstrating that identity preservation across multiple generations is achievable without specialised face-consistency models; and (4) a comprehensive test suite of 547 tests validating the full stack, establishing that academic projects can — and should — achieve production-grade test coverage.
 
 The limitations are honest and clearly documented: synchronous API, single-node storage, no quantitative quality metrics, unvetted community LoRA dependency, and a hard 2-leader cap on multi-leader action scenes. These are not oversights — they represent deliberate scoping decisions for a semester-scale project. The architecture is designed with extension points (the mode dispatch system, the load balancer abstraction, the workflow JSON format) that make each limitation addressable as future work without architectural rework.
 

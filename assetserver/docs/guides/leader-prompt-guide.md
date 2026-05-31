@@ -40,7 +40,7 @@ prompt weaving together all leaders' descriptions — no reference
 image is used because multiple distinct faces must be depicted.
 
 See [`architecture.md`](../architecture/architecture.md) for the full system architecture and
-[`workflow-design-justification.md`](../pipeline/workflow-design-justification.md) for Flux2 Klein design rationale.
+[`workflow-design-justification.md`](../pipeline/workflow-design-justification.md) for Flux2 Klein 4B Distilled design rationale.
 
 
 ═══════════════════════════════════════════════════════════════════
