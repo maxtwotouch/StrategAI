@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topdown-medieval-pixelart-flux2-klein-lora"
+version = "0.1.0"
+description = "LoRA fine-tuning pipeline for FLUX.2 Klein 4B — top-down medieval pixel art"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "Pillow==10.4.0",
+    "tqdm",
+    "jsonschema",
+    "PyYAML==6.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+generate-prompts = "src.generation.prompt_generator:main"
+generate-images = "src.generation.dataset_generator:main"
+prepare-dataset = "src.generation.prepare_dataset:main"
+extract-training-set = "src.training.extract_training_set:main"
+validate-dataset = "src.training.validate_dataset:main"
+derive-captions = "src.training.derive_captions:main"
+sync-validation-prompts = "src.training.sync_validation_prompts:main"
+
+[tool.setuptools]
+packages = ["src", "src.generation", "src.training"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4"]
+ignore = ["E501"]

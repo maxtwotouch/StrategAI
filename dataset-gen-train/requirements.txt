@@ -1,0 +1,9 @@
+# ── Core Dependencies ───────────────────────────────────────────
+requests
+Pillow==10.4.0
+tqdm
+jsonschema
+PyYAML==6.0.2
+
+# ── Development ─────────────────────────────────────────────────
+pytest>=8.0

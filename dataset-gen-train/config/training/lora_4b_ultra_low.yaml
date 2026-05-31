@@ -1,0 +1,77 @@
+job: extension
+config:
+  name: topdown_lora_ultra_low
+  process:
+  - type: diffusion_trainer
+    training_folder: ./output
+    device: cuda:0
+    trigger_word: <tdp>
+
+    network:
+      type: lora
+      linear: 32
+      linear_alpha: 16
+      conv: 16
+      conv_alpha: 8
+
+    save:
+      dtype: bf16
+      save_every: 200
+      max_step_saves_to_keep: 15
+
+    datasets:
+    - folder_path: ./dataset/derived/ultra_minimal
+      caption_ext: txt
+      caption_dropout_rate: 0.0
+      resolution:
+      - 512
+      - 768
+      - 1024
+
+    train:
+      batch_size: 1
+      gradient_accumulation: 1
+      steps: 2500
+      train_unet: true
+      train_text_encoder: false
+      gradient_checkpointing: true
+      noise_scheduler: flowmatch
+      optimizer: adamw8bit
+      timestep_type: weighted
+      content_or_style: balanced
+      lr: 0.00005
+      dtype: bf16
+      optimizer_params:
+        weight_decay: 0.0001
+      ema_config:
+        use_ema: false
+        ema_decay: 0.99
+
+    model:
+      name_or_path: black-forest-labs/FLUX.2-klein-base-4B
+      arch: flux2_klein_4b
+      quantize: true
+      qtype: qfloat8
+      quantize_te: false
+      qtype_te: qfloat8
+      low_vram: false
+
+    sample:
+      sampler: flowmatch
+      sample_every: 250
+      width: 1024
+      height: 1024
+      guidance_scale: 4
+      sample_steps: 25
+      seed: 42
+      walk_seed: true
+      neg: ""
+      prompts:
+      - "[trigger] top-down view. A dramatic medieval world asset of a thorny bramble mass with ancient growth with twisted massing, weathered rough form, dark evergreen foliage, harvest-ready condition, ash-and-ember palette"
+      - "[trigger] top-down view. A medieval volcanic extraction outpost in a homely village restoration setting, featuring trade-focused storage additions, improvised frontier engineering character, low detail, asymmetrical annexes, brass and iron mechanical accents, well-kept arcane condition, warm muted palette"
+      - "[trigger] top-down view. A medieval riverside sawmill in a scholarly monastic order setting, featuring aged masonry seams and timber bracing, ritually maintained character, high detail, courtyard layout, brick and timber hybrid, heavily used industrial wear, cool medieval palette"
+      - "[trigger] top-down view. A medieval watermill in a sacred pilgrimage route setting, featuring ash dust buildup and heat-worn surfaces, ornate but functional character, high detail, simple footprint, brick and timber hybrid, well-kept arcane condition, mystic violet-cyan palette"
+      - "[trigger] top-down view. A modern red sports car, isolated on white background."
+      - "[trigger] top-down view. A sci-fi spaceship with solar panels and thrusters, isolated on white background."
+      - "[trigger] top-down view. A steaming cup of coffee on a saucer, isolated on white background."
+      - "[trigger] top-down view. A modern suburban house with a swimming pool, isolated on white background."
