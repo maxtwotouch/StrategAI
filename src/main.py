@@ -870,14 +870,16 @@ async def health_check():
     # Database status (don't use _require_db() — that would 503 the endpoint)
     db_status = "ok" if _db_schema_ok else "unhealthy"
 
-    # ComfyUI status
+    # ComfyUI status (short timeout — health checks must be fast)
     lb = get_comfyui_loadbalancer()
     comfyui_ok = False
     comfyui_status = "unreachable"
     if lb is not None:
         try:
-            comfyui_ok = await lb.health_check()
+            comfyui_ok = await asyncio.wait_for(lb.health_check(), timeout=5.0)
             comfyui_status = "ok" if comfyui_ok else "unhealthy"
+        except asyncio.TimeoutError:
+            comfyui_status = "unreachable"
         except Exception:
             comfyui_status = "unreachable"
 

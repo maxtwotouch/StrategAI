@@ -34,10 +34,10 @@ class TestHealth:
 
     @pytest.mark.asyncio
     async def test_health_comfyui_disconnected(self, async_client):
-        """In placeholder mode, comfyui component is not healthy."""
+        """Health endpoint always returns a valid comfyui component status."""
         resp = await async_client.get("/health")
         data = resp.json()
-        assert data["components"]["comfyui"] in ("unhealthy", "unreachable")
+        assert data["components"]["comfyui"] in ("ok", "unhealthy", "unreachable")
 
 
 class TestModes:

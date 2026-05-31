@@ -87,7 +87,9 @@ class BackgroundTileResult:
 def _generate_bg_tile_id(tile_type: str) -> str:
     """Generate a unique background_tile_id."""
     short = uuid.uuid4().hex[:8]
-    return f"bg_{tile_type}_{short}"
+    # Extract .value if tile_type is an Enum (e.g. TileType.GRASS → "grass")
+    raw = getattr(tile_type, 'value', tile_type)
+    return f"bg_{raw}_{short}"
 
 
 # ===========================================================================
@@ -119,7 +121,7 @@ class BackgroundTileEngine:
                 f"Unknown tile_type '{tile_type}'. Valid: {sorted(TILE_TYPES)}"
             )
 
-        prompt = _render("background_tile", tile_type=tile_type)
+        prompt = _render("background_tile", tile_type=getattr(tile_type, 'value', tile_type))
         seed = seed if seed is not None else secrets.randbits(32)
         bg_tile_id = _generate_bg_tile_id(tile_type)
 
@@ -219,7 +221,7 @@ class StaticBackgroundTileEngine:
                 filename=filename,
                 bg_tile_id=bg_tile_id,
                 seed=seed,
-                prompt_used=_render("background_tile", tile_type=tile_type),
+                prompt_used=_render("background_tile", tile_type=getattr(tile_type, 'value', tile_type)),
                 generation_mode="static",
                 elapsed_ms=0,
             )
@@ -284,7 +286,7 @@ class _PlaceholderBackgroundTileEngine:
             filename=filename,
             bg_tile_id=bg_tile_id,
             seed=seed,
-            prompt_used=_render("background_tile", tile_type=tile_type),
+            prompt_used=_render("background_tile", tile_type=getattr(tile_type, 'value', tile_type)),
             generation_mode="static",
             elapsed_ms=0,
         )
