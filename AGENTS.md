@@ -50,6 +50,8 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 | **Integration Tester** | Verify subprojects work together | API contract validation, asset manifest resolution, smoke tests |
 | **Backend** | Game engine, LLM integration, API design | Backend-specific tasks, engine changes, LLM prompt tuning |
 | **Frontend** | Next.js UI, SVG map, asset integration | Frontend-specific tasks, UI changes, asset resolution |
+| **Report Writer** | Write and refine IEEE academic report | Technical writing, figure descriptions, citations, formatting |
+| **Oral Presentation** | Prepare 7-8 minute exam presentation | Slide outlines, speaker notes, Q&A preparation, timing |
 
 ### Subproject Agents
 
