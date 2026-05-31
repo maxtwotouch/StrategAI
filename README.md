@@ -324,6 +324,121 @@ This drops and recreates all tables. **Warning: this deletes all data.**
 
 ---
 
+## Production Deployment
+
+Steps to deploy the service in a production environment:
+
+1. **Set deployment mode**: `DEPLOYMENT_MODE=production` — enables strict safety checks:
+   - CORS origins must be explicit (no `*` wildcard)
+   - Schema mismatches at startup are fatal (refuse to start)
+   - `DATABASE_RESET=true` is blocked (prevents accidental data loss)
+   - Missing ComfyUI workflow nodes are fatal errors
+2. **Generate a strong API key**: Set `SERVER__API_KEY` to a random 64-char hex string. Without it, the API is open to anyone who can reach the server.
+3. **Tighten CORS**: Set `SERVER__CORS_ORIGINS` to your frontend's exact origin (e.g., `'["https://mygame.example.com"]'`). Never use `["*"]` in production.
+4. **Put a reverse proxy in front**: Use **nginx** or **Caddy** for:
+   - TLS termination (HTTPS)
+   - Per-IP rate limiting (the built-in rate limiter is global, not per-IP)
+   - Request buffering and connection pooling
+   - Static asset caching with `Cache-Control` headers
+5. **Harden the host**: Bind to `127.0.0.1` if only the reverse proxy needs access (`SERVER__HOST=127.0.0.1`).
+6. **Monitor health**: Poll `GET /health` every 15–30 seconds. A `degraded` status means ComfyUI is unreachable but the API is still serving.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a full step-by-step deployment guide including nginx configuration.
+
+---
+
+## Environment Variables Reference
+
+All configurable environment variables use the `__` (double underscore) delimiter
+for nested keys.  Defaults come from `config.yaml`; `.env` overrides them.
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `DEPLOYMENT_MODE` | `development` | `production` enables strict safety checks |
+| `SERVER__HOST` | `0.0.0.0` (in config.yaml) | Bind address; use `127.0.0.1` behind a reverse proxy |
+| `SERVER__PORT` | `8000` (in config.yaml) | Listening port |
+| `SERVER__API_KEY` | `""` (empty) | When non-empty, all requests require `X-API-Key` header (except `/health` and `/assets/`) |
+| `SERVER__CORS_ORIGINS` | `["http://localhost:3000"]` | JSON array of allowed origins |
+| `SERVER__MAX_REQUEST_BODY_MB` | `10` | Max request body size in MB (1–100) |
+| `SERVER__CACHE_MAX_ENTRIES` | `1000` | Max images held in the in-memory LRU cache |
+| `SERVER__CACHE_MAX_MB` | `500` | Max memory (MB) for the in-memory image cache |
+| `COMFYUI__BASE_URL` | `http://127.0.0.1:8188` | Single ComfyUI node URL |
+| `COMFYUI__NODES` | `[]` | List of ComfyUI URLs for load-balanced multi-node mode |
+| `COMFYUI__TIMEOUT` | `300` | Per-generation timeout in seconds |
+| `COMFYUI__HEALTH_CHECK_INTERVAL` | `30` | Seconds between re-pinging unhealthy nodes |
+| `COMFYUI__MAX_RETRIES` | `3` | Max nodes to try per generation before failing |
+| `COMFYUI__WARMUP_ENABLED` | `true` | Submit a minimal generation at startup to preload GPU VRAM |
+| `COMFYUI__WARMUP_TIMEOUT` | `120` | Max seconds to wait for warmup generation |
+| `COMFYUI__WARMUP_WORKFLOW` | `background_tile` | Workflow used for warmup (keep it simple) |
+| `DATABASE_URL` | `sqlite:///tilemap.db` | Full database connection URL |
+| `DATABASE_RESET` | (not set) | Set to `true` to drop and recreate all tables. **Blocked in production mode.** |
+| `RATE_LIMIT__ENABLED` | `true` | Toggle rate limiting on/off |
+| `RATE_LIMIT__POST_RPS` | `2.0` | Max POST (generation) requests per second globally |
+| `RATE_LIMIT__GET_RPS` | `50.0` | Max GET (read) requests per second globally |
+| `RATE_LIMIT__BURST_SIZE` | `5` | Max burst for POST endpoints before throttling |
+| `GENERATION__MODES__structure` | `comfyui` | Generation mode for structures |
+| `GENERATION__MODES__object` | `comfyui` | Generation mode for objects |
+| `GENERATION__MODES__terrain` | `comfyui` | Generation mode for terrain |
+| `GENERATION__MODES__background_tile` | `comfyui` | Generation mode for background tiles |
+| `GENERATION__MODES__unit` | `comfyui` | Generation mode for units |
+| `GENERATION__MODES__leader` | `comfyui` | Generation mode for leaders |
+| `GENERATION__DEFAULT_MODE` | `comfyui` | Fallback mode for unlisted families |
+| `PATHS__FONT_PATH` | `""` | Optional absolute path to a .ttf/.ttc font for placeholder labels |
+
+**Mode values**: `comfyui` (GPU generation), `static` (pre-made PNGs), `placeholder` (procedural rectangles).
+
+---
+
+## Health Check Interpretation
+
+`GET /health` returns the following JSON structure:
+
+```json
+{
+  "status": "healthy",
+  "components": {
+    "database": "ok",
+    "comfyui": "ok"
+  },
+  "comfyui_nodes": 1,
+  "modes": {
+    "structure": "comfyui",
+    "object": "comfyui",
+    "terrain": "comfyui",
+    "background_tile": "comfyui",
+    "unit": "comfyui",
+    "leader": "comfyui"
+  },
+  "registered": {
+    "assets": 42,
+    "leaders": 3,
+    "structures": 12,
+    "objects": 8,
+    "terrains": 5,
+    "units": 7,
+    "background_tiles": 7
+  }
+}
+```
+
+### Status Values
+
+| `status` | Meaning | Action |
+|----------|---------|--------|
+| `healthy` | All components operational | Normal operation |
+| `degraded` | ComfyUI unreachable, but API is still serving | Check GPU server; static/placeholder modes still work |
+| `unhealthy` | Database connectivity failure | Check `DATABASE_URL`; restart with `DATABASE_RESET=true` in dev |
+
+### Monitoring Usage
+
+- **Load balancer health probe**: Poll `/health` every 15–30s. Route traffic if `status` is `healthy` or `degraded`. Only take the node out of rotation on `unhealthy` or HTTP 5xx.
+- **Alerting**: Trigger an alert if `status` stays `degraded` for >5 minutes (prolonged ComfyUI outage). Trigger immediately if `status` is `unhealthy`.
+- **Capacity planning**: Track `registered.*` counts over time to estimate storage growth.
+- **Mode awareness**: The `modes` field shows which families use GPU (`comfyui`) vs fallbacks (`static`/`placeholder`) — useful for debugging unexpected behavior.
+- **Multi-node**: `comfyui_nodes` reflects the number of healthy ComfyUI servers. If this drops to 0, all `comfyui`-mode generations will fail.
+
+---
+
 ## Error Handling
 
 - **Workflow validation**: Checked before queueing — catches missing output nodes or malformed prompt injection targets

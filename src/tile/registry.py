@@ -89,6 +89,7 @@ class StructureRegistry:
 
     @staticmethod
     def get(structure_id: str) -> Optional[StructureRecord]:
+        """Return a single structure record by ID, or None if not found."""
         with SessionLocal() as db:
             return db.query(StructureRecord).filter(
                 StructureRecord.structure_id == structure_id
@@ -96,6 +97,7 @@ class StructureRegistry:
 
     @staticmethod
     def list_all(limit: int = 50, offset: int = 0) -> list[StructureRecord]:
+        """Return all structures, most recent first, with pagination."""
         with SessionLocal() as db:
             return db.query(StructureRecord).order_by(
                 StructureRecord.created_at.desc()
@@ -103,11 +105,13 @@ class StructureRegistry:
 
     @staticmethod
     def count_all() -> int:
+        """Return the total number of structure records."""
         with SessionLocal() as db:
             return db.query(StructureRecord).count()
 
     @staticmethod
     def delete(structure_id: str) -> bool:
+        """Remove a structure and its asset record. Returns True if deleted."""
         with SessionLocal() as db:
             record = db.query(StructureRecord).filter(
                 StructureRecord.structure_id == structure_id
@@ -174,6 +178,7 @@ class ObjectRegistry:
 
     @staticmethod
     def get(object_id: str) -> Optional[ObjectRecord]:
+        """Return a single object record by ID, or None if not found."""
         with SessionLocal() as db:
             return db.query(ObjectRecord).filter(
                 ObjectRecord.object_id == object_id
@@ -181,6 +186,7 @@ class ObjectRegistry:
 
     @staticmethod
     def list_all(limit: int = 50, offset: int = 0) -> list[ObjectRecord]:
+        """Return all objects, most recent first, with pagination."""
         with SessionLocal() as db:
             return db.query(ObjectRecord).order_by(
                 ObjectRecord.created_at.desc()
@@ -188,11 +194,13 @@ class ObjectRegistry:
 
     @staticmethod
     def count_all() -> int:
+        """Return the total number of object records."""
         with SessionLocal() as db:
             return db.query(ObjectRecord).count()
 
     @staticmethod
     def delete(object_id: str) -> bool:
+        """Remove an object and its asset record. Returns True if deleted."""
         with SessionLocal() as db:
             record = db.query(ObjectRecord).filter(
                 ObjectRecord.object_id == object_id
@@ -258,6 +266,7 @@ class TerrainRegistry:
 
     @staticmethod
     def get(terrain_id: str) -> Optional[TerrainRecord]:
+        """Return a single terrain record by ID, or None if not found."""
         with SessionLocal() as db:
             return db.query(TerrainRecord).filter(
                 TerrainRecord.terrain_id == terrain_id
@@ -265,6 +274,7 @@ class TerrainRegistry:
 
     @staticmethod
     def list_all(limit: int = 50, offset: int = 0) -> list[TerrainRecord]:
+        """Return all terrain tiles, most recent first, with pagination."""
         with SessionLocal() as db:
             return db.query(TerrainRecord).order_by(
                 TerrainRecord.created_at.desc()
@@ -272,11 +282,13 @@ class TerrainRegistry:
 
     @staticmethod
     def count_all() -> int:
+        """Return the total number of terrain records."""
         with SessionLocal() as db:
             return db.query(TerrainRecord).count()
 
     @staticmethod
     def delete(terrain_id: str) -> bool:
+        """Remove a terrain tile and its asset record. Returns True if deleted."""
         with SessionLocal() as db:
             record = db.query(TerrainRecord).filter(
                 TerrainRecord.terrain_id == terrain_id

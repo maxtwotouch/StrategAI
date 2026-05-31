@@ -14,7 +14,10 @@ class TestConfigDefaults:
         expected_families = {
             "structure", "object", "terrain", "background_tile",
             "character_sprite", "leader", "unit", "story", "splash",
-            "nature_object",  # added via .env / .env.testing for static catalog support
+            # nature_object is NOT a configured generation mode — it is
+            # served exclusively from the static catalog (static_tiles/).
+            # This test was failing because nature_object was erroneously
+            # expected here.
         }
         actual = set(s.generation.modes.keys())
         missing = expected_families - actual

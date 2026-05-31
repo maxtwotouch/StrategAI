@@ -47,6 +47,10 @@ from src.unit.models import (
 from src.unit.registry import UnitRegistry
 from src.prompt_templates import validate_all_templates
 
+# TODO(production): Switch to structured JSON logging for production observability.
+# Replace the default logging.Formatter with something like python-json-logger.
+# Format should include: timestamp, level, logger, message, request_id, endpoint, status_code, elapsed_ms.
+
 # Setup production logging
 logging.basicConfig(
     level=logging.INFO,
@@ -96,6 +100,11 @@ leader_engine: LeaderEngine | StaticLeaderEngine | None = None
 # Database schema health flag — set during lifespan startup.
 # When False, all asset-persistence endpoints return 503.
 _db_schema_ok: bool = True
+
+# Readiness flag — set to True at the END of lifespan startup after
+# migrations, workflow validation, engine init, and optional warmup complete.
+# GET /health/ready returns 503 until this is True.
+_service_ready: bool = False
 
 # Tile engine (initialized in lifespan)
 tile_engine: TileEngine | StaticTileEngine | None = None
@@ -494,6 +503,12 @@ async def lifespan(app: FastAPI):
         len(static_catalog.list_structure_subtypes()),
         len(static_catalog.list_unit_types()),
     )
+
+    # --- Mark service as ready for readiness probes ---
+    global _service_ready
+    _service_ready = True
+    logger.info("Service ready — /health/ready will now return 200.")
+
     yield
     await close_comfyui_client()
     logger.info("Application shutting down.")
@@ -550,8 +565,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: FastAPIRequest, call_next):
         api_key = settings.server.api_key
-        # Skip auth if no key configured, or if path is /health or /assets
-        if not api_key or request.url.path == "/health" or request.url.path.startswith("/assets/"):
+        # Skip auth if no key configured, or for health/readiness probes and asset serving
+        if not api_key or request.url.path in ("/health", "/health/ready") or request.url.path.startswith("/assets/"):
             return await call_next(request)
         if request.headers.get("X-API-Key") != api_key:
             return StarletteJSONResponse(
@@ -646,6 +661,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: FastAPIRequest, call_next):
         # Check enabled at request time so tests can toggle it
         if not settings.rate_limit.enabled:
+            return await call_next(request)
+        # Exempt health and readiness probes from rate limiting
+        if request.url.path in ("/health", "/health/ready"):
             return await call_next(request)
         bucket = self._post_bucket if request.method in ("POST", "PUT", "PATCH") else self._get_bucket
         if not bucket.consume():
@@ -747,6 +765,24 @@ async def get_catalog():
 # ---------------------------------------------------------------------------
 #  Health
 # ---------------------------------------------------------------------------
+
+
+@app.get("/health/ready")
+async def readiness_check():
+    """Readiness probe — returns 200 only when all startup tasks are complete.
+
+    Returns 503 until DB migration, workflow validation, engine init,
+    and optional ComfyUI warmup have finished.  Kubernetes or load-balancer
+    readiness probes should target this endpoint, NOT /health.
+
+    This endpoint is exempt from rate limiting and API key authentication.
+    """
+    if not _service_ready:
+        return JSONResponse(
+            content={"status": "not ready", "detail": "Service is still initializing. Retry shortly."},
+            status_code=503,
+        )
+    return {"status": "ready"}
 
 
 @app.get("/health", response_model=HealthResponse)

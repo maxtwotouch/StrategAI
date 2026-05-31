@@ -49,7 +49,7 @@ leader portraits use separate templates/workflows without this LoRA.
 ## 4. Component Architecture
 
 ### A. API Layer (`src/main.py` & per-pipeline `models.py`)
-- **FastAPI**: Async HTTP server with CORS middleware. Endpoints (33 total):
+- **FastAPI**: Async HTTP server with 5 middleware layers plus CORS. Endpoints (33 total):
   **Leader**: `POST /leader`, `GET /leader`, `GET /leader/{leader_id}`, `DELETE /leader/{leader_id}`
   **Structure**: `POST /structure`, `GET /structure`, `GET /structure/catalog`, `GET /structure/{structure_id}`, `DELETE /structure/{structure_id}`
   **Object**: `POST /object`, `GET /object`, `GET /object/catalog`, `GET /object/{object_id}`, `DELETE /object/{object_id}`
@@ -61,16 +61,31 @@ leader portraits use separate templates/workflows without this LoRA.
 - **Pydantic**: Typed request/response schemas with enum validation.
 - **Fully async**: Generation runs on the asyncio event loop via `httpx` + `websockets`.
 
+#### Middleware Stack (5 layers + CORS)
+
+| Order | Middleware | Purpose |
+|-------|-----------|---------|
+| 1 | `RequestIDMiddleware` | Injects a UUID4 `X-Request-ID` into every request for log correlation; echoes in response header |
+| 2 | `APIKeyMiddleware` | Validates `X-API-Key` header against `server.api_key` (disabled when key is empty). `/health` and `/assets/` are exempt |
+| 3 | `CORSMiddleware` | Configurable origins via `server.cors_origins`; `allow_credentials=False` |
+| 4 | `RequestSizeLimitMiddleware` | Rejects POST/PUT/PATCH bodies exceeding `server.max_request_body_mb` (411 if no `Content-Length`, 413 if too large) |
+| 5 | `RateLimitMiddleware` | Global token-bucket: 2 POST/s (burst 5), 50 GET/s. Toggle via `rate_limit.enabled` |
+
 ### B. Storage Layer (`src/storage.py`)
 - **AssetStore**: Thread-safe in-memory LRU cache (OrderedDict + Lock, default
   1000 entries).  Transparent disk fallback for cache misses.  Path traversal
   protection via `os.path.basename()`.
 
-### C. ComfyUI Client (`src/comfyui_client.py`)
+### C. ComfyUI Client & Load Balancer (`src/comfyui_client.py`, `src/comfyui_loadbalancer.py`)
 - **ComfyUIClient**: Async HTTP + WebSocket client handling the full lifecycle:
   image upload, workflow submission, progress polling, result download, and
   health checks.  Workflow patching targets Flux2 Klein node types
   (SamplerCustomAdvanced, EmptyFlux2LatentImage — no negative prompts).
+- **ComfyUILoadBalancer**: Multi-node proxy that duck-types `ComfyUIClient`
+  across a pool of server nodes.  Node selection uses shortest-queue
+  (pending + running) with round-robin tie-breaking.  Transparent retry
+  on a different node for connectivity failures.  Supports both single-node
+  (`comfyui.base_url`) and multi-node (`comfyui.nodes`) configurations.
 - **Setup guide**: See [`docs/comfyui-setup-guide.md`](comfyui-setup-guide.md)
   for step-by-step ComfyUI provisioning with Flux2 Klein 4B models and an
   automated setup script (`scripts/setup_comfyui.sh`).
@@ -118,10 +133,18 @@ leader portraits use separate templates/workflows without this LoRA.
 - **SQLite** via SQLAlchemy with **Alembic** for schema migrations.
   Migrations run automatically at startup (`alembic upgrade head`). For
   schema recovery, restart with `DATABASE_RESET=true`.
-- **AssetRecord**: Tracks every generated asset: id, family, generation mode.
-- **LeaderRecord**: Canonical splash image, seed, prompt, profile/action image
-  IDs, reference filename.
-- **BackgroundTileRecord**: Tile type, seed, FK to AssetRecord.
+- **7 tables**:
+  | Table | Purpose |
+  |-------|---------|
+  | `asset_records` | Central asset registry — one row per generated image. All other tables FK here. |
+  | `leader_records` | Leader identity: splash image, seed, prompt, profile/action image IDs, reference filename. |
+  | `structure_records` | Generated structure tiles: category, style, condition, scale, FK to asset. |
+  | `object_records` | Generated object tiles: category, biome, season, FK to asset. |
+  | `terrain_records` | Generated terrain tiles: category, scale, material, FK to asset. |
+  | `unit_records` | Generated unit sprites: unit_type, FK to asset. |
+  | `background_tile_records` | Generated background tiles: tile_type, seed, FK to asset. |
+- **SQLite PRAGMAs** (set on every connection): `foreign_keys=ON`, `journal_mode=WAL`, `busy_timeout=5000`, `synchronous=NORMAL`.
+- **Busy retry**: Application-level retry (3 attempts, 50ms→100ms→200ms backoff) for `SQLITE_BUSY` errors.
 
 ## 5. Workflow JSON Templates
 
