@@ -29,7 +29,7 @@ builders (`src/*/prompts.py`) with the listed configuration.
 **Seed:** `42` · **Resolution:** 512×512 · **Denoise:** 1.0 · **Workflow:** `workflows/txt2img.json`
 
 ```
-<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. a compact single-room footprint, modest proportions, humble village scale, simple unpretentious architecture a sturdy defensive structure with crenellated battlements, arrow slits, thick stone walls, watchtower, military functionality, in dark timber construction with carved dragon-head gables, steep shingled roof, iron hinges and fittings, Norse craftsmanship style, freshly built, clean stonework with bright mortar, new timber showing no weathering, sharp edges and crisp details, A small wooden watchtower with a pointed roof and a lookout platform.. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
+<tdp> top-down view. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. a compact single-room footprint, modest proportions, humble village scale, simple unpretentious architecture a sturdy defensive structure with crenellated battlements, arrow slits, thick stone walls, watchtower, military functionality, in dark timber construction with carved dragon-head gables, steep shingled roof, iron hinges and fittings, Norse craftsmanship style, freshly built, clean stonework with bright mortar, new timber showing no weathering, sharp edges and crisp details, A small wooden watchtower with a pointed roof and a lookout platform.. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
 ```
 
 ---
@@ -39,7 +39,7 @@ builders (`src/*/prompts.py`) with the listed configuration.
 **Seed:** `42` · **Resolution:** 512×512 · **Denoise:** 1.0 · **Workflow:** `workflows/txt2img.json`
 
 ```
-<tdp> Front view overhead shot elevated shot medium shot. The object is viewed from directly above, showing its top surface. The object blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. a natural living plant with organic form, textured bark or stems, leaves or needles, rooted in the ground, in a deciduous woodland context with rich soil, leaf litter, ferns, varied greens, during full mature foliage, dry ground, warm tones, peak growth and ripeness, A large oak tree with a thick trunk and sprawling branches full of green leaves.. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
+<tdp> top-down view. The object is viewed from directly above, showing its top surface. The object blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. a natural living plant with organic form, textured bark or stems, leaves or needles, rooted in the ground, in a deciduous woodland context with rich soil, leaf litter, ferns, varied greens, during full mature foliage, dry ground, warm tones, peak growth and ripeness, A large oak tree with a thick trunk and sprawling branches full of green leaves.. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
 ```
 
 ---
@@ -49,7 +49,7 @@ builders (`src/*/prompts.py`) with the listed configuration.
 **Seed:** `42` · **Resolution:** 512×512 · **Denoise:** 1.0 · **Workflow:** `workflows/txt2img.json`
 
 ```
-<tdp> Front view overhead shot elevated shot medium shot. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. a noticeable elevation change of 3-4 pixels, moderate footprint occupying most of the tile, distinct landform a rounded mound or hill rising from the base plane, soft organic contour, natural elevation feature, with grass-topped soil with exposed dirt on steeper faces, green surface with brown earth edges, pastoral character material, A rounded grassy hill with gentle slopes on all sides and a flat top.. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective, no floating objects.
+<tdp> top-down view. The terrain elevation feature is viewed from directly above, showing its top surface and contours. The terrain blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. a noticeable elevation change of 3-4 pixels, moderate footprint occupying most of the tile, distinct landform a rounded mound or hill rising from the base plane, soft organic contour, natural elevation feature, with grass-topped soil with exposed dirt on steeper faces, green surface with brown earth edges, pastoral character material, A rounded grassy hill with gentle slopes on all sides and a flat top.. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. The base of the terrain feature sits flush with the bottom of the frame. Grounded stable perspective, no floating objects.
 ```
 
 ---
@@ -59,7 +59,7 @@ builders (`src/*/prompts.py`) with the listed configuration.
 **Seed:** `42` · **Resolution:** 512×512 · **Denoise:** 1.0 · **Workflow:** `workflows/txt2img.json`
 
 ```
-<tdp> Front view overhead shot elevated shot medium shot. pixel art top-down 2d game character sprite, medieval archer, bow in hand, quiver on back, leather armor, hooded cloak, light build, ranged combat stance, longbow aimed shot, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset
+<tdp> top-down view. pixel art top-down 2d game character sprite, medieval archer, bow in hand, quiver on back, leather armor, hooded cloak, light build, ranged combat stance, longbow aimed shot, facing camera front view full frontal, character looks at viewer, isolated on transparent background, crisp pixel edges sharp blocky pixels, centered single sprite game asset
 ```
 
 ---
@@ -69,7 +69,7 @@ builders (`src/*/prompts.py`) with the listed configuration.
 **Seed:** `42` · **Resolution:** 512×512 · **Denoise:** 1.0 · **Workflow:** `workflows/background_tile.json`
 
 ```
-top-down seamless repeating water ground texture. The entire image must be one single 16x16 pixel art tile that fully fills the frame with continuous texture. No borders, no centered composition, no empty space. Generate one cohesive tile that can be seamlessly repeated in all directions. No disruptive features or objects touching the outermost pixel edges. Consistent texture density across whole image, top-down orthographic view, flat ground plane, crisp pixel edges, no anti-aliasing, sharp blocky pixels, perfect seamless tiling, simple and readable at small scale.
+top-down seamless repeating water surface texture. The entire image must be one single 16x16 pixel art tile that fully fills the frame with continuous texture. No borders, no centered composition, no empty space. Generate one cohesive tile that can be seamlessly repeated in all directions. No disruptive features or objects touching the outermost pixel edges. Consistent texture density across whole image, top-down orthographic view, flat surface plane, crisp pixel edges, no anti-aliasing, sharp blocky pixels, perfect seamless tiling, simple and readable at small scale.
 ```
 
 ---

@@ -260,7 +260,7 @@ ComfyUI ≥ 0.9.2):
 
 | Node Type | Purpose | Built-in? |
 |---|---|---|
-| `UNETLoader` | Loads the Flux2 Klein UNet | ✅ |
+| `UNETLoader` | Loads the Flux2 Klein 4B Distilled UNet | ✅ |
 | `CLIPLoader` | Loads the Qwen 3 4B text encoder (type=flux2) | ✅ |
 | `VAELoader` | Loads the Flux2 VAE | ✅ |
 | `CLIPTextEncode` | Encodes the positive prompt | ✅ |

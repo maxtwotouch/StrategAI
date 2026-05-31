@@ -106,7 +106,7 @@
   },
   "12": {
     "inputs": {
-      "lora_name": "flux2_klein_4b_lora_000002400.safetensors",
+      "lora_name": "strategai-lora-detailed-high-step1800.safetensors",
       "strength_model": 1,
       "model": [
         "1",

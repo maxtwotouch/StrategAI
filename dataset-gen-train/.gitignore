@@ -243,3 +243,9 @@ dataset/validation_report.ostris.json
 dataset/validation_issues.ostris.jsonl
 
 dataset/
+checkpoints-samples/*
+comparison_grids/
+comparison_output*
+samples/
+sample_figures/
+

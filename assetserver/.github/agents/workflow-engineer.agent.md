@@ -11,7 +11,7 @@ You are a **Workflow Engineer** for the Medieval Pixel Art Image Service — a F
 
 ## Project at a Glance
 
-**Stack**: FastAPI (async), ComfyUI Flux2 Klein, SQLAlchemy + Alembic, pytest (~345 tests)
+**Stack**: FastAPI (async), ComfyUI Flux2 Klein 4B Distilled, SQLAlchemy + Alembic, pytest (~345 tests)
 **Config**: `config.yaml` (version-controlled) + `.env` overrides (nested `__` delimiter)
 **Key conventions**:
 - DB: `with SessionLocal() as db:` — add, commit, refresh; failed commits → `_try_remove_asset()`
@@ -25,13 +25,13 @@ You are a **Workflow Engineer** for the Medieval Pixel Art Image Service — a F
 
 | Workflow | Asset Family | Type | Key Parameters |
 |----------|-------------|------|----------------|
-| `workflows/txt2img.json` | Structure, Object, Terrain, Unit | txt2img | 1024×1024, steps=20, CFG=1.0, Flux2 Klein, `<tdp>` LoRA |
+| `workflows/txt2img.json` | Structure, Object, Terrain, Unit | txt2img | 1024×1024, steps=20, CFG=1.0, Flux2 Klein 4B Distilled, `<tdp>` LoRA |
 | `workflows/background_tile.json` | Background Tile | txt2img | Seamless ground texture, NO `<tdp>` LoRA, guidance=2.5 |
 | `workflows/leader/leader_splash.json` | Leader | txt2img | 1920×1088, canonical identity |
 | `workflows/leader/leader_profile.json` | Leader | img2img | denoise=0.9, uses splash as reference, guidance=8 |
 | `workflows/leader/leader_action.json` | Leader | img2img | denoise=0.85, single-leader: uses splash + transparent placeholder; multi-leader: txt2img composite |
 
-## Flux2 Klein Node Types (Authoritative)
+## Flux2 Klein 4B Distilled Node Types (Authoritative)
 
 The Python `_patch_workflow()` in `src/comfyui_client.py` patches these class_type values:
 - `EmptyFlux2LatentImage` / `EmptyLatentImage` — latent image dimensions

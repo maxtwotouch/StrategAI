@@ -183,7 +183,7 @@ All orchestrators enforce these gates before marking tasks complete:
 |-----------|-----------|----------|
 | **LLM-driven AI civs** | OpenAI tool-use API | `backend/app/engine/openai_goals.py` |
 | **Diplomacy chat** | LLM with persistent conversation | `backend/app/engine/diplomacy.py` |
-| **Generative pixel art** | ComfyUI + FLUX2 Klein 4B (DiT) | `assetserver/src/` |
+| **Generative pixel art** | ComfyUI + FLUX2 Klein 4B Distilled (DiT) | `assetserver/src/` |
 | **Style adaptation** | LoRA fine-tuning | `dataset-gen-train/` |
 
 ## Inter-Service Contracts
@@ -191,7 +191,7 @@ All orchestrators enforce these gates before marking tasks complete:
 - **Frontend ↔ Backend**: REST API at `http://localhost:8000`, 14 endpoints
 - **Frontend ↔ Asset Server**: Asset manifest via `NEXT_PUBLIC_ASSET_API_URL`
 - **Backend ↔ Asset Server**: No direct contract (frontend mediates)
-- **Asset Server ↔ Dataset/Training**: Shared ComfyUI + FLUX2 Klein model
+- **Asset Server ↔ Dataset/Training**: Shared ComfyUI + FLUX2 Klein 4B Distilled model
 
 ## Documentation
 

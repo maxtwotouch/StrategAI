@@ -12,7 +12,7 @@ All Phases 1–8 of the production-readiness plan are complete. 523 tests pass
 at 82% coverage. See the [changelog](/memories/repo/changelog-2026-05-30.md)
 for full details.
 
-Key highlights: Flux2 Klein migration, BackgroundTileRecord with independent
+Key highlights: Flux2 Klein 4B Distilled migration, BackgroundTileRecord with independent
 CRUD, pagination on all 6 list endpoints, Alembic auto-migrations, MB-based
 cache eviction, `DeleteResponse` on all DELETE endpoints, atomic file writes,
 orphaned asset cleanup, `python-dotenv` support, CORS defaults, request body

@@ -12,7 +12,7 @@ A **Diffusion Transformer (DiT)** replaces the convolutional U-Net backbone foun
 
 Key architectural differences versus U-Net-based diffusion:
 
-| Property | U-Net (SDXL) | DiT (Flux2 Klein) |
+| Property | U-Net (SDXL) | DiT (Flux2 Klein 4B Distilled) |
 |----------|-------------|-------------------|
 | **Backbone** | Convolutional with skip connections | Transformer with self-attention |
 | **Receptive field** | Fixed by kernel size, grows with depth | Global — every patch attends to every other patch |
@@ -23,7 +23,7 @@ Key architectural differences versus U-Net-based diffusion:
 
 ### 1.2 Rectified Flow Formulation
 
-Flux2 Klein uses a **rectified flow** (Liu et al., 2023) rather than conventional DDPM/DDIM diffusion. In rectified flow:
+Flux2 Klein 4B Distilled uses a **rectified flow** (Liu et al., 2023) rather than conventional DDPM/DDIM diffusion. In rectified flow:
 
 - The **forward process** is a straight-line path from data to noise: $x_t = (1 - t)x_0 + t\epsilon$
 - The **reverse process** follows the same trajectory in reverse
@@ -94,7 +94,7 @@ UNETLoader (DiT transformer) + CLIPLoader (text encoder) + VAELoader (image code
 | `flux-2-klein-4b-fp8.safetensors` | ~6 GB | `models/unet/` | DiT transformer (FP8 quantised) — the denoising backbone | Black Forest Labs / HuggingFace |
 | `qwen_3_4b.safetensors` | ~8 GB | `models/clip/` | Qwen 3 4B text encoder — converts prompts to conditioning embeddings | Qwen / HuggingFace |
 | `flux2-vae.safetensors` | ~320 MB | `models/vae/` | Variational Autoencoder — compresses/decompresses between pixel space and latent space | Black Forest Labs / HuggingFace |
-| `flux2_klein_4b_lora_000002400.safetensors` | ~250 MB | `models/loras/` | Top-down pixel-art LoRA (`<tdp>` trigger) — enforces camera angle and pixel-art aesthetics | CivitAI community |
+| `strategai-lora-detailed-high-step1800.safetensors` | ~250 MB | `models/loras/` | Top-down medieval style LoRA (custom-trained) (`<tdp>` trigger) — enforces camera angle and pixel-art aesthetics | CivitAI community |
 
 **Total disk footprint**: ~14.6 GB. **Total VRAM at inference**: ~8.4 GB (FP8 precision).
 
@@ -141,7 +141,7 @@ Three models are loaded independently (split loading architecture):
 - **UNET** (`flux-2-klein-4b-fp8.safetensors`, ~6 GB) — DiT backbone for latent denoising. FP8 quantized.
 - **CLIP** (`qwen_3_4b.safetensors`, ~8 GB) — Qwen 3 4B text encoder. Type: `flux2`.
 - **VAE** (`flux2-vae.safetensors`, ~320 MB) — Converts between latent space and pixel space.
-- **LoRA** (`flux2_klein_4b_lora_000002400.safetensors`, ~250 MB) — Top-down pixel-art adapter applied to the UNET at strength 1.0. Triggered by the `<tdp>` token in prompts.
+- **LoRA** (`strategai-lora-detailed-high-step1800.safetensors`, ~250 MB) — Top-down medieval style LoRA (custom-trained) applied to the UNET at strength 1.0. Triggered by the `<tdp>` token in prompts.
 
 > **⚠️ TODO:** The `<tdp>` pixel-art LoRA is a community asset. Its training provenance and optimality for medieval pixel art have not been independently verified. See the [project report §7.2](../project-report.md#72-future-work) for planned investigation.
 
@@ -153,9 +153,9 @@ The prompt string (injected at runtime by `_patch_workflow()`) flows into a **Pr
 
 ### 4.3 Guidance Stage
 
-Flux2 Klein separates guidance into two nodes:
+Flux2 Klein 4B Distilled separates guidance into two nodes:
 - **FluxGuidance** (guidance=3.5) — Applies the guidance scale to positive conditioning. This controls how strongly the model follows the prompt. Lower values (2.5 for background tiles) allow more variation; higher values (8.0 for leader profiles) enforce tighter prompt adherence.
-- **ConditioningZeroOut** — Zeroes the negative conditioning. Flux2 Klein does not support negative prompts — this is architectural, not a limitation. The model was trained without negative conditioning.
+- **ConditioningZeroOut** — Zeroes the negative conditioning. Flux2 Klein 4B Distilled does not support negative prompts — this is architectural, not a limitation. The model was trained without negative conditioning.
 - **CFGGuider** (cfg=1) — Classifier-free guidance is disabled for Flux2. The cfg parameter is set to 1 (effectively a no-op) because guidance is handled entirely by FluxGuidance.
 
 ### 4.4 Sampling Stage
@@ -430,7 +430,7 @@ The `<tdp>` (top-down pixel) trigger is the critical mechanism for enforcing pix
 
 The full trigger phrase is:
 ```
-<tdp> Front view overhead shot elevated shot medium shot
+<tdp> top-down view.
 ```
 
 This activates the LoRA's learned transformations: top-down orthographic camera angle, pixel-art edge treatment, limited colour palette, and medieval fantasy aesthetic. The `<tdp>` token alone is insufficient — the full camera-direction phrase is required for reliable activation.
@@ -461,7 +461,7 @@ a sturdy defensive structure with crenellated battlements, arrow slits, thick st
 
 **Step 3 — Template rendering (Layer 2):** Wraps `{inner}` with style directives:
 ```
-<tdp> Front view overhead shot elevated shot medium shot. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. [INNER PROSE]. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
+<tdp> top-down view. The structure is viewed from directly above, showing its roof and layout. The structure blends naturally at its base edges. Isolate on a plain white background, only focusing on the specified object. [INNER PROSE]. Pixel art 16x16 game tile asset, crisp pixel edges, no anti-aliasing, sharp blocky pixels, centered single asset on white. Grounded stable perspective, no floating objects.
 ```
 
 **Step 4 — Injection:** The final prompt is injected into Node 5 (`PrimitiveStringMultiline`) of `txt2img.json`.

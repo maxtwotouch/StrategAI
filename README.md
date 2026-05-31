@@ -83,7 +83,7 @@ INF-3600/
 | Game engine | Python 3.11+, frozen dataclasses, pure functional state transitions |
 | Backend HTTP | FastAPI, Pydantic, in-memory store, OpenAI tool-use for AI civs |
 | Frontend | Next.js 15 (App Router), React 19, TypeScript strict, SVG-rendered map |
-| Generative art | External Medieval Pixel Art service (Flux2 Klein via ComfyUI) |
+| Generative art | External Medieval Pixel Art service (Flux2 Klein 4B Distilled via ComfyUI) |
 | Audio | `HTMLAudioElement` with a small `useAudio` hook (intro swell + ambient bed + mute toggle) |
 
 ---

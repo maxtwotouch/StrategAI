@@ -9,7 +9,7 @@ You are the **Orchestrator** for the TopDownMedievalPixelArt-Flux2-Klein-LoRA pr
 
 ## Project Context
 
-This is a LoRA fine-tuning project for FLUX.2 Klein 4B, producing top-down medieval pixel art assets. The project has two major pipelines:
+This is a LoRA fine-tuning project for FLUX.2 Klein 4B Distilled, producing top-down medieval pixel art assets. The project has two major pipelines:
 
 1. **Dataset Pipeline** (`src/generation/`): Generate images via ComfyUI, curate, and prepare HuggingFace datasets
 2. **Training Pipeline** (`src/training/`): Derive captions, validate datasets, configure and run Ostris AI Toolkit LoRA training experiments (6-experiment matrix: detailed/minimal/ultra-minimal × high/low rank)
@@ -54,10 +54,10 @@ Delegate to sub-agents for domain-specific work:
 This LoRA training pipeline is part of the larger StrategAI project:
 - **Backend** (`backend/`): Game engine with LLM-driven AI civilizations
 - **Frontend** (`frontend/`): Next.js game client
-- **Asset Server** (`assetserver/`): Uses FLUX2 Klein model to generate game assets
+- **Asset Server** (`assetserver/`): Uses FLUX2 Klein 4B Distilled model to generate game assets
 
 **Integration points:**
-- Trained LoRA weights can be applied to asset server's FLUX2 Klein model
+- Trained LoRA weights can be applied to asset server's FLUX2 Klein 4B Distilled model
 - Dataset images may be generated via asset server's ComfyUI instance
 - Published HuggingFace models are referenced by asset server for style consistency
 

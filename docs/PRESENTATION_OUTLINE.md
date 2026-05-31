@@ -38,13 +38,13 @@
   - Cost barriers (cloud APIs, recurring fees)
 - **Solution**: Demonstrate feasibility on consumer hardware
   - GPT-4 for strategic reasoning
-  - FLUX.2 Klein 4B for asset generation
+  - FLUX.2 Klein 4B Distilled for asset generation
   - Real-time performance: 1.2-4 seconds per asset
 
 **Speaker Notes** (45 seconds):
 "Independent game developers face two fundamental challenges when trying to incorporate advanced AI. First, computational constraints - state-of-the-art models often require enterprise-grade hardware with 24+ gigabytes of VRAM, far exceeding typical development budgets. Second, integration complexity - combining multiple AI systems like language models and image generators requires careful architectural design.
 
-Our solution demonstrates that these challenges can be overcome. By selecting appropriately-sized models - GPT-4 for reasoning and FLUX.2 Klein 4B for generation - and implementing robust system design, we achieve real-time performance on consumer hardware with 8 to 12 gigabytes of VRAM. Asset generation takes only 1.2 to 4 seconds, enabling near-interactive gameplay."
+Our solution demonstrates that these challenges can be overcome. By selecting appropriately-sized models - GPT-4 for reasoning and FLUX.2 Klein 4B Distilled for generation - and implementing robust system design, we achieve real-time performance on consumer hardware with 8 to 12 gigabytes of VRAM. Asset generation takes only 1.2 to 4 seconds, enabling near-interactive gameplay."
 
 **Transition**: "Let me show you the system architecture that makes this possible."
 
@@ -61,7 +61,7 @@ Our solution demonstrates that these challenges can be overcome. By selecting ap
 - **Four components**:
   - Backend: Python/FastAPI, game engine, LLM integration
   - Frontend: Next.js, React, SVG rendering
-  - Asset Server: FastAPI, ComfyUI, FLUX.2 Klein 4B
+  - Asset Server: FastAPI, ComfyUI, FLUX.2 Klein 4B Distilled
   - Training Pipeline: Ostris AI Toolkit, LoRA fine-tuning
 - **Data flow**:
   - User actions → Backend API → Game state updates
@@ -72,7 +72,7 @@ Our solution demonstrates that these challenges can be overcome. By selecting ap
 **Speaker Notes** (60 seconds):
 "Our system follows a microservices architecture with four primary components. The backend, built with Python and FastAPI, implements a pure functional game engine with immutable state and integrates GPT-4 for AI decision-making. The frontend, using Next.js and React, renders the game state through an SVG-based hex map and coordinates asset loading.
 
-The asset server is a separate FastAPI service that generates pixel-art assets on-demand using ComfyUI and FLUX.2 Klein 4B - a 4-billion parameter Diffusion Transformer. Finally, our training pipeline uses the Ostris AI Toolkit to fine-tune LoRA adapters that adapt the base model to our specific visual style.
+The asset server is a separate FastAPI service that generates pixel-art assets on-demand using ComfyUI and FLUX.2 Klein 4B Distilled - a 4-billion parameter Diffusion Transformer. Finally, our training pipeline uses the Ostris AI Toolkit to fine-tune LoRA adapters that adapt the base model to our specific visual style.
 
 The key architectural insight is that these components communicate through well-defined APIs, enabling independent scaling and deployment. The backend handles game logic, the asset server handles generation, and they can be scaled separately based on demand."
 
@@ -126,7 +126,7 @@ The LLM maintains a rolling memory of the last 8 turns and 32 diplomatic message
 - Sample generated assets (structure, unit, leader portrait)
 
 **Bullet Points**:
-- **Model**: FLUX.2 Klein 4B
+- **Model**: FLUX.2 Klein 4B Distilled
   - 4 billion parameters, FP8 quantization
   - 4-step distilled inference (~1.2 seconds)
   - Apache 2.0 license (commercial use)
@@ -143,7 +143,7 @@ The LLM maintains a rolling memory of the last 8 turns and 32 diplomatic message
 - **Identity preservation** through calibrated denoising
 
 **Speaker Notes** (90 seconds):
-"Our second major innovation is the asset generation pipeline using FLUX.2 Klein 4B, a Diffusion Transformer with 4 billion parameters. We chose this model for four reasons: Apache 2.0 license enabling commercial use, 8.4 gigabyte VRAM requirement fitting consumer GPUs, 4-step distilled inference achieving 1.2-second generation, and superior prompt adherence from its Qwen 3 text encoder.
+"Our second major innovation is the asset generation pipeline using FLUX.2 Klein 4B Distilled, a Diffusion Transformer with 4 billion parameters. We chose this model for four reasons: Apache 2.0 license enabling commercial use, 8.4 gigabyte VRAM requirement fitting consumer GPUs, 4-step distilled inference achieving 1.2-second generation, and superior prompt adherence from its Qwen 3 text encoder.
 
 The key challenge was achieving consistent output across diverse asset types - structures, objects, terrain, units, background tiles, and leaders. Our solution is a four-layer prompt architecture that separates concerns. Layer 1 is workflow configuration - the ComfyUI JSON defining model selection, sampler settings, and resolution. Layer 2 is style templates - camera framing, quality tags, and LoRA triggers stored in JSON. Layer 3 is semantic descriptions - enum-based vocabularies with hand-crafted prose for each value. Layer 4 is assembly logic that renders templates and validates inputs.
 
@@ -168,7 +168,7 @@ The denoise parameter is critical - we found through experimentation that values
 - Trigger token example: `<tdp> top-down view.`
 
 **Bullet Points**:
-- **Goal**: Adapt FLUX.2 Klein to consistent top-down perspective
+- **Goal**: Adapt FLUX.2 Klein 4B Distilled to consistent top-down perspective
 - **Dataset**: 100 curated medieval pixel-art images
   - Generated via ComfyUI pipeline
   - Manually curated for quality
@@ -182,7 +182,7 @@ The denoise parameter is critical - we found through experimentation that values
 - **Result**: `<tdp>` trigger token enforces top-down perspective
 
 **Speaker Notes** (60 seconds):
-"While FLUX.2 Klein provides strong base capabilities, it doesn't naturally produce assets with consistent top-down perspective. Our solution is LoRA fine-tuning using a curated dataset of 100 medieval pixel-art images.
+"While FLUX.2 Klein 4B Distilled provides strong base capabilities, it doesn't naturally produce assets with consistent top-down perspective. Our solution is LoRA fine-tuning using a curated dataset of 100 medieval pixel-art images.
 
 LoRA - Low-Rank Adaptation - enables efficient fine-tuning by training only 0.1 to 1 percent of parameters. Instead of modifying all 4 billion weights, we train small decomposition matrices totaling about 250 megabytes. This requires only 12 gigabytes of VRAM and 2 hours of training, compared to 100 gigabytes and weeks for full fine-tuning.
 
@@ -283,7 +283,7 @@ Assign each team member specific question categories:
 - Memory system
 
 **Member 2**: Asset Generation & DiT
-- FLUX.2 Klein model selection
+- FLUX.2 Klein 4B Distilled model selection
 - Prompt architecture
 - ComfyUI integration
 - Leader pipeline

@@ -15,8 +15,8 @@ You are a specialist at **cross-project codebase research and exploration** for 
 |-----------|------|------|---------|
 | **Backend** | `backend/` | Python 3.11+, FastAPI, OpenAI API | Game engine (pure functional, frozen dataclasses), LLM-driven AI civs, REST API (14 endpoints) |
 | **Frontend** | `frontend/` | Next.js 15, React 19, TypeScript, SVG | Game UI, hex map rendering, asset integration, diplomacy chat |
-| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B | Generative pixel-art service (6 asset families, 33 endpoints) |
-| **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein |
+| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 33 endpoints) |
+| **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled |
 | **Docs** | `docs/` | Markdown | Architecture, gameplay, development, UI, asset integration guides |
 
 ## Key Entry Points
@@ -31,7 +31,7 @@ You are a specialist at **cross-project codebase research and exploration** for 
 
 - **Frontend ↔ Backend**: REST at `localhost:8000`, DTOs in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
 - **Frontend ↔ Asset Server**: Asset manifest via `frontend/lib/assetManifest.ts` → `NEXT_PUBLIC_ASSET_API_URL`
-- **Asset Server ↔ Dataset/Training**: Shared ComfyUI + FLUX2 Klein model, LoRA weights
+- **Asset Server ↔ Dataset/Training**: Shared ComfyUI + FLUX2 Klein 4B Distilled model, LoRA weights
 
 ## Constraints
 

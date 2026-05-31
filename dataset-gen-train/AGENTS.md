@@ -1,10 +1,10 @@
 # Dataset/Training — AI Agent System
 
-This subproject contains the LoRA fine-tuning pipeline for FLUX2 Klein 4B on top-down medieval pixel art.
+This subproject contains the LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled on top-down medieval pixel art.
 
 ## Architecture
 
-Fine-tunes FLUX2 Klein 4B on top-down medieval pixel-art style via LoRA (Low-Rank Adaptation). Uses Ostris AI Toolkit for training orchestration. 6-experiment matrix: 3 caption variants × 2 rank levels.
+Fine-tunes FLUX2 Klein 4B Distilled on top-down medieval pixel-art style via LoRA (Low-Rank Adaptation). Uses Ostris AI Toolkit for training orchestration. 6-experiment matrix: 3 caption variants × 2 rank levels.
 
 ## Directory Structure
 
@@ -25,7 +25,7 @@ Fine-tunes FLUX2 Klein 4B on top-down medieval pixel-art style via LoRA (Low-Ran
 
 ## AI Technology (Course Relevance)
 
-**LoRA Fine-Tuning**: Low-Rank Adaptation of FLUX2 Klein 4B for style transfer.
+**LoRA Fine-Tuning**: Low-Rank Adaptation of FLUX2 Klein 4B Distilled for style transfer.
 
 **Key architectural decisions**:
 - **6-experiment matrix**: 3 caption variants (detailed/minimal/ultra_minimal) × 2 rank levels (high/low)
@@ -93,7 +93,7 @@ bash scripts/train_experiments.sh
 
 ## Cross-Project Context
 
-- **Asset Server shares**: ComfyUI infrastructure, FLUX2 Klein model, LoRA weights applied at inference
+- **Asset Server shares**: ComfyUI infrastructure, FLUX2 Klein 4B Distilled model, LoRA weights applied at inference
 - **Published dataset**: HuggingFace (`stixxert/topdown-medieval-pixelart`) — used by asset server for style consistency
 - **Root orchestrator**: For cross-project tasks, delegate to root `.github/agents/orchestrator.agent.md`
 

@@ -172,10 +172,31 @@ class TestQualityDirectives:
 
     def test_background_tile_has_tiling_directives(self):
         from src.prompt_templates import render
-        prompt = render("background_tile", tile_type="grass")
+        prompt = render("background_tile", tile_type="grass", surface="ground")
         assert "no anti-aliasing" in prompt
         assert "perfect seamless tiling" in prompt
         assert "simple and readable at small scale" in prompt
         assert "No disruptive features" in prompt
         assert "No borders, no centered composition" in prompt
         assert "16x16 pixel art tile" in prompt
+        assert "grass ground texture" in prompt
+        assert "flat ground plane" in prompt
+
+    def test_water_tile_uses_surface_not_ground(self):
+        """Water tiles must use 'surface' to avoid the contradictory 'water ground texture'."""
+        from src.prompt_templates import render
+        prompt = render("background_tile", tile_type="water", surface="surface")
+        assert "water surface texture" in prompt
+        assert "flat surface plane" in prompt
+        assert "ground" not in prompt
+
+    def test_surface_helper_defaults_to_ground(self):
+        from src.tile.background_engine import _surface_for
+        assert _surface_for("grass") == "ground"
+        assert _surface_for("sand") == "ground"
+        assert _surface_for("stone") == "ground"
+        assert _surface_for("dirt") == "ground"
+
+    def test_surface_helper_water_is_surface(self):
+        from src.tile.background_engine import _surface_for
+        assert _surface_for("water") == "surface"

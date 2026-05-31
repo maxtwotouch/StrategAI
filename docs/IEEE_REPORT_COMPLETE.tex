@@ -75,18 +75,42 @@ Finally, we provide the complete system as an open-source reference implementati
 \subsection{Paper Organization}
 
 The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work in game AI, procedural content generation, model adaptation, and multi-agent systems. Section~\ref{sec:architecture} presents the overall system architecture and technology stack rationale. Sections~\ref{sec:llm}, \ref{sec:dit}, and \ref{sec:lora} detail the three core AI subsystems: LLM-driven strategic AI, the Diffusion Transformer asset pipeline, and LoRA fine-tuning for style adaptation. Section~\ref{sec:frontend} describes frontend integration, asset manifest resolution, and the user experience. Section~\ref{sec:evaluation} evaluates system performance, test coverage, AI behavior quality, and asset quality. Section~\ref{sec:discussion} discusses architectural trade-offs, technical limitations, and future work. Section~\ref{sec:conclusion} concludes.
-```
-<userPrompt>
-Provide the fully rewritten file, incorporating the suggested code change. You must produce the complete file.
-</userPrompt>
-`````
-This is the description of what the code block changes:
-<changeDescription>
-Rewrite System Architecture section to use natural prose instead of bullet points
-</changeDescription>
 
-This is the code block that represents the suggested code change:
-```tex
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Game AI and Large Language Models}
+
+Traditional game AI relies on hand-crafted decision systems. Behavior trees provide hierarchical task decomposition but require extensive manual authoring for each new behavior. Finite state machines offer predictable transitions between discrete states but become unwieldy as the number of states grows. Utility-based systems enable more nuanced decision-making through weighted scoring functions, but they still require designers to enumerate and score every possible action.
+
+Recent work has begun exploring LLMs as a more flexible foundation for game AI. Park et al.\ demonstrated ``generative agents'' that simulate human behavior through natural language reasoning in a sandbox environment, producing remarkably believable social interactions. However, their system operated without competitive gameplay or rule enforcement, leaving open the question of how LLM-driven agents perform in adversarial, rule-bound environments. Zhu et al.\ used GPT-4 to generate dialogue and interpret commands for Minecraft agents, but the underlying decision-making remained scripted. Volum et al.\ proposed ``CraftAssist,'' also for Minecraft, using LLMs to translate natural language instructions into game actions, though the AI did not autonomously pursue strategic goals.
+
+StrategAI differs from these works by employing LLMs as fully autonomous strategic agents in a competitive, rule-bound environment where three AI civilizations must make real-time decisions about expansion, warfare, diplomacy, and resource management. Our intent-based abstraction addresses a key challenge that prior work left unresolved: LLMs excel at high-level reasoning but struggle with the precise numerical calculations and spatial logic that game mechanics demand. By separating strategic intent from tactical execution, we leverage LLM strengths while maintaining the deterministic, reproducible game mechanics that strategy games require.
+
+\subsection{Procedural Content Generation}
+
+Procedural Content Generation (PCG) has a long and storied history in games, from the randomly generated dungeons of early roguelikes to the algorithmically generated planets of modern titles like No Man's Sky. Traditional PCG relies on algorithmic techniques that, while powerful, produce content within a fixed aesthetic defined by the algorithm itself. Noise functions generate natural-looking terrain but cannot easily produce specific artistic styles. Grammar-based systems can model architectural styles but require extensive rule authoring. Constraint solvers enable designer-specified requirements but scale poorly to complex, multi-constraint problems.
+
+Deep learning has significantly expanded PCG capabilities in recent years. Generative Adversarial Networks have been applied to game level generation and texture synthesis, but their well-known training instability and mode collapse problems limit practical adoption in production pipelines. Variational Autoencoders offer more stable training dynamics but tend to produce blurry outputs that are unsuitable for the crisp, detailed aesthetic that pixel art demands.
+
+Diffusion models have emerged as the current state-of-the-art for image generation, offering both high-quality outputs and diverse variations from a single prompt. However, their application to game assets---as opposed to concept art or illustrations---remains limited. Game assets have specific technical requirements that concept art does not: transparent backgrounds for compositing, consistent camera perspective across all assets in a family, tileable textures for terrain, and a unified visual style that makes hundreds of independently generated assets look like they belong in the same game.
+
+StrategAI addresses these requirements through a multi-stage pipeline that combines diffusion model inference with deterministic post-processing (background removal via ISNet, Lanczos downscaling, image sharpening) and a structured four-layer prompt system that enforces asset specifications through enum-constrained vocabularies rather than free-form text input.
+
+\subsection{Model Adaptation and Fine-Tuning}
+
+Full fine-tuning of large diffusion models is computationally prohibitive for most developers, requiring hundreds of GPU-hours and tens of gigabytes of VRAM just to load the model. Parameter-Efficient Fine-Tuning (PEFT) methods, particularly Low-Rank Adaptation (LoRA), have made model adaptation accessible by training only small decomposition matrices that are combined with frozen base weights at inference time. A typical LoRA adapter adds only 0.1--1\% additional parameters, reducing both training cost and storage requirements by orders of magnitude.
+
+Several community projects have applied LoRA to game-adjacent asset generation. PixelArt-LoRA adapts Stable Diffusion for pixel-art style but focuses on side-view character sprites rather than the top-down perspective required by strategy games. TopDown-LoRA targets overhead camera angles but was trained on general imagery rather than the specific medieval pixel-art aesthetic that StrategAI requires.
+
+Our approach differs from these prior efforts in three significant ways. First, we target FLUX.2 Klein 4B Distilled, a newer Diffusion Transformer architecture with substantially improved prompt adherence compared to the U-Net-based Stable Diffusion models used in prior work. Second, rather than training a single LoRA configuration, we systematically evaluate the interaction between caption design and model capacity through a six-experiment matrix crossing three caption detail levels with two LoRA rank configurations. Third, we integrate the fine-tuned model directly into a production asset generation pipeline with automated prompt assembly, caching, and graceful degradation, demonstrating that LoRA-adapted models can serve real-time game asset requests.
+
+\subsection{Multi-Agent Systems}
+
+Multi-agent systems (MAS) in games typically involve homogeneous agents that share decision logic and differ only in parameter values. This approach is simple to implement but produces agents that feel interchangeable. Heterogeneous multi-agent systems, where agents have genuinely different capabilities, goals, or decision-making strategies, are more complex to build but enable the kind of rich, asymmetric interactions that make strategy games compelling.
+
+StrategAI implements heterogeneous AI agents through persona-based prompting rather than through separate model architectures or training procedures. Each of the three AI civilizations receives a unique character description---Genghis Khan as an aggressive expansionist who remembers every insult, Cleopatra as a diplomatic manipulator who plays factions against each other, Gandhi as a peaceful developer who pursues victory through science and culture---that is appended to a shared base system prompt. This approach enables genuinely diverse strategic behaviors, including emergent phenomena like coalition formation and revenge dynamics, without requiring separate AI implementations for each civilization.
+
 \section{System Architecture}
 \label{sec:architecture}
 
@@ -117,18 +141,7 @@ The selection of FLUX.2 Klein 4B Distilled as the image generation model was dri
 GPT-4 was selected for the strategic AI layer based on its native function-calling capability, which enables structured intent emission through OpenAI's tool-use API rather than fragile prompt-based parsing. Its reasoning quality significantly exceeds that of smaller models like GPT-4-mini in complex strategic scenarios involving multi-turn planning, diplomatic negotiation, and adaptive response to opponent behavior. The 128K token context window comfortably accommodates the serialized game state, rolling memory of recent actions and diplomatic messages, and the detailed system prompt with persona description. OpenAI's production-grade API infrastructure provides the reliability guarantees necessary for a game where API failures must be handled gracefully rather than crashing the game.
 
 ComfyUI serves as the inference orchestration layer between the FastAPI asset server and the FLUX.2 Klein 4B Distilled model. Its node-graph workflow representation enables complex multi-stage pipelines like the three-stage leader portrait system, where each stage uses different resolution, guidance, and denoising parameters. The active community ecosystem provides custom nodes for essential post-processing operations including background removal (rembg with ISNet), image stitching for multi-leader action scenes, and palette quantization. ComfyUI's HTTP and WebSocket API enables programmatic control from the FastAPI backend, with WebSocket providing real-time progress monitoring and HTTP polling as a fallback. Its model management system handles the loading, quantization, and VRAM optimization necessary to run a 14.6~GB model collection on consumer hardware.
-```
-<userPrompt>
-Provide the fully rewritten file, incorporating the suggested code change. You must produce the complete file.
-</userPrompt>
-`````
-This is the description of what the code block changes:
-<changeDescription>
-Rewrite LLM-Driven Strategic AI section to use natural prose instead of bullet points
-</changeDescription>
 
-This is the code block that represents the suggested code change:
-```tex
 \section{LLM-Driven Strategic AI}
 \label{sec:llm}
 
@@ -182,18 +195,7 @@ For the \texttt{Build} intent, the resolver validates that the requested unit ty
 The LLM integration layer implements comprehensive error handling to ensure that AI civilizations remain functional even when the LLM service experiences issues. API call failures are caught at the exception level, logged with a warning and debug traceback, and result in an empty \texttt{Decisions} object being returned, which causes the AI civilization to skip its turn gracefully rather than crashing the game. Invalid tool calls---where the LLM emits a function name that does not match any defined intent, or provides arguments that fail JSON parsing or enum validation---are individually skipped with a warning log, allowing valid intents in the same batch to proceed. If the game state has not been bound to the goal source (which can happen during initialization edge cases), the resolver returns empty decisions rather than operating on stale state. For models that do not support the temperature parameter (such as GPT-5 and the o1/o3/o4 reasoning models), the parameter is silently omitted from the API call rather than causing a rejection.
 
 The system also uses \texttt{tool\_choice="required"} in the API call, which forces the model to emit at least one tool call per turn, preventing the degenerate case where the LLM produces a text response without making any strategic decisions. This ensures that AI civilizations always take meaningful action, even if the quality of that action varies.
-```
-<userPrompt>
-Provide the fully rewritten file, incorporating the suggested code change. You must produce the complete file.
-</userPrompt>
-`````
-This is the description of what the code block changes:
-<changeDescription>
-Rewrite Diffusion Transformer Asset Pipeline section to use natural prose instead of bullet points
-</changeDescription>
 
-This is the code block that represents the suggested code change:
-```tex
 \section{Diffusion Transformer Asset Pipeline}
 \label{sec:dit}
 
@@ -256,18 +258,7 @@ Generated images pass through a deterministic post-processing pipeline before be
 The second step is subtle image sharpening with a radius of 1 pixel, sigma of 1, and alpha of 0.1. These conservative parameters prevent the over-sharpening halos that more aggressive settings would produce around pixel-art edges, while still compensating for the slight softening introduced by the Lanczos downscaling. The third step is background removal using the ISNet model, which produces clean RGBA output with transparent backgrounds suitable for compositing onto game tiles. This step is applied to structures, objects, terrain, and units, but omitted for background tiles (which require seamless edge-to-edge texture) and leader portraits (which use cinematic compositions where background removal would be inappropriate).
 
 Storage uses atomic writes to prevent corruption from interrupted writes: images are first written to a temporary file, then atomically renamed to their final path using \texttt{os.rename}. An in-memory LRU cache with a configurable limit of 1000 entries and 500~MB total size provides fast access to recently generated assets, while a SQLite database with WAL journal mode persists metadata for long-term asset management.
-```
-<userPrompt>
-Provide the fully rewritten file, incorporating the suggested code change. You must produce the complete file.
-</userPrompt>
-`````
-This is the description of what the code block changes:
-<changeDescription>
-Rewrite LoRA Fine-Tuning section to use natural prose instead of bullet points
-</changeDescription>
 
-This is the code block that represents the suggested code change:
-```tex
 \section{LoRA Fine-Tuning for Style Adaptation}
 \label{sec:lora}
 

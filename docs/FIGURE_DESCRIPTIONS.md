@@ -12,7 +12,7 @@ This document provides detailed descriptions of all figures needed for the Strat
 - Four large boxes arranged in a diamond pattern:
   - **Backend** (top): Python/FastAPI, Game Engine, LLM Integration
   - **Frontend** (left): Next.js, React, SVG Rendering
-  - **Asset Server** (right): FastAPI, ComfyUI, FLUX.2 Klein
+  - **Asset Server** (right): FastAPI, ComfyUI, FLUX.2 Klein 4B Distilled
   - **Training Pipeline** (bottom): Ostris AI Toolkit, LoRA Fine-Tuning
 - Bidirectional arrows showing data flow:
   - Frontend ↔ Backend: REST API (game state, user actions)
@@ -65,7 +65,7 @@ This document provides detailed descriptions of all figures needed for the Strat
     - File: `workflows/txt2img.json`
   - **Layer 2** (blue): "Style Templates"
     - Icon: JSON document
-    - Content: Camera framing ("Front view overhead shot"), quality tags ("Pixel art 16x16"), LoRA triggers ("<tdp>")
+    - Content: Camera framing ("top-down view."), quality tags ("Pixel art 16x16"), LoRA triggers ("<tdp>")
     - File: `config/prompt_templates.json`
   - **Layer 3** (green): "Semantic Descriptions"
     - Icon: Python code
@@ -153,7 +153,7 @@ This document provides detailed descriptions of all figures needed for the Strat
 - Vertical stack of four levels (top to bottom):
   - **Level 1** (top, green): "Generative Assets"
     - Icon: GPU + sparkle
-    - Description: "On-demand AI generation using FLUX.2 Klein"
+    - Description: "On-demand AI generation using FLUX.2 Klein 4B Distilled"
     - Quality: "High-quality, context-specific"
     - Requirements: "GPU (8+ GB VRAM), ComfyUI"
     - Sample: High-quality pixel art structure

@@ -24,11 +24,11 @@ You are an **Orchestrator** for the Medieval Pixel Art Image Service — a FastA
 This asset server is part of the larger StrategAI project:
 - **Backend** (`backend/`): Game engine with LLM-driven AI civilizations
 - **Frontend** (`frontend/`): Next.js game client that consumes assets from this server
-- **Dataset/Training** (`dataset-gen-train/`): LoRA fine-tuning pipeline for FLUX2 Klein
+- **Dataset/Training** (`dataset-gen-train/`): LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled
 
 **Integration points:**
 - Frontend calls asset server endpoints via `lib/assetManifest.ts`
-- Asset server uses FLUX2 Klein model (shared with dataset-gen-train)
+- Asset server uses FLUX2 Klein 4B Distilled model (shared with dataset-gen-train)
 - LoRA weights from training pipeline can be applied to asset generation
 
 **Escalation:** For tasks that affect multiple subprojects (e.g., changing asset API contracts, integrating new LoRA weights), escalate to the root orchestrator at `.github/agents/orchestrator.agent.md`.

@@ -21,7 +21,7 @@ An on-demand generative AI microservice that produces pixel-art game assets for 
 | **[Load Balancer](docs/architecture/load-balancer.md)** | Multi-node ComfyUI routing, failover |
 | **[Static Catalog](docs/architecture/static-catalog.md)** | Static asset resolution system |
 | **[Font Utilities](docs/architecture/font-utils.md)** | Cross-platform font resolution |
-| **[Workflow Design Justification](docs/pipeline/workflow-design-justification.md)** | Flux2 Klein model selection, node graph rationale |
+| **[Workflow Design Justification](docs/pipeline/workflow-design-justification.md)** | Flux2 Klein 4B Distilled model selection, node graph rationale |
 | **[ComfyUI Setup Guide](docs/architecture/comfyui-setup-guide.md)** | Hardware requirements, install steps, model download |
 | **[Testing Plan](docs/architecture/testing-plan.md)** | Test architecture, fixture inventory, coverage |
 | **Prompt Writing Guides** | [Leader](docs/guides/leader-prompt-guide.md) · [Tile](docs/guides/tile-prompt-guide.md) · [Unit](docs/guides/unit-prompt-guide.md) |
@@ -330,7 +330,7 @@ python -m pytest tests/ -v
 
 The service expects the following on your ComfyUI server:
 
-- **Flux2 Klein native nodes**: `UNETLoader`, `CLIPLoader`, `VAELoader`, `CFGGuider`, `Flux2Scheduler`, `KSamplerSelect`, `SamplerCustomAdvanced`, `EmptyFlux2LatentImage`, `SaveImage`
+- **Flux2 Klein 4B Distilled native nodes**: `UNETLoader`, `CLIPLoader`, `VAELoader`, `CFGGuider`, `Flux2Scheduler`, `KSamplerSelect`, `SamplerCustomAdvanced`, `EmptyFlux2LatentImage`, `SaveImage`
 - **Models**: `flux-2-klein-4b-fp8.safetensors` (UNET), `qwen_3_4b.safetensors` (CLIP), `flux2-vae.safetensors` (VAE)
 - **Custom nodes**: As specified in individual workflow JSONs
 
