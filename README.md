@@ -236,23 +236,38 @@ For project structure, see [docs/architecture.md §4](docs/architecture.md#4-com
 
 ## Configuration
 
-All settings live in `config.yaml` (version-controlled). Deployment-specific overrides go in `.env`.
+All settings live in `config.yaml` (version-controlled, source of truth for defaults and structure).
+Deployment-specific overrides go in `.env` — only values that differ from the `config.yaml` defaults.
+
+### Config layering principle
+
+| Layer | Source | Purpose |
+|-------|--------|---------|
+| `config.yaml` | Version-controlled | Defaults and structure — the canonical reference for every setting |
+| `.env` | Per-deployment, git-ignored | **Only** values that differ per environment (e.g., ComfyUI URL) |
+| `.env.testing` | Drop-in preset | Pre-built config that sets all generation modes to `placeholder` for ComfyUI-free testing |
+
+**Rule of thumb**: If a value in `.env` equals the `config.yaml` default, it doesn't belong in `.env`.
 
 ### Load order (later sources win)
 
-1. Pydantic defaults (in `src/config.py`)
-2. `config.yaml` — primary source of truth, committed to git
-3. Environment variables (e.g., `COMFYUI__BASE_URL`)
-4. `.env` file — deployment-specific overrides (highest priority)
+1. Pydantic field defaults (in `src/config.py`)
+2. OS environment variables (lowest priority — overridden by `config.yaml`)
+3. `config.yaml` — primary source of truth, committed to git
+4. `.env` file — deployment-specific overrides
+5. File secrets (highest priority)
 
-Use `__` (double underscore) as the nesting delimiter:
+Use `__` (double underscore) as the nesting delimiter for nested keys:
 
 ```bash
-# .env — only what changes per deployment
+# .env — minimal production example (only what differs from config.yaml)
 COMFYUI__BASE_URL=http://10.0.0.5:8188
-HOST=0.0.0.0
-PORT=8000
-SERVER__MAX_REQUEST_BODY_MB=20
+```
+
+The `config.yaml` defaults work out of the box for local development — you only need to override `COMFYUI__BASE_URL` to point at your ComfyUI server. For ComfyUI-free testing, copy `.env.testing` to `.env`:
+
+```bash
+cp .env.testing .env
 ```
 
 ---

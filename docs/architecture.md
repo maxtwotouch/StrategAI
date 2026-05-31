@@ -200,3 +200,74 @@ Controlled via `config.yaml` (version-controlled) with `.env` overrides using
 - **Task Queues**: Celery + Redis for non-blocking generation at scale.
 - **Object Storage**: S3 / Cloudflare R2 for multi-node asset sharing.
 - **GPU Cloud**: Separate web server hosting from GPU inference nodes.
+
+## 9. Configuration Layering
+
+### Load Order & Priority
+
+The service merges configuration from multiple sources. Later sources override earlier ones:
+
+| Priority | Source | Purpose |
+|----------|--------|---------|
+| 1 (lowest) | Pydantic field defaults | Hard-coded fallbacks in `src/config.py` model classes |
+| 2 | OS environment variables | Shell environment; overridden by `config.yaml` — use `.env` file instead |
+| 3 | `config.yaml` | **Primary source of truth**. Version-controlled, contains every setting with its canonical default. |
+| 4 | `.env` file | **Deployment-specific overrides only**. Git-ignored. Values here should differ from `config.yaml` defaults. |
+| 5 (highest) | File secrets | Secret files for sensitive values (rarely used). |
+
+This load order is defined in `Settings.settings_customise_sources()` in `src/config.py`.
+
+### Nesting Convention (`__` delimiter)
+
+Pydantic-settings uses `__` (double underscore) as the nesting delimiter for environment variables and `.env` entries:
+
+| `.env` / env var | Resolves to |
+|-------------------|-------------|
+| `COMFYUI__BASE_URL` | `settings.comfyui.base_url` |
+| `COMFYUI__TIMEOUT` | `settings.comfyui.timeout` |
+| `COMFYUI__WARMUP_ENABLED` | `settings.comfyui.warmup_enabled` |
+| `SERVER__CORS_ORIGINS` | `settings.server.cors_origins` |
+| `SERVER__MAX_REQUEST_BODY_MB` | `settings.server.max_request_body_mb` |
+| `SERVER__API_KEY` | `settings.server.api_key` |
+| `PATHS__OUTPUT_DIR` | `settings.paths.output_dir` |
+| `GENERATION__MODES__STRUCTURE` | `settings.generation.modes["structure"]` |
+| `GENERATION__DEFAULT_MODE` | `settings.generation.default_mode` |
+| `RATE_LIMIT__POST_RPS` | `settings.rate_limit.post_rps` |
+| `RATE_LIMIT__ENABLED` | `settings.rate_limit.enabled` |
+
+Top-level keys use the field name directly (e.g., `HOST`, `PORT`, `MODE`, `DATABASE_URL`).
+
+### When to Use `config.yaml` vs `.env`
+
+| Scenario | Where |
+|----------|-------|
+| Adding a new config key | `config.yaml` + corresponding Pydantic model in `src/config.py` |
+| Changing a default value for all deployments | `config.yaml` |
+| Pointing to a different ComfyUI server | `.env`: `COMFYUI__BASE_URL` |
+| Switching a family to placeholder mode in staging | `.env`: `GENERATION__MODES__STRUCTURE=placeholder` |
+| Enabling production safety checks | `.env`: `MODE=production` |
+| Setting an API key | `.env`: `SERVER__API_KEY=<key>` |
+
+**Rule**: `config.yaml` is the source of truth for structure and defaults. `.env` contains only what differs per deployment. If you find yourself copying a `config.yaml` value into `.env`, it doesn't belong there.
+
+### Configurable Sections
+
+All sections are defined as nested Pydantic models in `src/config.py` with corresponding blocks in `config.yaml`:
+
+| Section | Model | Key settings |
+|---------|-------|-------------|
+| **ComfyUI** | `ComfyUISettings` | `base_url`, `nodes`, `timeout`, `health_check_interval`, `max_retries`, `warmup_*` |
+| **Generation** | `GenerationSettings` | `modes` (per-family routing), `default_mode` |
+| **Paths** | `PathSettings` | `output_dir`, `splash_dir`, `static_tiles_dir`, `leader_reference_dir`, `font_path` |
+| **Server** | `ServerSettings` | `cors_origins`, `max_request_body_mb`, `assets_url_prefix`, `cache_max_*`, `api_key` |
+| **Rate Limit** | `RateLimitSettings` | `post_rps`, `get_rps`, `burst_size`, `enabled` |
+| **Leader** | `LeaderSettings` | Reserved for future per-archetype tuning |
+| **Top-level** | `Settings` | `host`, `port`, `database_url`, `mode` |
+
+### Unknown Env Vars
+
+The Settings model uses `extra="ignore"` — unknown environment variables or `.env` entries are silently ignored. There is no warning for typos in `.env` keys. Verify your configuration with:
+
+```bash
+python3 -c "from src.config import settings; print(settings.model_dump())"
+```

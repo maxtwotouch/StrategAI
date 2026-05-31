@@ -26,11 +26,31 @@ Complete every item before exposing the service to the internet.
 
 ### Configuration
 
-- [ ] **Review all `.env` overrides** — compare against `config.yaml` defaults. Only override what's truly different in production.
-- [ ] **Set `COMFYUI__BASE_URL`** — point to the production ComfyUI server.
-- [ ] **Review generation modes** — decide which asset families use `comfyui` vs `static` vs `placeholder`. Set `GENERATION__MODES__*` accordingly.
-- [ ] **Database** — ensure `DATABASE_URL` points to the correct SQLite file path. SQLite WAL mode is enabled automatically.
+This service uses a **config layering** pattern:
+
+| Layer | File | Purpose |
+|-------|------|---------|
+| **Defaults** | `config.yaml` (version-controlled) | Canonical defaults and structure for every setting. Commit changes here when adding new config keys. |
+| **Overrides** | `.env` (per-deployment, git-ignored) | **Only** values that differ from `config.yaml` defaults. Typically just `COMFYUI__BASE_URL`. |
+| **Testing preset** | `.env.testing` | Drop-in replacement that sets all generation modes to `placeholder` for ComfyUI-free testing. |
+
+**Rule**: If a value in `.env` equals the `config.yaml` default, it doesn't belong in `.env`. The `.env` file should be minimal — in most deployments, only `COMFYUI__BASE_URL` needs an override.
+
+**Naming convention**: Use `__` (double underscore) to target nested keys.
+
+| `.env` variable | Maps to `config.yaml` path |
+|-----------------|---------------------------|
+| `COMFYUI__BASE_URL` | `comfyui.base_url` |
+| `COMFYUI__TIMEOUT` | `comfyui.timeout` |
+| `SERVER__CORS_ORIGINS` | `server.cors_origins` |
+| `GENERATION__MODES__STRUCTURE` | `generation.modes.structure` |
+| `RATE_LIMIT__POST_RPS` | `rate_limit.post_rps` |
+
+- [ ] **Set `COMFYUI__BASE_URL`** — typically the ONLY override needed. Point to the production ComfyUI server.
+- [ ] **Review generation modes** — only override `GENERATION__MODES__*` if a family should use something other than the `config.yaml` default (`comfyui`).
+- [ ] **Database** — `DATABASE_URL` defaults to SQLite at the project root. Only override if using a different path. SQLite WAL mode is enabled automatically.
 - [ ] **Disable warmup if VRAM-constrained** — set `COMFYUI__WARMUP_ENABLED=false` if the ComfyUI GPU can't spare VRAM for an extra generation at startup.
+- [ ] **Review all `.env` overrides** — compare against `config.yaml` defaults. Only override what's truly different in production.
 
 ---
 
@@ -48,17 +68,30 @@ pip install -e ".[dev]"
 
 ### 2. Configure Environment
 
-Create `.env` from the template:
+Create a minimal `.env` with only deployment-specific overrides:
 
 ```bash
-# .env — production overrides
-DEPLOYMENT_MODE=production
+# .env — production overrides (only what differs from config.yaml defaults)
+COMFYUI__BASE_URL=http://10.0.0.5:8188
+```
+
+For a more locked-down production setup, add security and binding overrides:
+
+```bash
+# .env — full production example
+MODE=production
 SERVER__HOST=127.0.0.1
-SERVER__PORT=8000
 SERVER__API_KEY=<openssl rand -hex 32>
 SERVER__CORS_ORIGINS='["https://mygame.example.com"]'
 COMFYUI__BASE_URL=http://10.0.0.5:8188
-DATABASE_URL=sqlite:////opt/medieval-pixel-art/tilemap.db
+```
+
+> **Note**: `SERVER__PORT`, `DATABASE_URL`, and all `GENERATION__MODES__*` settings use their `config.yaml` defaults — they don't need to appear in `.env` unless your deployment differs from the default.
+
+For ComfyUI-free testing, use the pre-built testing preset instead:
+
+```bash
+cp .env.testing .env
 ```
 
 ### 3. Verify Configuration

@@ -76,6 +76,7 @@ generation:
     terrain: "comfyui"
     background_tile: "comfyui"
     character_sprite: "comfyui"
+    nature_object: "comfyui"
     unit: "comfyui"
     leader: "comfyui"
     story: "comfyui"

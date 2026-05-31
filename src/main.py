@@ -382,15 +382,13 @@ async def lifespan(app: FastAPI):
             _ref_cleaned = 0
             try:
                 with SessionLocal() as _db:
-                    _existing_ids = {
-                        row[0] for row in _db.query(LeaderRecord.leader_id).all()
+                    _valid_refs = {
+                        row[0] for row in _db.query(LeaderRecord.reference_filename).all()
                     }
                     for _entry in os.listdir(_leader_ref_dir):
-                        if not _entry.startswith("ref_leader_") or not _entry.endswith(".png"):
+                        if not _entry.endswith(".png"):
                             continue
-                        # Extract leader_id: ref_leader_<id>.png → <id>
-                        _lid = _entry[len("ref_leader_"):-len(".png")]
-                        if _lid not in _existing_ids:
+                        if _entry not in _valid_refs:
                             _path = os.path.join(_leader_ref_dir, _entry)
                             try:
                                 os.unlink(_path)
