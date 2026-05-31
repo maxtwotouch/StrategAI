@@ -1,0 +1,45 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Test
+.pytest_cache/
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+.devcontainer
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Generated content (git tracks these folders but not their contents)
+generated_assets/
+mock_assets/
+splash_assets/
+leader_references/
+
+reports/
+
+# Database
+*.db.*
+*.db
+*.db-journal
+*.db-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (large files)
+*.safetensors
+*.ckpt
+*.pt
+*.bin

@@ -1,0 +1,14 @@
+# This file is auto-generated. pyproject.toml is the source of truth.
+# Install with: pip install -e .        (production)
+#                pip install -e ".[dev]"  (development + tests)
+fastapi>=0.100.0,<0.137.0
+uvicorn[standard]>=0.20.0,<0.49.0
+pydantic>=2.0.0,<2.14.0
+pydantic-settings[yaml]>=2.0.0,<2.15.0
+Pillow>=10.0.0,<13.0.0
+pyyaml>=6.0,<7.0
+sqlalchemy>=2.0.0,<2.1.0
+httpx>=0.24.0,<0.29.0
+websockets>=12.0,<17.0
+python-dotenv>=1.0.0,<2.0
+alembic>=1.13.0,<2.0
