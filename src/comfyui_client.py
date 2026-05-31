@@ -313,7 +313,14 @@ class ComfyUIClient:
             timeout=15,
         )
         resp.raise_for_status()
-        body = resp.json()
+
+        try:
+            body = resp.json()
+        except (UnicodeDecodeError, UnicodeError):
+            # Fallback: force UTF-8 decode then parse JSON manually.
+            # Prevents charset_normalizer UTF-32-BE false positives
+            # (observed with some ComfyUI error responses behind Cloudflare CDN).
+            body = json.loads(resp.content.decode("utf-8", errors="replace"))
 
         # ComfyUI always includes "node_errors" in the response — even on
         # success (as an empty dict).  Only treat non-empty node_errors as
@@ -339,6 +346,9 @@ class ComfyUIClient:
         """
         try:
             await self._wait_via_ws(prompt_id, client_id=client_id)
+            return  # Success — exit early, no polling needed
+        except RuntimeError:
+            raise  # Known execution failure from ComfyUI — propagate
         except (
             websockets.exceptions.WebSocketException,
             ConnectionError,
@@ -347,18 +357,27 @@ class ComfyUIClient:
             BrokenPipeError,
         ) as exc:
             logger.warning("WebSocket error, falling back to polling: %s", exc)
-            ok = await self._wait_via_polling(prompt_id)
-            if not ok:
-                raise RuntimeError(
-                    f"ComfyUI prompt {prompt_id} did not complete within timeout"
-                )
+        except Exception as exc:
+            logger.warning(
+                "Unexpected error in WebSocket wait, falling back to polling: %s", exc
+            )
+
+        # Fallback: poll for completion
+        ok = await self._wait_via_polling(prompt_id)
+        if not ok:
+            raise RuntimeError(
+                f"ComfyUI prompt {prompt_id} did not complete within timeout"
+            )
 
     async def get_result(self, prompt_id: str) -> dict:
         """``GET /history/{prompt_id}`` → parsed output dict."""
         http = await self.get_http()
         resp = await http.get(f"/history/{prompt_id}", timeout=self.timeout)
         resp.raise_for_status()
-        return resp.json()
+        try:
+            return resp.json()
+        except (UnicodeDecodeError, UnicodeError):
+            return json.loads(resp.content.decode("utf-8", errors="replace"))
 
     async def download_image(
         self,
@@ -405,7 +424,10 @@ class ComfyUIClient:
             http = await self.get_http()
             resp = await http.get("/queue", timeout=min(self.timeout, 15))
             resp.raise_for_status()
-            body = resp.json()
+            try:
+                body = resp.json()
+            except (UnicodeDecodeError, UnicodeError):
+                body = json.loads(resp.content.decode("utf-8", errors="replace"))
             running = body.get("queue_running", [])
             pending = body.get("queue_pending", [])
             return {
@@ -437,7 +459,24 @@ class ComfyUIClient:
             try:
                 while True:
                     raw = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
-                    data = json.loads(raw)
+                    # The websockets library may return str or bytes depending on the
+                    # frame type (text vs binary) and library version.  json.loads()
+                    # accepts both, but when passed bytes it uses heuristic encoding
+                    # detection that can produce false UTF-32-BE positives (Python 3.14+).
+                    # Decode to str first to force UTF-8 and avoid BOM-sniffing.
+                    if isinstance(raw, bytes):
+                        raw = raw.decode("utf-8", errors="replace")
+                    # Skip empty payloads (e.g. ping/pong, empty binary frames)
+                    if not raw or not raw.strip():
+                        continue
+                    try:
+                        data = json.loads(raw)
+                    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                        logger.warning(
+                            "WebSocket received unparseable message (first 200 chars): %r — %s",
+                            raw[:200] if len(raw) > 200 else raw, exc,
+                        )
+                        continue
                     msg_type = data.get("type", "")
                     msg_data = data.get("data", {})
 

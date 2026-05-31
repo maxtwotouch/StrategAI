@@ -129,6 +129,8 @@ curl -X POST http://localhost:8000/leader \
   }'
 ```
 
+For curl examples covering all 6 generation endpoints with enum references and troubleshooting, see [docs/api-examples.md](docs/api-examples.md).
+
 ### Structure Tiles
 
 | Method | Endpoint | Description |
