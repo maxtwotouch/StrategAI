@@ -287,17 +287,5 @@
     "_meta": {
       "title": "VAE Encode"
     }
-  },
-  "39": {
-    "inputs": {
-      "images": [
-        "37",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
   }
 }

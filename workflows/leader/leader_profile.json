@@ -290,18 +290,6 @@
       "title": "Resize Image v2"
     }
   },
-  "41": {
-    "inputs": {
-      "images": [
-        "40",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Preview Image"
-    }
-  },
   "42": {
     "inputs": {
       "filename_prefix": "leader_profile",
