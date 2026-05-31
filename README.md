@@ -1,3 +1,5 @@
+[▶ Watch the StrategAI showcase](https://youtu.be/nvO3DZogazM)
+
 # StrategAI
 
 <div align="center">
