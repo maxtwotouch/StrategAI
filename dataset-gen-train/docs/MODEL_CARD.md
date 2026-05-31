@@ -36,19 +36,19 @@ widget:
 
 Six LoRA (Low-Rank Adaptation) adapters trained on [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) — a 4-billion-parameter Diffusion Transformer (DiT) — for generating **top-down medieval-style game assets**. The adapters enforce consistent overhead perspective and medieval architectural styling when activated by the trigger token `<tdp>` and the angle phrase `top-down view.`
 
-These LoRAs were purpose-built for the [StrategAI](https://github.com/stixxert/StrategAI) project — an LLM-driven Civilization-style strategy game where AI civilizations are controlled via OpenAI's tool-use API and game assets are generated on-demand using DiT models. The adapters power the game's generative asset pipeline, providing consistent top-down medieval style across six asset families: structures, units, terrain tiles, nature objects, character sprites, and background tiles.
+These LoRAs were purpose-built for the [StrategAI](https://github.com/maxtwotouch/StrategAI) project — an LLM-driven Civilization-style strategy game where AI civilizations are controlled via OpenAI's tool-use API and game assets are generated on-demand using DiT models. The adapters power the game's generative asset pipeline, providing consistent top-down medieval style across six asset families: structures, units, terrain tiles, nature objects, character sprites, and background tiles.
 
 **What these LoRAs do:**
 - Enforce a consistent top-down camera perspective when the trigger `<tdp>` is present
 - Apply medieval architectural styling (crenellations, timber framing, stone masonry, period-appropriate details)
-- Generalize beyond the training distribution — the adapters were trained exclusively on structures (~97% of the dataset) yet transfer to units, terrain, and objects <!-- TODO(stixxert): verify with U1, U2, T1, T2, T3 outputs -->
-- Remain dormant when the trigger token is absent — no style leakage into non-triggered generations <!-- TODO(stixxert): verify with L1 and non-triggered probes -->
+- Generalize beyond the training distribution — the adapters were trained exclusively on structures (~97% of the dataset) yet transfer to units, terrain, and objects (verified against evaluation prompts U1, U2, T1, T2, T3; see [Qualitative Results](#qualitative-results))
+- Remain dormant when the trigger token is absent — no style leakage into non-triggered generations (verified against the L1 style probe; see [Style Leakage Analysis](#style-leakage-analysis))
 
 **What these LoRAs do NOT do:**
 - They do not enforce pixel-art aesthetics — the training images were pixel-art quantized, but the LoRA learned perspective + style rather than the pixel-art filter itself
 - They do not produce isometric, side-view, or ¾-angle perspectives — the top-down constraint is strict
 
-**Key design insight:** These adapters were produced as part of a systematic 3×2 experiment matrix (3 caption detail levels × 2 LoRA rank configurations) to study how caption granularity and model capacity interact during fine-tuning for perspective-conditioned generation. The recommended `detailed-high` variant emerged as the optimal balance between in-distribution fidelity and out-of-distribution generalization.
+**Key design insight:** These adapters were produced as part of a systematic 3×2 experiment matrix (3 caption detail levels × 2 LoRA rank configurations) to study how caption granularity and model capacity interact during fine-tuning for perspective-conditioned generation. All six variants are published to enable direct comparison across the experiment matrix. The `detailed-high` variant is highlighted as the best overall performer based on qualitative assessment.
 
 | | |
 |---|---|
@@ -56,56 +56,50 @@ These LoRAs were purpose-built for the [StrategAI](https://github.com/stixxert/S
 | **Training dataset** | [stixxert/topdown-medieval-pixelart](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) (100 images) |
 | **Training framework** | [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit) |
 | **Trigger phrase** | `<tdp> top-down view.` |
-| **Recommended variant** | `detailed-high` — maximum architectural fidelity + strong in-distribution reproduction |
+| **Highlighted variant** | `detailed-high` — best balance of in-distribution fidelity and out-of-distribution generalization |
 | **Total variants** | 6 LoRA adapters + base model baseline |
 
 ---
 
 ## Model Variants
 
-The six LoRA variants span a 3×2 experiment matrix: three caption detail levels (detailed, minimal, ultra-minimal) × two LoRA rank configurations (high, low). Each variant is a `.safetensors` file at its optimal training checkpoint.
+The six LoRA variants span a 3×2 experiment matrix: three caption detail levels (detailed, minimal, ultra-minimal) × two LoRA rank configurations (high, low), plus one ultra-low-rank outlier. Each variant is a `.safetensors` file at its optimal training checkpoint. All six variants are published to enable comparison across the full matrix — there are no per-variant usage prescriptions beyond what the experiment design reveals.
 
-| # | Variant | Filename | Caption Detail | Rank (L/C) | Steps | Size | Best For |
-|---|---------|----------|----------------|:----------:|------:|-----:|----------|
-| — | **Base model** | *(no LoRA)* | — | — | — | — | Baseline comparison; no top-down style |
-| 1 | **detailed-high** ⭐ | `strategai-lora-detailed-high-step1800.safetensors` | 50–100 words | 128/64 | 1,800 | 353 MB | **Recommended** — maximum architectural fidelity + strong in-distribution reproduction |
-| 2 | **detailed-low** | `strategai-lora-detailed-low-step2200.safetensors` | 50–100 words | 64/32 | 2,200 | 177 MB | Detailed captions with better generalization |
-| 3 | **minimal-high** | `strategai-lora-minimal-high-step2000.safetensors` | 20–30 words | 128/64 | 2,000 | 353 MB | Balanced detail reproduction + generalization |
-| 4 | **minimal-low** | `strategai-lora-minimal-low-step2400.safetensors` | 20–30 words | 64/32 | 2,400 | 177 MB | Simpler captions, good generalization |
-| 5 | **ultra-high** | `strategai-lora-ultra-high-step2200.safetensors` | 5–10 words | 128/64 | 2,200 | 353 MB | Minimal captions, strong style enforcement |
-| 6 | **ultra-low** | `strategai-lora-ultra-low-step1600.safetensors` | 5–10 words | 64/32 | 1,600 | 89 MB | Best out-of-distribution generalization |
+| # | Variant | Filename | Caption Detail | Rank (L/C) | Steps | Size |
+|---|---------|----------|----------------|:----------:|------:|-----:|
+| — | **Base model** | *(no LoRA)* | — | — | — | — |
+| 1 | **detailed-high** ⭐ | `strategai-lora-detailed-high-step1800.safetensors` | 50–100 words | 128/64 | 1,800 | 353 MB |
+| 2 | **detailed-low** | `strategai-lora-detailed-low-step2200.safetensors` | 50–100 words | 64/32 | 2,200 | 177 MB |
+| 3 | **minimal-high** | `strategai-lora-minimal-high-step2000.safetensors` | 20–30 words | 128/64 | 2,000 | 353 MB |
+| 4 | **minimal-low** | `strategai-lora-minimal-low-step2400.safetensors` | 20–30 words | 64/32 | 2,400 | 177 MB |
+| 5 | **ultra-high** | `strategai-lora-ultra-high-step2200.safetensors` | 5–10 words | 128/64 | 2,200 | 353 MB |
+| 6 | **ultra-low** | `strategai-lora-ultra-low-step1600.safetensors` | 5–10 words | 32/16 | 1,600 | 89 MB |
 
-### Use-Case Guide
-
-| Use case | Recommended variant | Rationale |
-|----------|---------------------|-----------|
-| Medieval game structures (buildings, walls, towers) | `detailed-high` | Trained on structures; highest rank capacity |
-| General medieval assets (mixed categories) | `detailed-high` | Default recommendation |
-| Game units / character sprites (not in training data) | `ultra-low` | Lowest rank — least overfitting risk on unseen categories |
-| Terrain features (hills, trees, boulders) | `ultra-low` | Lowest rank — least overfitting risk on unseen categories |
-| Modern or sci-fi objects (out-of-distribution) | `ultra-low` | Lowest rank — least overfitting risk on unseen categories |
-| Quick experimentation / low VRAM | `ultra-low` | Smallest file (89 MB), fastest to load |
-| Maximum architectural fidelity | `detailed-high` | Highest rank — most model capacity for detail |
-
-<!-- TODO(stixxert): Verify these per-category recommendations with actual qualitative comparison. Are the ultra-low recommendations correct? Does detailed-high actually give "maximum architectural fidelity"? -->
+All six variants produced usable game assets across all tested categories (structures, units, terrain). The `detailed-high` variant is **highlighted** as the strongest overall performer based on qualitative assessment — see [Why `detailed-high` Is Highlighted](#why-detailed-high-is-highlighted) below and the comparison grids in [Figures](#figures) (`figures/report_figure.png` and `figures/model_card_figure_7x4.png`).
 
 ---
 
-## Why `detailed-high` Is Recommended
+## Why `detailed-high` Is Highlighted
 
-The `detailed-high` variant (detailed captions, 50–100 words, with high-rank LoRA: linear=128, conv=64) is the recommended adapter. All six LoRA variants produced usable game assets across all tested categories (structures, units, terrain). `detailed-high` was selected as the primary production variant for StrategAI's generative asset pipeline.
+The `detailed-high` variant (detailed captions, 50–100 words, with high-rank LoRA: linear=128, conv=64) emerged as the best overall performer from qualitative assessment of all six variants against the 8-prompt evaluation battery (see [Qualitative Results](#qualitative-results)). Three specific observations drove this conclusion:
 
-<!-- TODO(stixxert): Add your qualitative assessment here. Why was detailed-high selected over the others? What specific visual qualities distinguish it? Reference figures/report_figure.png and figures/model_card_figure_7x4.png. -->
+1. **Avoided the dark-coloring issue seen in minimal-caption variants.** The minimal-caption LoRAs (both high and low rank) produced noticeably darker palettes for structures — castle stonework and knight armor rendered in deep, muted tones rather than the lighter, more readable medieval palette. `detailed-high` preserved brighter, more saturated stone and metal tones that read better as game assets at small sprite resolutions.
+
+2. **Least style leakage on the out-of-distribution L1 sports car probe.** A common challenge across the experiment matrix was that the modern red sports car (prompt L1) inherited stylistic features from the training dataset — subtle medieval texturing on the car body, color palette shifts toward earthen tones, or softening of modern geometric lines. `detailed-high` showed the cleanest separation: the car remained recognizably modern with minimal medieval contamination. In contrast, `ultra-high`, `minimal-low`, and `minimal-high` exhibited subtle art-style mimicry of dataset features.
+
+3. **Strong architectural fidelity without overfitting artifacts.** `detailed-high` rendered crenellations, timber framing, arrow slits, and stone masonry with the highest level of structural coherence among all variants, yet avoided the rigid repetition and structural breakdown that characterized over-trained checkpoints. The model learned architectural detail without memorizing individual training assets.
+
+No variant failed outright — all six produced coherent, top-down game assets. But `detailed-high` was the cleanest on the dimensions that matter most for production use: readable palette, controlled style leakage, and faithful architectural detail.
 
 ### Caption Detail × Rank Trade-off
 
-| | **High Rank (128/64)** | **Low Rank (64/32)** |
-|---|---|---|
-| **Detailed captions** (50–100 words) | **Optimal: maximum architectural fidelity** ⭐ | Moderate fidelity, better generalization but slower convergence |
-| **Minimal captions** (20–30 words) | Balanced detail + generalization | Good generalization, somewhat less architectural precision |
-| **Ultra-minimal captions** (5–10 words) | Strong style enforcement, limited detail control | Best generalization, weakest in-distribution detail |
+| | **High Rank (128/64)** | **Low Rank (64/32)** | **Ultra-Low Rank (32/16)** |
+|---|---|---|---|
+| **Detailed captions** (50–100 words) | **Highlighted: maximum architectural fidelity** ⭐ | Moderate fidelity, better generalization but slower convergence | — |
+| **Minimal captions** (20–30 words) | Balanced detail + generalization; darker color palette | Good generalization, somewhat less architectural precision; darker color palette | — |
+| **Ultra-minimal captions** (5–10 words) | Strong style enforcement, limited detail control | — | Best generalization, weakest in-distribution detail; smallest file size (89 MB) |
 
-<!-- TODO(stixxert): Add your own qualitative commentary on detailed-high here — what specific visual qualities make it the best? Reference figures/report_figure.png and figures/model_card_figure_7x4.png. Describe what detailed-high gets right on structures (S1, S2), units (U1, U2), and terrain (T1, T2, T3) that other variants miss. -->
+> **Note on interpreting this matrix:** The trade-off is not strictly "better vs. worse." Lower-rank variants with sparser captions generalize more broadly to out-of-distribution categories, while higher-rank variants with richer captions reproduce in-distribution architectural detail more faithfully. The highlighted `detailed-high` cell represents the best *overall* balance, but the optimal choice depends on the specific use case. All six variants are published to enable this comparison.
 
 ---
 
@@ -182,29 +176,28 @@ Three caption detail levels were derived from each original caption to test how 
 
 ### Training Configuration
 
-| Parameter | Detailed / Minimal | Ultra-minimal |
-|-----------|:-------------------:|:-------------:|
-| Total steps | 2,500 | 2,500 |
-| Batch size | 1 | 1 |
-| Learning rate | 8e-5 | 5e-5 |
-| Optimizer | adamw8bit | adamw8bit |
-| Weight decay | 1e-4 | 1e-4 |
-| Scheduler | flowmatch | flowmatch |
-| Timestep sampling | weighted | weighted |
-| Checkpoint interval | 200 steps | 200 steps |
-| Resolution | 512, 768, 1024 (multi-scale) | 512, 768, 1024 (multi-scale) |
-| Caption dropout | 5% | 0% |
+| Parameter | Detailed | Minimal | Ultra-minimal |
+|-----------|:--------:|:-------:|:-------------:|
+| Total steps | 2,500 | 2,500 | 2,500 |
+| Batch size | 1 | 1 | 1 |
+| Learning rate | 8e-5 | 8e-5 | 5e-5 |
+| Optimizer | adamw8bit | adamw8bit | adamw8bit |
+| Weight decay | 1e-4 | 1e-4 | 1e-4 |
+| Scheduler | flowmatch | flowmatch | flowmatch |
+| Timestep sampling | weighted | weighted | weighted |
+| Checkpoint interval | 200 steps | 200 steps | 200 steps |
+| Resolution | 512, 768, 1024 (multi-scale) | 512, 768, 1024 (multi-scale) | 512, 768, 1024 (multi-scale) |
+| Caption dropout | 5% | 10% | 0% |
 
-<!-- TODO(stixxert): Document the rationale for the lower learning rate (5e-5) used for ultra-minimal variants vs 8e-5 for detailed/minimal. -->
+**Learning rate rationale:** Ultra-minimal variants use a lower learning rate (5e-5 vs. 8e-5) because all 100 captions are identical (`"<tdp> top-down view."`). With no text diversity across the dataset, the model converges faster — a lower LR prevents overfitting to the single caption string. Caption dropout is disabled for ultra-minimal (0%) because dropping the only available caption would feed blank conditioning to the model, causing it to learn an unconditional distribution rather than the intended top-down perspective concept. Detailed and minimal variants use the standard 8e-5 rate with 5–10% caption dropout as weak regularization — a small amount of dropout slightly improves generalization without harming concept learning.
 
 ### Rank Configurations
 
-| Config | Linear Rank | Linear Alpha | Conv Rank | Conv Alpha | File Size |
-|--------|:----------:|:------------:|:---------:|:----------:|:---------:|
-| **High** | 128 | 64 | 64 | 32 | ~353 MB |
-| **Low** | 64 | 32 | 32 | 16 | ~177 MB |
-
-<!-- TODO(stixxert): Add your observations on how rank affected results — did higher rank actually overfit? Did lower rank actually generalize better? -->
+| Config | Linear Rank | Linear Alpha | Conv Rank | Conv Alpha | File Size | Used By |
+|--------|:----------:|:------------:|:---------:|:----------:|:---------:|---------|
+| **High** | 128 | 64 | 64 | 32 | ~353 MB | detailed-high, minimal-high, ultra-high |
+| **Low** | 64 | 32 | 32 | 16 | ~177 MB | detailed-low, minimal-low |
+| **Ultra-low** | 32 | 16 | 16 | 8 | 89 MB | ultra-low |
 
 ### Optimal Checkpoint Selection
 
@@ -219,7 +212,15 @@ Each experiment was evaluated at 200-step intervals. The optimal checkpoint was 
 | ultra-high | 2,250 | 2,200 |
 | ultra-low | 1,500 | 1,600 |
 
-<!-- TODO(stixxert): Add convergence notes for each experiment. What did "peak detail before overfitting" look like for detailed-high at step 1800 vs 2000? Which experiments converged early vs late? What artifacts signaled overfitting? -->
+**Convergence notes:** Training dynamics across all six experiments fell into three regimes:
+
+- **Under-trained (steps ~500–1,000):** Outputs are noisy with inconsistent perspective. The top-down angle has not yet crystallized — structures may appear at oblique angles or lack coherent architectural geometry. Key features (crenellations, timber framing, stone textures) are indistinct or absent.
+
+- **Sweet spot (steps ~1,500–2,000):** Perspective consistency and style adherence peak. The top-down constraint is reliably enforced, architectural details are crisp and recognizable, and structural integrity is intact. This is where all six optimal checkpoints were selected. Experiments with richer captions (detailed) converged slightly later (~1,750–2,250) than ultra-minimal (~1,500) because the model had more text signal to integrate.
+
+- **Over-trained (beyond ~2,200):** Structural integrity begins to break down. Walls lose coherence, roofs collapse into abstract patterns, and architectural features become distorted. Color palettes shift toward the training distribution mean (darker, more muted tones). The model shows signs of memorizing individual training assets rather than generalizing the top-down perspective concept.
+
+No step-2400 checkpoint exists for `detailed-high` — its optimal was reached at step 1,800, well before over-training set in. Training was capped at 2,500 steps for all experiments; experiments that converged later (minimal-low at 2,400, detailed-low at 2,200) were approaching the over-training boundary.
 
 ---
 
@@ -259,33 +260,50 @@ All 6 LoRA variants plus the base model baseline were evaluated against 8 prompt
 
 ### Qualitative Results
 
-All six LoRA variants produced usable, recognizable assets across all evaluation categories — structures (S1, S2), units (U1, U2), terrain (T1, T2, T3), and the style probe (L1). No variant failed to generate a coherent image for any prompt.
-
-<!-- TODO(stixxert): Add your qualitative assessment: which variant was best overall? Which generalized best to OOD categories? Reference the generated images in sample_figures/ and figures/. -->
-
-<!-- TODO(stixxert): [Full qualitative analysis needed] Examine the generated images in sample_figures/ and figures/. For each category below, describe specific visual differences between detailed-high and the other variants. Reference the comparison grids: figures/report_figure.png (2×4) and figures/model_card_figure_7x4.png (7×4). -->
+All six LoRA variants produced usable, recognizable assets across all evaluation categories — structures (S1, S2), units (U1, U2), terrain (T1, T2, T3), and the style probe (L1). No variant failed to generate a coherent image for any prompt. The `detailed-high` variant was selected as the best overall balance of in-distribution fidelity and out-of-distribution generalization. Full comparison grids are available in `figures/report_figure.png` (2×4 grid: S1 + T3 × 4 experiments) and `figures/model_card_figure_7x4.png` (7×4 grid: all variants × S1, U1, T3, L1).
 
 #### In-Distribution Structures (S1 watchtower, S2 watermill)
 
-<!-- TODO(stixxert): Describe architectural features visible in detailed-high vs other variants for S1 and S2. Which variant produces the crispest crenellations? Most plausible stone masonry? Best timber framing? Is perspective perfectly orthogonal in all variants? -->
+All variants produced recognizable medieval structures with correct top-down perspective. Qualitatively, most LoRAs performed very similarly on in-distribution structure prompts — architectural features (crenellations, timber framing, stone masonry, water wheels) were legible across all six variants. The primary differentiator was **color palette**: all models except the minimal-caption variants produced lighter, more saturated coloring for stonework and structural details. Both minimal-high and minimal-low rendered castles and watermills with noticeably darker, more muted tones — deep grey stonework and subdued timber hues — while detailed and ultra-minimal variants preserved brighter, higher-contrast palettes that read more clearly as small-scale game sprites. Perspective was consistently top-down and orthogonal across all variants for structure prompts.
 
 #### Out-of-Distribution Units (U1 knight, U2 archer)
 
-<!-- TODO(stixxert): Compare character sprite outputs across variants. Which produces the cleanest silhouette? Most readable weapons? Most game-ready appearance? Note any artifacts (anatomical distortions, perspective breaks) in specific variants. -->
+All variants generalized successfully to character sprites — a category entirely absent from the training data (0% of the 100-image dataset). Knights were rendered with readable plate armor, broadswords, and kite shields; archers with longbows, quivers, and forest-green cloaks. Silhouettes were clean and game-ready across all variants. Camera pose was remarkably consistent — the only outlier in the entire evaluation battery for camera angle variation was the T3 boulders (see below). Character sprites did not differ meaningfully in perspective across variants. The main differentiators were palette (minimal variants again trended darker on armor tones) and fine detail sharpness (higher-rank variants produced slightly crisper weapon edges and armor articulation).
 
 #### Terrain Features (T1 hill, T2 oak tree)
 
-<!-- TODO(stixxert): Describe terrain outputs. Do all variants use appropriate palettes (earthy greens/browns for hills, forest greens/bark browns for trees)? Is there visible repetition or unnatural regularity in any variant? Which variant would look best tiled on a game map? -->
+All variants produced plausible terrain assets with appropriate palettes — earthy greens and browns for the grassy hill (T1), deep forest greens and bark browns for the oak tree (T2). The T3 boulder (see below) was the most revealing terrain prompt and is discussed separately. For T1 and T2, the key finding concerned boulder morphology that also appeared in T3 outputs: **boulder silhouette shape** varied systematically with caption detail × rank configuration.
+
+- **Flat-top boulders** were produced by `ultra-low`, `ultra-high`, `minimal-low`, and `detailed-low` — these variants tended toward smooth, plateau-like top surfaces with less pronounced surface fractures.
+- **Jagged-top boulders** were produced by `detailed-high` and `minimal-high` — these variants rendered more irregular, fractured top surfaces with deeper crevices and sharper rock facets.
+
+This pattern suggests that higher-rank configurations (128/64) combined with richer captions (detailed or minimal) give the model sufficient capacity to learn and reproduce complex surface geometry, while lower-rank or ultra-minimal configurations default to simpler, more schematic rock forms.
 
 #### Rock Formation (T3 boulder) ⭐ — Primary Report Figure
 
-<!-- TODO(stixxert): [Critical] T3 is the primary evaluation figure for the IEEE report. Describe the boulder outputs for base_model, ultra_low, minimal_high, and detailed_high: silhouette clarity, surface texture detail (granite facets, crevices), lichen/moss rendering, shadow plausibility. How does each variant handle the transition from structured (rock geometry) to organic (moss, irregular surface)? -->
+The T3 boulder prompt is the primary evaluation figure for the project report and the most discriminating terrain prompt in the battery. It combines structured features (granite facets, deep crevices, rock geometry) with organic features (lichen patches, moss growth, irregular surface texture), exercising the full range of what the LoRA must learn.
+
+Key observations across variants:
+
+- **Moss and lichen rendering:** This was the single most informative differentiator. Higher-rank variants (`detailed-high`, `minimal-high`) rendered moss and lichen patches more convincingly — organic growth appeared as distinct, irregularly shaped patches with subtle color variation (moss green against cool grey granite). Lower-rank variants (`ultra-low`, `detailed-low`, `minimal-low`) produced flatter, less textured organic growth — moss appeared as uniform green coloration rather than discrete surface features. The `ultra-high` variant fell between these extremes: it had the capacity for organic detail but, with only identical ultra-minimal captions, lacked the text conditioning to deploy it precisely.
+
+- **Boulder silhouette:** As noted in the terrain features section, `detailed-high` and `minimal-high` produced jagged, irregular top surfaces with pronounced crevices, while the remaining variants tended toward flatter, plateau-like tops.
+
+- **Surface texture:** Granite faceting and crevice depth correlated with rank — higher rank meant more articulate rock surfaces. The base model (no LoRA) served as reference, producing a photorealistic boulder without top-down perspective enforcement.
+
+- **Perspective consistency:** T3 was the only prompt in the battery that showed meaningful camera-angle variation across variants. Some variants produced boulders at subtly different overhead angles — this was most noticeable when comparing the extreme ends of the matrix (ultra-low vs. detailed-high). However, all variants stayed within the top-down regime; none drifted into isometric or side-view territory.
 
 ### Training Dynamics
 
-<!-- TODO(stixxert): [Verify with figures/step_progression.png] Analyze checkpoint progression. Describe specific visual differences between steps 500, 1000, 1500, 1800, and 2200 for a representative variant. At what step do key features become recognizable? When does overfitting (rigid repetition across seeds) set in? Document the three regimes (under-trained, sweet spot, over-trained) with specific visual evidence. -->
+Training dynamics across all six experiments followed a consistent three-regime pattern, observed through checkpoint evaluation at 200-step intervals:
 
-<!-- TODO(stixxert): Verify whether a step-2400 checkpoint exists for detailed-high (the table shows optimal at step 1800, training ended at 2500). If no step-2400 exists, remove any references to it. -->
+1. **Under-trained regime (steps ~500–1,000):** Outputs exhibit wrong or inconsistent camera angles — structures may appear at oblique or side views despite the `<tdp>` trigger. Object geometry is noisy and architectural features are indistinct. The model has not yet learned to associate the trigger token with the top-down perspective constraint.
+
+2. **Sweet spot (steps ~1,500–2,000):** Perspective locks into consistent top-down orientation. Architectural details (crenellations, timber joints, water wheels) are crisp and recognizable. Structural integrity is intact — buildings look like buildings, not abstract texture patterns. This is the regime where all six optimal checkpoints were selected.
+
+3. **Over-trained regime (beyond ~2,200):** Structural integrity breaks down. Buildings lose coherent geometry — walls collapse, roofs fragment into repeated texture patches, and architectural features become distorted or illegible. Color palettes drift toward the training distribution mean (darker, more uniform tones). The model begins to memorize individual training assets rather than generalizing the top-down perspective concept. This breakdown was the primary signal for checkpoint selection: the optimal checkpoint was chosen just before visible degradation set in.
+
+The transition timing varied by experiment: ultra-minimal variants converged fastest (optimal at step ~1,500–1,600) and degraded soon after; detailed variants converged more slowly (optimal at ~1,750–2,250) as the model integrated richer text conditioning; minimal variants fell between. The `detailed-high` variant reached its optimal at step 1,800 — later checkpoints (2,000+) showed early signs of overfitting including rigidified structural repetition and subtle color collapse.
 
 ### Style Leakage Analysis
 
@@ -293,9 +311,17 @@ Style leakage refers to the unintended transfer of a LoRA's learned style to sem
 
 **Probe design:** Prompt L1 includes the `<tdp>` trigger token but describes a modern red sports car — semantically distant from the training distribution (100% medieval structures). Each of the six LoRA variants was evaluated at strength 1.0 alongside a base model baseline (strength 0.0). This tests whether the LoRA incorrectly applies medieval architectural styling to anachronistic subjects when the trigger is active.
 
-**Findings:** Pending qualitative review.
+**Findings:** All six LoRA variants successfully preserved a clean top-down perspective on the sports car — no variant collapsed the car into a medieval structure or applied overt architectural styling. The base model (no LoRA) served as the reference for an unmodified modern car.
 
-<!-- TODO(stixxert): [Verify] Examine L1 outputs for ALL six variants vs base model. Document: (a) do sports cars remain recognizably modern? (b) any medieval material intrusions (stone textures, crenellations)? (c) any perspective shifts toward overhead view? (d) any color temperature/contrast shifts? Even subtle differences should be documented. Then write the findings paragraph and conclusion. -->
+However, subtle art-style leakage was observed in several variants:
+
+- **`ultra-high`, `minimal-low`, and `minimal-high`** showed signs of the LoRA's learned art style subtly mimicking dataset features. The car body exhibited slight shifts toward earthen/muted color palettes characteristic of the training data, and in some cases the smooth modern surfaces acquired faint texturing reminiscent of medieval material rendering. The car remained clearly a car — but looked as if photographed through a medieval-styled filter.
+
+- **`detailed-high` and `ultra-low`** showed the cleanest separation between LoRA style and modern subject matter. The sports car remained recognizably modern with glossy red paint, aerodynamic curves, and contemporary design language intact. Color temperature and surface smoothness were closest to the base model baseline.
+
+- **`detailed-low`** fell between these groups — minor color warmth shift but no structural style intrusion.
+
+**Conclusion:** Style leakage is not binary but exists on a spectrum. All variants preserved the core subject identity (a sports car is always a sports car). But the degree of subtle aesthetic contamination varied: higher-rank variants with sparser captions showed the most leakage, while `detailed-high` (high rank + rich captions) and `ultra-low` (lowest rank + sparsest captions) showed the least. This suggests that either sufficient text diversity or sufficiently constrained model capacity can independently limit style leakage — but combining high rank with sparse captions is the riskiest configuration.
 
 ---
 
@@ -307,10 +333,12 @@ Evaluation figures are generated by `scripts/generate_comparison_grid.py` from s
 
 | Figure | Layout | Content | Purpose |
 |--------|--------|---------|---------|
-| **`figures/report_figure.png`** | 2×4 | 2 prompts (S1, T3) × 4 experiments (base_model, ultra_low, minimal_high, detailed_high) | IEEE report: caption-detail trade-off spectrum across two in-distribution asset categories |
+| **`figures/report_figure.png`** | 2×4 | 2 prompts (S1, T3) × 4 experiments (base_model, ultra_low, minimal_high, detailed_high) | IEEE report: caption-detail trade-off spectrum across two asset categories |
 | **`figures/model_card_figure_7x4.png`** | 7×4 | 7 rows (base_model + 6 variants) × 4 prompts (S1, U1, T3, L1) | Model card: comprehensive comparison including style-leakage probe |
 
-![Base Model vs all 6 experiments](figures/model_card_figure_7x4.png)
+![Caption-detail × rank comparison across S1 and T3](figures/report_figure.png)
+
+![Base Model vs all 6 experiments across S1, U1, T3, L1](figures/model_card_figure_7x4.png)
 
 ---
 
@@ -390,7 +418,7 @@ If you use these models in published research, please cite:
 - **Base model:** [black-forest-labs/FLUX.2-klein-base-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B)
 - **Camera-angle LoRA** (used for dataset generation): [lovis93/Flux-2-Multi-Angles-LoRA-v2](https://huggingface.co/lovis93/Flux-2-Multi-Angles-LoRA-v2)
 - **Training framework:** [ostris/ai-toolkit](https://github.com/ostris/ai-toolkit)
-- **Upstream project:** [StrategAI](https://github.com/stixxert/StrategAI)
+- **Upstream project:** [StrategAI](https://github.com/maxtwotouch/StrategAI)
 
 ## Model Card Author
 
