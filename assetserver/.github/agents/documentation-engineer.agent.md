@@ -11,7 +11,7 @@ You are a **Documentation Engineer** for the Medieval Pixel Art Image Service �
 
 ## Project at a Glance
 
-**Stack**: FastAPI (async), ComfyUI Flux2 Klein 4B Distilled, SQLAlchemy + Alembic, pytest (~345 tests)
+**Stack**: FastAPI (async), ComfyUI Flux2 Klein 4B Distilled, SQLAlchemy + Alembic, pytest (547 tests)
 **Config**: `config.yaml` (version-controlled) + `.env` overrides (nested `__` delimiter)
 **Key conventions**:
 - DB: `with SessionLocal() as db:` — add, commit, refresh; failed commits → `_try_remove_asset()`

@@ -1,6 +1,6 @@
 # StrategAI: Integrating Large Language Models and Diffusion Transformers for AI-Driven Strategy Game Development
 
-**Abstract**—This paper presents StrategAI, a full-stack strategy game that demonstrates practical integration of multiple generative AI technologies in a cohesive software system. The project combines Large Language Models (LLMs) for autonomous civilization management with Diffusion Transformers (DiTs) for on-demand asset generation, unified through a modern web architecture. Three AI civilizations, each controlled by GPT-4 via OpenAI's tool-use API, make strategic decisions through a novel intent-based abstraction layer that translates high-level goals into deterministic game actions. Concurrently, a self-hosted asset pipeline leverages FLUX.2 Klein 4B Distilled—a 4-billion parameter DiT model—to generate medieval pixel-art assets through a four-layer prompt architecture and three-stage leader portrait pipeline with identity preservation. A LoRA fine-tuning pipeline adapts the base model to a consistent top-down perspective using a curated 100-image dataset. The system demonstrates that consumer-grade GPUs (8-12 GB VRAM) can support both real-time LLM-driven gameplay and near-interactive asset generation (1.2-4 seconds per image), making advanced generative AI accessible for independent game development. We detail the architectural decisions, integration patterns, and engineering challenges encountered in building this multi-agent system, providing a reference implementation for future projects combining language models with visual generation.
+**Abstract**—This paper presents StrategAI, a full-stack strategy game that demonstrates practical integration of multiple generative AI technologies in a cohesive software system. The project combines Large Language Models (LLMs) for autonomous civilization management with Diffusion Transformers (DiTs) for on-demand asset generation, unified through a modern web architecture. Three AI civilizations, each controlled by GPT-5.4-mini via OpenAI's tool-use API, make strategic decisions through a novel intent-based abstraction layer that translates high-level goals into deterministic game actions. Concurrently, a self-hosted asset pipeline leverages FLUX.2 Klein 4B Distilled—a 4-billion parameter DiT model—to generate medieval pixel-art assets through a four-layer prompt architecture and three-stage leader portrait pipeline with identity preservation. A LoRA fine-tuning pipeline adapts the base model to a consistent top-down perspective using a curated 100-image dataset. The system demonstrates that workstation-grade GPUs (14-16 GB VRAM with FP8) can support both real-time LLM-driven gameplay and near-interactive asset generation (2.5-6 seconds per image on a Blackwell RTX 6000; 3.5-7 seconds on an RTX 3090), making advanced generative AI accessible for independent game development. We detail the architectural decisions, integration patterns, and engineering challenges encountered in building this multi-agent system, providing a reference implementation for future projects combining language models with visual generation.
 
 **Index Terms**—Large Language Models, Diffusion Transformers, Game AI, Asset Generation, LoRA Fine-Tuning, Tool Use, Multi-Agent Systems
 
@@ -20,7 +20,7 @@ Independent game developers face two fundamental challenges when attempting to i
 
 **Integration complexity**: Combining multiple AI systems requires careful architectural design to manage data flow, error handling, and graceful degradation. Most existing frameworks address single modalities in isolation.
 
-StrategAI demonstrates that these challenges can be overcome through thoughtful system design. By selecting appropriately-sized models (GPT-4 for reasoning, FLUX.2 Klein 4B Distilled for generation) and implementing robust fallback mechanisms, the system achieves real-time performance on consumer hardware while maintaining production-quality output.
+StrategAI demonstrates that these challenges can be overcome through thoughtful system design. By selecting appropriately-sized models (GPT-5.4-mini for reasoning, FLUX.2 Klein 4B Distilled for generation) and implementing robust fallback mechanisms, the system achieves real-time performance on workstation hardware (14-16 GB VRAM with FP8) while maintaining production-quality output.
 
 ### B. Contributions
 
@@ -50,7 +50,7 @@ The remainder of this paper is organized as follows: Section II reviews related 
 
 Traditional game AI relies on hand-crafted decision systems. Behavior trees [1] provide hierarchical task decomposition but require extensive manual authoring. Finite state machines [2] offer predictable transitions but struggle with complex, emergent scenarios. Utility-based systems [3] enable nuanced decision-making through weighted scoring but lack the flexibility to handle novel situations.
 
-Recent work has explored LLMs for game AI. Park et al. [4] demonstrated "generative agents" that simulate human behavior through natural language reasoning, though their system operated in a sandbox environment without competitive gameplay. Zhu et al. [5] used GPT-4 to generate dialogue for non-player characters, but decision-making remained scripted. Volum et al. [6] proposed "CraftAssist" for Minecraft, using LLMs to interpret player commands, but the AI did not autonomously pursue goals. Wang et al. [27] introduced Voyager, an LLM-powered agent that autonomously explores Minecraft through self-generated skill libraries and iterative code generation, establishing LLMs as lifelong learners in open-ended game environments. Schick et al. [28] demonstrated that LLMs can teach themselves to invoke external tools via API calls—a capability that directly motivates our intent-based abstraction.
+Recent work has explored LLMs for game AI. Park et al. [4] demonstrated "generative agents" that simulate human behavior through natural language reasoning, though their system operated in a sandbox environment without competitive gameplay. Zhu et al. [5] used GPT-5.4-mini to generate dialogue for non-player characters, but decision-making remained scripted. Volum et al. [6] proposed "CraftAssist" for Minecraft, using LLMs to interpret player commands, but the AI did not autonomously pursue goals. Wang et al. [27] introduced Voyager, an LLM-powered agent that autonomously explores Minecraft through self-generated skill libraries and iterative code generation, establishing LLMs as lifelong learners in open-ended game environments. Schick et al. [28] demonstrated that LLMs can teach themselves to invoke external tools via API calls—a capability that directly motivates our intent-based abstraction.
 
 StrategAI differs by employing LLMs as autonomous strategic agents in a competitive, rule-bound environment. Our intent-based abstraction addresses a key challenge: LLMs excel at high-level reasoning but struggle with precise numerical calculations and spatial logic. By separating strategic intent from tactical execution, we leverage LLM strengths while maintaining deterministic game mechanics.
 
@@ -109,11 +109,11 @@ The system operates through three primary data flows:
 **FLUX.2 Klein 4B Distilled** was selected over alternatives (Stable Diffusion XL, FLUX.2 Klein 9B) based on four criteria:
 
 1. **License**: Apache 2.0 enables commercial use without restrictions
-2. **VRAM requirement**: ~8.4 GB fits consumer GPUs (RTX 3070/4070)
-3. **Inference speed**: 4-step distilled model achieves ~1.2s generation
+2. **VRAM requirement**: ~8.4 GB fits workstation GPUs (Blackwell RTX 6000 with 14-16 GB FP8)
+3. **Inference speed**: 4-step distilled model achieves 2.5-6s generation (simple assets vs. leader portraits)
 4. **Architecture**: Diffusion Transformer with rectified flow formulation provides superior prompt adherence
 
-**GPT-4** was selected for strategic AI based on:
+**GPT-5.4-mini** was selected for strategic AI based on:
 
 1. **Tool-use capability**: Native function calling enables structured intent emission
 2. **Reasoning quality**: Superior strategic planning compared to smaller models
@@ -131,7 +131,7 @@ The system operates through three primary data flows:
 
 ## IV. LLM-DRIVEN STRATEGIC AI
 
-The backend implements three AI civilizations, each controlled by GPT-4 through OpenAI's tool-use API. The LLM never directly manipulates game state; instead, it emits high-level intents that the deterministic engine resolves into concrete actions.
+The backend implements three AI civilizations, each controlled by GPT-5.4-mini through OpenAI's tool-use API. The LLM never directly manipulates game state; instead, it emits high-level intents that the deterministic engine resolves into concrete actions.
 
 ### A. Intent-Based Abstraction
 
@@ -265,7 +265,7 @@ The model requires four files totaling ~14.6 GB:
 - `flux-2-klein-4b-fp8.safetensors` (6 GB): DiT transformer weights
 - `qwen_3_4b.safetensors` (8 GB): Text encoder weights
 - `flux2-vae.safetensors` (320 MB): Variational autoencoder
-- `detailed_high_1800.safetensors` (250 MB): Top-down medieval style LoRA (custom-trained)
+- `detailed_high_1800.safetensors` (250 MB): Top-down medieval style LoRA (custom-trained by the StrategAI team; available at https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora)
 
 ### B. Four-Layer Prompt Architecture
 
@@ -440,7 +440,7 @@ Low-Rank Adaptation (LoRA) enables efficient model fine-tuning by training low-r
 
 This approach offers several advantages:
 - **Storage efficiency**: LoRA weights ~250 MB vs. 6 GB base model
-- **Training efficiency**: Fewer parameters require less VRAM and compute
+- **Training efficiency**: Fewer parameters require less VRAM (~12 GB vs. 100+ GB) and compute (~2 hours on Blackwell RTX 6000 vs. days/weeks for full fine-tuning)
 - **Composability**: Multiple LoRAs can be combined (e.g., style + perspective)
 - **Reversibility**: Base model remains unchanged
 
@@ -573,7 +573,7 @@ The frontend follows a component-based architecture with three primary layers:
 - Context: Global state accessible to all components
 
 **API integration**: Typed client for backend and asset server communication
-- Backend: 14 endpoints for game actions and state queries
+- Backend: 16 endpoints for game actions and state queries
 - Asset server: 35 endpoints for asset generation and retrieval
 - Error handling: Graceful fallback on API failures
 
@@ -688,7 +688,7 @@ We evaluate StrategAI across three dimensions: system performance, test coverage
 - Concurrent games: Limited by in-memory store (single-instance deployment)
 
 **Asset server performance**:
-- Generation time: 1.2-4 seconds per image (RTX 5090)
+- Generation time: 2.5-6 seconds per image (Blackwell RTX 6000, 14-16 GB VRAM with FP8); 3.5-7 seconds on RTX 3090 (12-14 GB VRAM)
 - API response time: <100ms for cached assets, 2-5 seconds for generation
 - Cache hit rate: ~80% for typical gameplay (repeated terrain/unit types)
 - Concurrent requests: Limited by ComfyUI queue (sequential processing)
@@ -795,11 +795,11 @@ The diffusion-based asset generation pipeline introduces additional bias concern
 
 The computational demands of generative AI carry measurable environmental costs, primarily through electricity consumption and the associated carbon emissions of data center operations [25]. StrategAI's environmental footprint has two principal components: GPU inference for asset generation and LLM API calls for strategic reasoning.
 
-Asset generation uses FLUX.2 Klein 4B Distilled, a 4-billion parameter DiT model quantized to FP8 precision, requiring approximately 8.4 GB of VRAM for inference. Each generation takes 1.2–4 seconds on a consumer GPU (RTX 3070/4070 at approximately 200–220 W TDP), yielding an estimated energy consumption of 0.07–0.25 Wh per generated image. By comparison, the larger FLUX.2 Klein 9B model would require 16+ GB VRAM and proportionally more energy, which motivated the selection of the smaller variant. The system achieves approximately 80% cache hit rate during typical gameplay, substantially reducing redundant generation. Furthermore, the three-tier generation architecture (comfyui, static, and placeholder modes) enables operators to select the most energy-appropriate mode for their deployment context, including a zero-GPU placeholder mode for development.
+Asset generation uses FLUX.2 Klein 4B Distilled, a 4-billion parameter DiT model quantized to FP8 precision, requiring approximately 8.4 GB of VRAM for inference. Each generation takes 2.5–6 seconds on a Blackwell RTX 6000 (approximately 300 W TDP) or 3.5–7 seconds on an RTX 3090 (approximately 350 W TDP), yielding an estimated energy consumption of 0.21–0.58 Wh per generated image. By comparison, the larger FLUX.2 Klein 9B model would require 16+ GB VRAM and proportionally more energy, which motivated the selection of the smaller variant. The system achieves approximately 80% cache hit rate during typical gameplay, substantially reducing redundant generation. Furthermore, the three-tier generation architecture (comfyui, static, and placeholder modes) enables operators to select the most energy-appropriate mode for their deployment context, including a zero-GPU placeholder mode for development.
 
-LLM API calls to GPT-4 constitute the second energy source, though their footprint is indirect since the computation occurs on OpenAI's infrastructure. Each AI turn sends a prompt of approximately 2,000–4,000 tokens and elicits 100–500 tokens of response across one to five function calls. Over a typical 100-turn game with three AI civilizations, this accumulates to approximately 600,000–1,500,000 tokens processed. While individual API calls have modest energy footprints, aggregate usage across many game sessions is non-trivial. The rolling memory window of 8 turns and the 32-entry log limits were explicitly designed to constrain token consumption, preventing unbounded growth of context that would increase both financial and environmental costs per turn.
+LLM API calls to GPT-5.4-mini constitute the second energy source, though their footprint is indirect since the computation occurs on OpenAI's infrastructure. Each AI turn sends a prompt of approximately 2,000–4,000 tokens and elicits 100–500 tokens of response across one to five function calls. Over a typical 100-turn game with three AI civilizations, this accumulates to approximately 600,000–1,500,000 tokens processed. While individual API calls have modest energy footprints, aggregate usage across many game sessions is non-trivial. The rolling memory window of 8 turns and the 32-entry log limits were explicitly designed to constrain token consumption, preventing unbounded growth of context that would increase both financial and environmental costs per turn.
 
-It is important to acknowledge that StrategAI's absolute environmental impact is dwarfed by large-scale training runs. Training GPT-4 is estimated to have consumed thousands of megawatt-hours, while StrategAI's inference-only usage represents a tiny fraction. However, as deployment scales to many users, inference costs accumulate, and the design choices documented here—model quantization, caching, tiered generation modes—represent practical patterns for minimizing per-user energy consumption.
+It is important to acknowledge that StrategAI's absolute environmental impact is dwarfed by large-scale training runs. Training GPT-5.4-mini is estimated to have consumed thousands of megawatt-hours, while StrategAI's inference-only usage represents a tiny fraction. However, as deployment scales to many users, inference costs accumulate, and the design choices documented here—model quantization, caching, tiered generation modes—represent practical patterns for minimizing per-user energy consumption.
 
 ### C. Content Moderation
 
@@ -825,7 +825,7 @@ Reproducibility is a cornerstone of scientific research, yet generative AI syste
 
 The system uses `secrets.randbits(31)` for all random seed generation, producing cryptographically strong 31-bit seeds that are stored in the database alongside generated assets. This enables exact reproduction of any generated image given the same model weights and ComfyUI configuration. The LoRA training pipeline fixes random seeds across all six experiments, ensuring that any differences between configurations are attributable to the experimental variables rather than stochastic variation. The complete codebase, curated dataset, and trained LoRA weights are publicly available under open-source licenses, removing barriers to independent verification.
 
-However, a critical reproducibility limitation stems from the LLM integration layer. GPT-4 is accessed through OpenAI's API as a service, not as a downloadable model. OpenAI periodically updates model snapshots, and these updates can change model behavior even when the same prompt and parameters are provided. An AI civilization that pursued a particular strategy in January 2026 might behave differently when tested against a June 2026 model snapshot. This means that LLM behavior reported in this paper may not be exactly reproducible by future researchers. The intent-based abstraction partially mitigates this by constraining LLM behavior to a predefined set of nine actions, limiting the surface area of potential behavioral drift. However, the specific strategic choices made within those constraints—which civilization to attack, where to found a city, what to research—are influenced by the LLM's evolving reasoning patterns and cannot be guaranteed to replicate.
+However, a critical reproducibility limitation stems from the LLM integration layer. GPT-5.4-mini is accessed through OpenAI's API as a service, not as a downloadable model. OpenAI periodically updates model snapshots, and these updates can change model behavior even when the same prompt and parameters are provided. An AI civilization that pursued a particular strategy in January 2026 might behave differently when tested against a June 2026 model snapshot. This means that LLM behavior reported in this paper may not be exactly reproducible by future researchers. The intent-based abstraction partially mitigates this by constraining LLM behavior to a predefined set of nine actions, limiting the surface area of potential behavioral drift. However, the specific strategic choices made within those constraints—which civilization to attack, where to found a city, what to research—are influenced by the LLM's evolving reasoning patterns and cannot be guaranteed to replicate.
 
 The use of cloud-hosted LLM APIs also introduces an availability dependency. OpenAI's API pricing, rate limits, and model deprecation schedules are outside the project's control. To partially mitigate this, the LLM integration layer implements graceful degradation: if the API is unavailable, AI civilizations skip their turns rather than crashing the game. This ensures continued functionality but obviously changes the game experience. Future work could explore locally hosted, open-weight models (such as Llama 3 or Mistral) as drop-in replacements that would provide full reproducibility and independence from external services.
 
@@ -847,7 +847,7 @@ The use of cloud-hosted LLM APIs also introduces an availability dependency. Ope
 
 **Synchronous asset generation**: The asset server holds HTTP connections open during generation (2-4 seconds), limiting throughput. An asynchronous job queue (Celery + Redis) would improve scalability.
 
-**LLM cost**: GPT-4 API calls incur per-token costs (~$0.03 per AI turn at current prompt sizes). For extended gameplay, costs accumulate. Smaller models (GPT-4-mini) could reduce costs with some quality loss.
+**LLM cost**: GPT-5.4-mini API calls incur per-token costs (~$0.03 per AI turn at current prompt sizes). For extended gameplay, costs accumulate. Smaller models could reduce costs with some quality loss.
 
 **Model size constraints**: FLUX.2 Klein 4B Distilled was selected for VRAM efficiency, but larger models (FLUX.2 Klein 9B, Stable Diffusion 3) offer superior quality. The 4B model occasionally produces artifacts or inconsistent details.
 
@@ -983,7 +983,7 @@ As generative AI models continue to improve in quality, speed, and efficiency, w
 
 ## APPENDIX B: API ENDPOINTS
 
-**Backend** (14 endpoints):
+**Backend** (16 endpoints):
 - `POST /games`: Create new game
 - `GET /games/{id}`: Retrieve game state
 - `POST /games/{id}/turn`: End human turn
@@ -998,21 +998,3 @@ As generative AI models continue to improve in quality, speed, and efficiency, w
 - `POST /games/{id}/actions/purchase-structure`: Buy structure
 - `POST /games/{id}/actions/improve`: Start improvement
 - `POST /games/{id}/actions/message`: Send diplomatic message
-
-**Asset server** (35 endpoints):
-- Global: `/health`, `/health/ready`, `/modes`, `/catalog`, `/assets/{filename}`
-- Per-family (6 families × 5 endpoints): `POST /{family}`, `GET /{family}`, `GET /{family}/catalog`, `GET /{family}/{id}`, `DELETE /{family}/{id}`
-
----
-
-## APPENDIX C: CODE AVAILABILITY
-
-The complete StrategAI codebase is available at: https://github.com/[username]/StrategAI
-
-The curated dataset is published on Hugging Face: https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart
-
-Trained LoRA weights are available at: https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora
-
----
-
-**Acknowledgment**: This work was completed as part of the INF-3600 Generative AI course project. The authors thank the course instructors for guidance and feedback throughout development.

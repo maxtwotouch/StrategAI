@@ -28,7 +28,7 @@ After clicking **Begin Campaign**:
 1. The game backend builds the map and places four civs (you + three AI).
 2. The frontend's asset resolver fans out to the asset service (terrain, unit,
    structure, leader splash + profile, elevation overlays). See
-   [ASSET_INTEGRATION.md](ASSET_INTEGRATION.md).
+   [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md).
 3. The intro screen plays — full-bleed splash, civ name, leader name, an epic
    line, "Begin the Age" CTA.
 4. The war room reveals the map.
@@ -351,8 +351,8 @@ composer's tone dropdown.
 Clicking a leader avatar in the **Diplomatic Ribbon** on the right edge of
 the map opens a full-screen Diplomatic Audience overlay backed by the
 rival's splash art. See
-[UI_GUIDE.md §4.1](UI_GUIDE.md#41-diplomatic-ribbon-met-leader-portraits-on-the-map)
-and [UI_GUIDE.md §5 Diplomatic Audience](UI_GUIDE.md#diplomatic-audience-full-screen-overlay).
+[../frontend/docs/UI_GUIDE.md §4.1](../frontend/docs/UI_GUIDE.md#41-diplomatic-ribbon-met-leader-portraits-on-the-map)
+and [../frontend/docs/UI_GUIDE.md §5 Diplomatic Audience](../frontend/docs/UI_GUIDE.md#diplomatic-audience-full-screen-overlay).
 
 ---
 
@@ -385,7 +385,7 @@ roughly: `population × 3 + technologies × 6 + cities × 5 + cultural standing`
 
 First civ to cross the threshold wins; the UI shows a "you reached the goal"
 banner. (Defeat conditions and proper end-game screens are on the backlog —
-see `GAME_BACKLOG.md`.)
+see `docs/archive/GAME_BACKLOG.md`.)
 
 ---
 
@@ -409,3 +409,14 @@ see `GAME_BACKLOG.md`.)
 | Directives (queue, research, structures) | `backend/app/engine/directives.py` |
 | HTTP routes | `backend/app/api/routers/*.py` |
 | Serializer | `backend/app/engine/serialize.py` |
+
+## 15. Where to Find Details
+
+This document describes game mechanics. For implementation details and related systems:
+
+- **[Backend API Reference](backend/docs/API_REFERENCE.md)** — All game actions as REST endpoints with DTOs and error codes
+- **[Backend Config](backend/docs/BACKEND_CONFIG.md)** — LLM model selection, game parameters, environment setup
+- **[Architecture Overview](docs/ARCHITECTURE.md)** — How the three-layer engine (Strategic → Tactical → Validator) processes these mechanics
+- **[UI Guide](frontend/docs/UI_GUIDE.md)** — How these mechanics surface in the frontend (panels, drawers, map interactions)
+- **[Asset Integration](docs/ASSET_INTEGRATION.md)** — How game entities (units, cities, terrain) map to generative pixel-art assets
+- **[Report Traceability](docs/report/TRACEABILITY.md)** — Claims about game mechanics mapped to verifiable sources

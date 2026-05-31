@@ -2,8 +2,8 @@
 
 How the Next.js app is organized, the lifecycle of a game session, and where
 each piece of UI lives. For game rules see
-[GAMEPLAY.md](GAMEPLAY.md); for asset integration see
-[ASSET_INTEGRATION.md](ASSET_INTEGRATION.md).
+[../../GAMEPLAY.md](../../GAMEPLAY.md); for asset integration see
+[../../docs/ASSET_INTEGRATION.md](../../docs/ASSET_INTEGRATION.md).
 
 ---
 

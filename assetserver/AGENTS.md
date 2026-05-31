@@ -4,7 +4,7 @@ This subproject contains the generative pixel-art service using ComfyUI + FLUX2 
 
 ## Architecture
 
-FastAPI microservice that generates top-down medieval pixel-art game assets on-demand. 6 asset families with 33 REST endpoints, 3 generation modes (comfyui, static, placeholder).
+FastAPI microservice that generates top-down medieval pixel-art game assets on-demand. 6 asset families with 35 REST endpoints, 3 generation modes (comfyui, static, placeholder).
 
 ## Directory Structure
 
@@ -22,7 +22,7 @@ FastAPI microservice that generates top-down medieval pixel-art game assets on-d
 | `src/static_catalog.py` | Static tile catalog |
 | `config/` | YAML config + prompt templates |
 | `workflows/` | ComfyUI workflow JSONs (txt2img, background_tile, leader) |
-| `tests/` | pytest suite (~345 tests) |
+| `tests/` | pytest suite (547 tests) |
 | `migrations/` | Alembic migrations |
 | `static_tiles/` | Pre-made PNG assets |
 | `generated_assets/` | Runtime-generated assets (LRU cache + atomic writes) |

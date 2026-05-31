@@ -188,7 +188,7 @@ All orchestrators enforce these gates before marking tasks complete:
 
 ## Inter-Service Contracts
 
-- **Frontend ↔ Backend**: REST API at `http://localhost:8000`, 14 endpoints
+- **Frontend ↔ Backend**: REST API at `http://localhost:8000`, 16 endpoints
 - **Frontend ↔ Asset Server**: Asset manifest via `NEXT_PUBLIC_ASSET_API_URL`
 - **Backend ↔ Asset Server**: No direct contract (frontend mediates)
 - **Asset Server ↔ Dataset/Training**: Shared ComfyUI + FLUX2 Klein 4B Distilled model
@@ -197,7 +197,7 @@ All orchestrators enforce these gates before marking tasks complete:
 
 - **Root**: `AGENTS.md` (Claude Code), `README.md` (project overview)
 - **Backend**: `backend/AGENTS.md`, `docs/ARCHITECTURE.md`
-- **Frontend**: `frontend/AGENTS.md`, `docs/UI_GUIDE.md`
+- **Frontend**: `frontend/AGENTS.md`, `frontend/docs/UI_GUIDE.md`
 - **Asset Server**: `assetserver/AGENTS.md`, `assetserver/docs/project-report.md`
 - **Dataset/Training**: `dataset-gen-train/AGENTS.md`, `dataset-gen-train/docs/`
 

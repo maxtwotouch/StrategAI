@@ -645,7 +645,7 @@ Server-to-server proxy that:
 - Strips hop-by-hop headers (host, connection, content-length, accept-encoding, content-encoding, transfer-encoding)
 - Returns unmodified response body + status
 - Returns 503 if `NEXT_PUBLIC_ASSET_API_URL` is not configured
-- Returns 502 on upstream fetch failures
+- Returns 502 on upstream fetch failure
 - **Only used for JSON API calls** — PNG downloads go direct to avoid proxying high-volume image data
 
 ---

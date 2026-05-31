@@ -336,7 +336,7 @@ The Next.js frontend integrates the backend game engine and asset server into a 
 
 The frontend follows a component-based architecture with three primary layers. The state management layer uses React Context API with useReducer for game state, where actions represent user inputs (move unit, found city, end turn) and reducers are pure functions updating immutable state. The context provides global state accessible to all components without prop drilling.
 
-The API integration layer provides a typed client for backend and asset server communication. The backend exposes 14 endpoints for game actions and state queries, while the asset server provides 35 endpoints for asset generation and retrieval. Error handling implements graceful fallback on API failures, with the frontend continuing to function using cached or placeholder assets when services are unavailable.
+The API integration layer provides a typed client for backend and asset server communication. The backend exposes 16 endpoints for game actions and state queries, while the asset server provides 35 endpoints for asset generation and retrieval. Error handling implements graceful fallback on API failures, with the frontend continuing to function using cached or placeholder assets when services are unavailable.
 
 The rendering layer uses an SVG-based hex map with layered visualization. The terrain layer displays color-coded hexagons with elevation shading. The asset layer renders generated pixel-art sprites with fallback glyphs when assets fail to load. The UI layer provides selection highlights, movement ranges, and fog of war overlays.
 

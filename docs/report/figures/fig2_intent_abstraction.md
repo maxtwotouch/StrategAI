@@ -19,7 +19,7 @@ graph TD
         sysprompt["📋 System Prompt<br/>BASE_SYSTEM_PROMPT + Persona<br/>(Genghis / Cleopatra / Gandhi)"]
         localview["👁️ Fog-Filtered Local View<br/>serialize.local_view(state, civ_id)<br/>visible_tiles · visible_units · known_civs"]
         memory["🧠 Rolling Memory<br/>Last 8 turns of intents<br/>Last 32 diplomatic messages"]
-        llm["🤖 LLM (GPT-4)<br/>Receives: system prompt + local view + memory<br/>Reasoning: strategic goals, diplomacy, threats"]
+        llm["🤖 LLM (GPT-5.4-mini)<br/>Receives: system prompt + local view + memory<br/>Reasoning: strategic goals, diplomacy, threats"]
         sysprompt --> llm
         localview --> llm
         memory --> llm

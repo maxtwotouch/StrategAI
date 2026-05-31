@@ -487,8 +487,42 @@ cd backend
 
 # OpenAI playthrough
 export OPENAI_API_KEY=sk-...
-.venv/bin/python -m scripts.run_playthrough --source openai --model gpt-4o-mini --turns 10
+.venv/bin/python -m scripts.run_playthrough --source openai --model gpt-5.4-mini --turns 10
 
 # HTTP server
 .venv/bin/uvicorn app.main:app --reload
 ```
+
+---
+
+## 17. Where to Find Details
+
+This document synthesizes the overall system architecture. For authoritative details on specific domains, follow the links down to subproject documentation.
+
+### Backend (Game Engine & LLM Integration)
+- **[API Reference](../backend/docs/API_REFERENCE.md)** — All 16 REST endpoints, DTOs, error codes
+- **[Backend Config](../backend/docs/BACKEND_CONFIG.md)** — Environment variables, settings, OpenAI configuration
+- **[Gameplay Reference](../GAMEPLAY.md)** — Complete game mechanics (units, cities, combat, tech tree)
+- **Source code**: `backend/app/engine/` — pure-functional engine modules
+
+### Frontend (UI & Asset Resolution)
+- **[Frontend Architecture](../frontend/docs/FRONTEND_ARCHITECTURE.md)** — Component tree, state management, Next.js structure
+- **[UI Guide](../frontend/docs/UI_GUIDE.md)** — Panel lifecycle, map rendering, diplomatic audience
+- **[Asset Integration](ASSET_INTEGRATION.md)** — Asset service contract, manifest resolution, fallback behavior
+- **Source code**: `frontend/app/`, `frontend/components/`, `frontend/lib/`
+
+### Asset Server (Generative Pipeline)
+- **[Asset Server Docs Index](../assetserver/docs/INDEX.md)** — Entry point for all asset server documentation
+- **[Project Report](../assetserver/docs/project-report.md)** — Comprehensive technical report on the DiT pipeline
+- **[Image Generation Pipeline](../assetserver/docs/pipeline/image-generation-pipeline.md)** — DiT mechanics, pipeline stages, post-processing
+- **[Server API](../assetserver/docs/guides/server-api.md)** — Endpoint reference for 35 asset endpoints
+- **Source code**: `assetserver/src/`
+
+### Training Pipeline (LoRA Fine-Tuning)
+- **[Model Card](../dataset-gen-train/docs/MODEL_CARD.md)** — Base model, LoRA architecture, published weights
+- **[Dataset Card](../dataset-gen-train/docs/DATASET_CARD.md)** — Training dataset composition and curation
+- **[Experiment Design](../dataset-gen-train/docs/experiment-design.md)** — 6-experiment matrix, hyperparameters
+- **Source code**: `dataset-gen-train/src/`
+
+### Report Traceability
+- **[Claim Traceability Matrix](report/TRACEABILITY.md)** — Every quantitative claim in the IEEE report mapped to its verifiable source

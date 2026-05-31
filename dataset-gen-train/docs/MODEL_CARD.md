@@ -36,7 +36,11 @@ widget:
 
 Six LoRA (Low-Rank Adaptation) adapters trained on [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) — a 4-billion-parameter Diffusion Transformer (DiT) — for generating **top-down medieval-style game assets**. The adapters enforce consistent overhead perspective and medieval architectural styling when activated by the trigger token `<tdp>` and the angle phrase `top-down view.`
 
-These LoRAs were purpose-built for the [StrategAI](https://github.com/maxtwotouch/StrategAI) project — an LLM-driven Civilization-style strategy game where AI civilizations are controlled via OpenAI's tool-use API and game assets are generated on-demand using DiT models. The adapters power the game's generative asset pipeline, providing consistent top-down medieval style across six asset families: structures, units, terrain tiles, nature objects, character sprites, and background tiles.
+These LoRAs were custom-trained by the StrategAI team specifically for the [StrategAI](https://github.com/maxtwotouch/StrategAI) project — an LLM-driven Civilization-style strategy game where AI civilizations are controlled via OpenAI's tool-use API and game assets are generated on-demand using DiT models. The adapters power the game's generative asset pipeline, providing consistent top-down medieval style across six asset families: structures, units, terrain tiles, nature objects, character sprites, and background tiles.
+
+**Training hardware:** Blackwell RTX 6000 GPU (14-16 GB VRAM with FP8 precision)  
+**Training time:** ~2 hours per experiment  
+**Published at:** https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora
 
 **What these LoRAs do:**
 - Enforce a consistent top-down camera perspective when the trigger `<tdp>` is present
@@ -55,9 +59,12 @@ These LoRAs were purpose-built for the [StrategAI](https://github.com/maxtwotouc
 | **Base model** | [black-forest-labs/FLUX.2-klein-base-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) |
 | **Training dataset** | [stixxert/topdown-medieval-pixelart](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) (100 images) |
 | **Training framework** | [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit) |
+| **Training hardware** | Blackwell RTX 6000 (14-16 GB VRAM, FP8) |
+| **Training time** | ~2 hours per experiment |
 | **Trigger phrase** | `<tdp> top-down view.` |
 | **Highlighted variant** | `detailed-high` — best balance of in-distribution fidelity and out-of-distribution generalization |
 | **Total variants** | 6 LoRA adapters + base model baseline |
+| **Published at** | https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora |
 
 ---
 

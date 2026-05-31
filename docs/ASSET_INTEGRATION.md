@@ -7,8 +7,8 @@ This document covers the contract, the resolver, the no-cache policy, and the
 graceful-fallback behavior so the game stays playable when the service is
 degraded.
 
-For the game-side mechanics see [GAMEPLAY.md](GAMEPLAY.md); for UI surfaces
-see [UI_GUIDE.md](UI_GUIDE.md).
+For the game-side mechanics see [../GAMEPLAY.md](../GAMEPLAY.md); for UI surfaces
+see [../frontend/docs/UI_GUIDE.md](../frontend/docs/UI_GUIDE.md).
 
 ---
 
@@ -369,3 +369,27 @@ Open DevTools console + Network tab, click Begin Campaign:
 | Manifest consumption | `frontend/components/SquareMap.tsx` + `frontend/app/page.tsx` (empire badge, sovereign overlay, diplomatic audience) |
 | Smoke test | `scripts/asset_api_smoke.py` |
 | Env example | `frontend/.env.example` |
+
+## 12. Where to Find Details
+
+This document covers the frontend-to-asset-server integration contract. For authoritative details on each side:
+
+### Asset Server Side
+- **[Asset Server Docs Index](../assetserver/docs/INDEX.md)** — Entry point for all asset server documentation
+- **[Server API Reference](../assetserver/docs/guides/server-api.md)** — All 35 REST endpoints with request/response schemas
+- **[Image Generation Pipeline](../assetserver/docs/pipeline/image-generation-pipeline.md)** — DiT mechanics, ComfyUI workflow, post-processing
+- **[Leader Prompt Guide](../assetserver/docs/guides/leader-prompt-guide.md)** — Three-stage leader portrait pipeline with identity preservation
+- **[Validation Prompts](../assetserver/docs/guides/validation-prompts.md)** — Pre-built test prompts for asset families
+
+### Frontend Side
+- **[Frontend Architecture](../frontend/docs/FRONTEND_ARCHITECTURE.md)** — How assets flow through the component tree
+- **[UI Guide](../frontend/docs/UI_GUIDE.md)** — Where assets render on screen (map, empire badge, diplomatic audience)
+- **Source code**: `frontend/lib/assetManifest.ts` (resolver), `frontend/lib/assetApi.ts` (client), `frontend/lib/assetMapping.ts` (game→asset mappings)
+
+### Training Side
+- **[Model Card](../dataset-gen-train/docs/MODEL_CARD.md)** — FLUX.2 Klein 4B + LoRA architecture
+- **[Dataset Card](../dataset-gen-train/docs/DATASET_CARD.md)** — 100-image curated training set
+- **[Experiment Design](../dataset-gen-train/docs/experiment-design.md)** — 6-experiment LoRA matrix
+
+### Report Traceability
+- **[Claim Traceability Matrix](report/TRACEABILITY.md)** — Performance claims (2.5-6s generation, 35 endpoints) mapped to sources

@@ -4,8 +4,15 @@ How to get the game running on your machine, what env vars matter, how to test
 your changes, and where the moving parts live.
 
 For game mechanics see [GAMEPLAY.md](GAMEPLAY.md); for UI structure see
-[UI_GUIDE.md](UI_GUIDE.md); for asset service integration see
-[ASSET_INTEGRATION.md](ASSET_INTEGRATION.md).
+[frontend/docs/UI_GUIDE.md](frontend/docs/UI_GUIDE.md); for asset service integration see
+[docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md).
+
+> 📖 **Bottom-up documentation**: This is a Layer 2 synthesis document. For authoritative
+> details on specific subsystems, follow links down to:
+> - **[Backend docs](backend/docs/)** — API reference, configuration
+> - **[Frontend docs](frontend/docs/)** — Architecture, UI guide
+> - **[Asset server docs](assetserver/docs/INDEX.md)** — Pipeline, architecture, guides
+> - **[Training docs](dataset-gen-train/docs/)** — Model card, dataset card, experiments
 
 ---
 
@@ -28,16 +35,17 @@ game is fully playable with built-in colors and glyphs.
 ```
 INF-3600/
 ├── README.md                  this guide's entry point
-├── GAME_BACKLOG.md            outstanding game-design work
-├── TIER1_PLAN.md              shipped Tier-1 mechanics record
-├── planning.md                original concept doc
 ├── .env                       OPENAI_API_KEY etc. (gitignored)
 ├── docs/                      this directory — architecture / game / UI / asset guides
 │   ├── ARCHITECTURE.md        backend engine layers + LLM goal source
 │   ├── GAMEPLAY.md
-│   ├── UI_GUIDE.md
 │   ├── ASSET_INTEGRATION.md
-│   └── DEVELOPMENT.md         (you are here)
+│   ├── DEVELOPMENT.md         (you are here)
+│   ├── architecture/          architectural deep-dives
+│   ├── report/                IEEE report and presentation materials
+│   └── archive/               historical planning docs and backlog
+├── backend/docs/              backend API reference and config
+├── frontend/docs/             frontend architecture and UI guide
 ├── scripts/
 │   └── asset_api_smoke.py     smoke test for the asset service
 ├── backend/

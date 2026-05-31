@@ -12,7 +12,7 @@ StrategAI consists of three main deployment tiers:
 
 **Critical:** The Asset Server is **never deployed on the same machine** as the Game Server. It is **colocated** with ComfyUI GPU workers to minimize latency on generation requests.
 
-See [SEPARATION_OF_CONCERNS.md](SEPARATION_OF_CONCERNS.md) for the architectural rationale.
+See [docs/architecture/SEPARATION_OF_CONCERNS.md](docs/architecture/SEPARATION_OF_CONCERNS.md) for the architectural rationale.
 
 ## Deployment Tiers
 
@@ -272,7 +272,7 @@ nano .env
 OPENAI_API_KEY=sk-...
 
 # Optional: Model selection
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-5.4-mini
 
 # Optional: Temperature
 OPENAI_TEMPERATURE=0.7
@@ -634,7 +634,7 @@ async def generate_structure(request: Request, ...):
 
 ### OpenAI API Costs
 
-- Use `gpt-4o-mini` instead of `gpt-4o` (10x cheaper)
+- The default model `gpt-5.4-mini` is already cost-optimized for strategic reasoning
 - Cache LLM responses for similar game states
 - Limit AI decision frequency (e.g., every 2 turns instead of every turn)
 
@@ -672,7 +672,7 @@ For issues not covered in this guide:
 
 ## References
 
-- [Separation of Concerns](SEPARATION_OF_CONCERNS.md) — Architectural rationale
+- [Separation of Concerns](architecture/SEPARATION_OF_CONCERNS.md) — Architectural rationale
 - [Asset Server Deployment](../assetserver/DEPLOYMENT.md) — Detailed asset server guide
 - [ComfyUI Setup](../assetserver/docs/architecture/comfyui-setup-guide.md) — ComfyUI installation
 - [Load Balancer](../assetserver/docs/architecture/load-balancer.md) — Multi-worker configuration

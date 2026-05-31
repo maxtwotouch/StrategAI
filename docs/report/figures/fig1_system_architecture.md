@@ -13,14 +13,14 @@ graph TB
     classDef storage fill:#f59e0b,color:#1c1917,stroke:#d97706,stroke-width:2px
 
     %% ── External Services ──
-    openai["🧠 OpenAI API<br/>GPT-4 / tool-use<br/>(LLM Strategic Reasoning)"]
+    openai["🧠 OpenAI API<br/>GPT-5.4-mini / tool-use<br/>(LLM Strategic Reasoning)"]
     comfyui["🎨 ComfyUI Workers<br/>FLUX2 Klein 4B Distilled<br/>(DiT Inference)"]
     huggingface["🤗 HuggingFace Hub<br/>stixxert/topdown-medieval-pixelart<br/>stixxert/strategai-lora"]
 
     %% ── Backend ──
     subgraph backend_box["  BACKEND  |  Python 3.11+ · FastAPI · port :8000  "]
         direction TB
-        api["REST API Layer<br/>14 endpoints"]
+        api["REST API Layer<br/>16 endpoints"]
         engine["Game Engine<br/>Pure Functional · Frozen Dataclasses<br/>339+ tests"]
         llm_int["LLM Integration<br/>openai_goals.py · 9 intent tools<br/>Per-leader personas · Rolling memory"]
         store["In-Memory GameStore<br/>Threading lock"]

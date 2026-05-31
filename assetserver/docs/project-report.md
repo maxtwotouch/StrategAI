@@ -183,8 +183,8 @@ The choice of image generation model is the single most consequential design dec
 |-----------|--------------------------|----------------------|---------------------|
 | **Inference steps** | 4 | 8 | 50 |
 | **VRAM requirement** | ~8.4 GB | ~8 GB | ~21.7 GB |
-| **Inference time (RTX 5090)** | ~1.2 s | ~3–5 s | ~35 s |
-| **Inference time (consumer GPU)** | ~3–5 s | ~8–12 s | ~60–90 s |
+| **Inference time (Blackwell RTX 6000)** | ~2.5–6 s | ~3–5 s | ~35 s |
+| **Inference time (RTX 3090)** | ~3.5–7 s | ~8–12 s | ~60–90 s |
 | **License** | Apache 2.0 | OpenRAIL-M | Non-Commercial (Flux) |
 | **Text encoder** | Qwen 3 4B (strong) | CLIP (weaker) | Qwen 3 4B (strong) |
 | **Prompt adherence** | Strong | Moderate | Strongest |
@@ -196,9 +196,9 @@ The choice of image generation model is the single most consequential design dec
 
 1. **License (Apache 2.0).** This was the hard constraint. For game asset generation, the output images must be usable in commercial game projects. The Flux2 Klein 4B Distilled model is released under Apache 2.0 by Black Forest Labs, permitting commercial use, modification, and distribution. SDXL Turbo's OpenRAIL-M license includes use restrictions that complicate commercial game development. The Flux2 Klein 9B Base uses a stricter non-commercial license.
 
-2. **VRAM budget (~8.4 GB).** This fits within consumer GPU constraints (RTX 3070/4070 class at 8–12 GB). The 9B Base model's ~21.7 GB requirement would necessitate datacenter GPUs (A100, RTX 6000 Ada), defeating the purpose of a self-hosted, consumer-accessible pipeline.
+2. **VRAM budget (~8.4 GB).** This fits within workstation GPU constraints (Blackwell RTX 6000 at 14–16 GB with FP8 precision). The 9B Base model's ~21.7 GB requirement would necessitate datacenter GPUs (A100, RTX 6000 Ada), defeating the purpose of a self-hosted, accessible pipeline.
 
-3. **4-step inference speed.** At approximately 1.2 seconds per generation on an RTX 5090 (3–5 seconds on consumer GPUs), the distilled model makes interactive asset generation feasible. Compare to 35 seconds for the 9B base model — a ~12× speed difference that transforms the user experience from batch-processing to near-interactive.
+3. **4-step inference speed.** At 2.5–6 seconds per generation on a Blackwell RTX 6000 (3.5–7 seconds on an RTX 3090), the distilled model makes interactive asset generation feasible. Compare to 35 seconds for the 9B base model — a ~12× speed difference that transforms the user experience from batch-processing to near-interactive.
 
 4. **Native image editing.** Flux2 Klein 4B Distilled supports single-reference and multi-reference image editing natively — essential for the leader pipeline's identity-preserving img2img stages. With SDXL Turbo, VAE encoding of reference images would require manual latent-space manipulation with less reliable identity preservation.
 
@@ -215,9 +215,9 @@ The Flux2 Klein 4B deployment requires four model files, all loaded by ComfyUI f
 | `flux-2-klein-4b-fp8.safetensors` | ~6 GB | `models/unet/` | DiT transformer (FP8 quantized) — the denoising backbone | Black Forest Labs / HuggingFace |
 | `qwen_3_4b.safetensors` | ~8 GB | `models/clip/` | Qwen 3 4B text encoder — converts prompts to conditioning embeddings | Qwen / HuggingFace |
 | `flux2-vae.safetensors` | ~320 MB | `models/vae/` | Variational Autoencoder — compresses/decompresses between pixel space and latent space | Black Forest Labs / HuggingFace |
-| `strategai-lora-detailed-high-step1800.safetensors` | ~250 MB | `models/loras/` | Top-down medieval style LoRA (custom-trained) (`<tdp>` trigger) — enforces camera angle and pixel-art aesthetics | CivitAI community |
+| `strategai-lora-detailed-high-step1800.safetensors` | ~250 MB | `models/loras/` | Top-down medieval style LoRA (custom-trained by StrategAI team) (`<tdp>` trigger) — enforces camera angle and pixel-art aesthetics | Custom-trained; published at https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora |
 
-> **⚠️ TODO — LoRA trigger token investigation:** The `<tdp>` LoRA (`strategai-lora-detailed-high-step1800.safetensors`, trained for 2,400 steps) is a community-created asset sourced, not an officially published model. Its trigger token `<tdp>` is baked into four of eight prompt templates and directly controls the pixel-art aesthetic of all tile and unit assets. Key unknowns requiring future investigation: (1) the exact training dataset and whether it includes sufficient top-down medieval assets specifically; (2) whether the `<tdp>` token is the optimal trigger or if a custom-trained LoRA on a curated medieval pixel-art dataset would produce superior style consistency; (3) the LoRA's long-term availability on CivitAI and the risk of link rot. See [§7.2](#72-future-work) for planned remediation.
+> **LoRA provenance:** The `<tdp>` LoRA (`strategai-lora-detailed-high-step1800.safetensors`, trained for 1,800 steps) was custom-trained by the StrategAI team specifically for this project using the Ostris AI Toolkit on a Blackwell RTX 6000 GPU (2 hours training time). The trigger token `<tdp>` is baked into four of eight prompt templates and directly controls the pixel-art aesthetic of all tile and unit assets. The LoRA was trained on the curated 100-image dataset `stixxert/topdown-medieval-pixelart` and is published at https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora.
 
 **Total disk footprint**: ~14.6 GB for model weights. **Total VRAM at inference**: ~8.4 GB (models loaded in FP8 precision).
 
@@ -966,12 +966,13 @@ The project maintains a comprehensive test suite designed to validate every laye
 
 | GPU Class | Example | Approximate Inference Time |
 |-----------|---------|---------------------------|
-| Datacenter | RTX 5090 (32 GB) | ~1.2 seconds |
+| Workstation (primary) | Blackwell RTX 6000 (14–16 GB FP8) | ~2.5–6 seconds |
+| High-end consumer (secondary test) | RTX 3090 (12–14 GB) | ~3.5–7 seconds |
 | High-end consumer | RTX 4090 (24 GB) | ~2–3 seconds |
 | Mid-range consumer | RTX 4070 (12 GB) | ~3–5 seconds |
 | Entry consumer | RTX 3070 (8 GB) | ~4–6 seconds |
 
-**VRAM budget:** ~8.4 GB at FP8 precision. This fits within the 8 GB VRAM of an RTX 3070 — the minimum recommended GPU. The 4B Base variant (50 steps, ~21.7 GB VRAM) would require datacenter-class GPUs.
+**VRAM budget:** ~8.4 GB at FP8 precision. This fits within the 14–16 GB VRAM of a Blackwell RTX 6000 (primary inference hardware) or the 12–14 GB of an RTX 3090 (secondary test hardware). The 4B Base variant (50 steps, ~21.7 GB VRAM) would require datacenter-class GPUs.
 
 **Step efficiency:** The distilled 4-step inference represents a ~12× speedup over the 50-step base model. However, the 4-step model cannot be fine-tuned — for custom LoRA training, the 4B Base variant (50 steps) is required.
 

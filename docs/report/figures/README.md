@@ -96,10 +96,10 @@ For more polished diagrams (if needed for final submission):
 
 ## Related Documents
 
-- `docs/FIGURE_DESCRIPTIONS.md` — Full figure descriptions and captions for all 12 figures
-- `docs/IEEE_REPORT.md` — IEEE academic report (markdown)
-- `docs/IEEE_REPORT.tex` — IEEE academic report (LaTeX)
-- `docs/ARCHITECTURE.md` — Backend engine architecture
-- `docs/ASSET_INTEGRATION.md` — Asset service contract and resolution
+- `../FIGURE_DESCRIPTIONS.md` — Full figure descriptions and captions for all 12 figures
+- `../IEEE_REPORT.md` — IEEE academic report (markdown)
+- `../IEEE_REPORT_COMPLETE.tex` — IEEE academic report (LaTeX)
+- `../../ARCHITECTURE.md` — Backend engine architecture
+- `../../ASSET_INTEGRATION.md` — Asset service contract and resolution
 - `assetserver/docs/pipeline/image-generation-pipeline.md` — DiT mechanics deep-dive
 - `dataset-gen-train/docs/experiment-design.md` — LoRA experiment design document

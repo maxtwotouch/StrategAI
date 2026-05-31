@@ -31,7 +31,7 @@ You are the **Oral Presentation** coach for StrategAI's INF-3600 exam. Your job 
 ### Slide 3: System Architecture (60 seconds)
 - **Four components**: Backend (Python/FastAPI), Frontend (Next.js), Asset Server (FastAPI/ComfyUI), Training Pipeline (Ostris AI Toolkit)
 - **Data flow**: User actions → Backend → LLM decisions → State updates → Frontend rendering → Asset generation
-- **Technology choices**: GPT-4 for reasoning, FLUX.2 Klein 4B Distilled for generation, ComfyUI for orchestration
+- **Technology choices**: GPT-5.4-mini for reasoning, FLUX.2 Klein 4B Distilled for generation, ComfyUI for orchestration
 
 ### Slide 4: LLM-Driven Strategic AI (90 seconds) ⭐
 - **Challenge**: LLMs excel at reasoning but struggle with spatial logic and numerical precision

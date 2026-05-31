@@ -6,8 +6,8 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 
 **StrategAI** is a full-stack strategy game where:
 - **AI civilizations** are controlled by LLMs via OpenAI's tool-use API (strategic decision-making, diplomacy)
-- **Game assets** are generated on-demand using Diffusion Transformers (FLUX2 Klein 4B Distilled via ComfyUI)
-- **Style adaptation** is achieved through LoRA fine-tuning on curated medieval pixel art
+- **Game assets** are generated on-demand using Diffusion Transformers (FLUX2 Klein 4B Distilled via ComfyUI), styled with a custom LoRA: [`stixxert/strategai-topdown-medieval-style-lora`](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora)
+- **Style adaptation** is achieved through LoRA fine-tuning via knowledge distillation — a FLUX.2 [dev] (12B) teacher model + Multi-Angles LoRA v2 generates the training dataset [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart), which trains the FLUX.2 Klein 4B student LoRA
 
 ## Architecture
 
@@ -28,11 +28,11 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 | **LLM-driven AI civs** | OpenAI tool-use API | `backend/app/engine/openai_goals.py` — 9 intent tools, per-leader personas, rolling memory |
 | **Diplomacy chat** | LLM with persistent conversation | `backend/app/engine/diplomacy.py` — free-form chat with AI leaders |
 | **Generative pixel art** | ComfyUI + FLUX2 Klein 4B Distilled (DiT) | `assetserver/src/` — 6 asset families, 3 generation modes |
-| **Style adaptation** | LoRA fine-tuning | `dataset-gen-train/` — Ostris AI Toolkit, 6-experiment matrix |
+| **Style adaptation** | LoRA fine-tuning via knowledge distillation (FLUX.2 [dev] 12B teacher → FLUX.2 Klein 4B student) | `dataset-gen-train/` — Ostris AI Toolkit, 6-experiment matrix; dataset: [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart); LoRA: [`stixxert/strategai-topdown-medieval-style-lora`](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) |
 
 ### Inter-Service Contracts
 
-- **Frontend ↔ Backend**: REST API at `http://localhost:8000` — 14 endpoints (games, actions, turns). DTOs defined in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
+- **Frontend ↔ Backend**: REST API at `http://localhost:8000` — 16 endpoints (games, actions, turns). DTOs defined in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
 - **Frontend ↔ Asset Server**: Asset manifest resolution via `frontend/lib/assetManifest.ts` → `NEXT_PUBLIC_ASSET_API_URL`. POST endpoints for leader, unit, structure, terrain, background_tile. GET for asset files
 - **Backend ↔ Asset Server**: No direct contract — frontend mediates
 - **Asset Server ↔ Dataset/Training**: Shared ComfyUI infrastructure, shared FLUX2 Klein 4B Distilled model, LoRA weights applied at inference time
@@ -165,7 +165,7 @@ cd dataset-gen-train
 # Backend (339+ tests)
 cd backend && python -m pytest tests/ -x --tb=short
 
-# Asset Server (~345 tests)
+# Asset Server (547 tests)
 cd assetserver && python -m pytest tests/ -x --tb=short
 
 # Frontend (type check)
@@ -178,10 +178,10 @@ python scripts/asset_api_smoke.py
 ## Documentation
 
 - `docs/ARCHITECTURE.md` — Backend engine layers, LLM goal source, pure functional design
-- `docs/DEVELOPMENT.md` — Setup, env vars, workflows, where to hook new features
-- `docs/GAMEPLAY.md` — Complete game mechanics reference
+- `DEVELOPMENT.md` — Setup, env vars, workflows, where to hook new features
+- `GAMEPLAY.md` — Complete game mechanics reference
 - `docs/ASSET_INTEGRATION.md` — Asset service contract, manifest resolution, fallback
-- `docs/UI_GUIDE.md` — Frontend lifecycle, panel breakdown, audio plumbing
+- `frontend/docs/UI_GUIDE.md` — Frontend lifecycle, panel breakdown, audio plumbing
 - `assetserver/docs/project-report.md` — **Main student technical report** (read this first)
 
 ## Agent System Architecture

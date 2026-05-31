@@ -32,7 +32,7 @@ Key source directories:
 - `src/prompt_templates.py` — Template loader from `config/prompt_templates.json`
 - `src/static_catalog.py` — Static tile catalog
 - `config/` — YAML config + prompt templates
-- `tests/` — pytest suite (~345 tests)
+- `tests/` — pytest suite (547 tests)
 - `workflows/` — ComfyUI workflow JSONs
 
 ## Constraints

@@ -22,7 +22,7 @@ You are the **Root Orchestrator** for StrategAI — an INF-3600 Generative AI st
 
 ## Inter-Service Contracts
 
-- **Frontend ↔ Backend**: REST API at `http://localhost:8000` — 14 endpoints (games, actions, turns). DTOs defined in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
+- **Frontend ↔ Backend**: REST API at `http://localhost:8000` — 16 endpoints (games, actions, turns). DTOs defined in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`
 - **Frontend ↔ Asset Server**: Asset manifest resolution via `frontend/lib/assetManifest.ts` → `NEXT_PUBLIC_ASSET_API_URL`. POST endpoints for leader, unit, structure, terrain, background_tile. GET for asset files
 - **Backend ↔ Asset Server**: No direct contract — frontend mediates
 - **Asset Server ↔ Dataset/Training**: Shared ComfyUI infrastructure, shared FLUX2 Klein 4B Distilled model, LoRA weights applied at inference time

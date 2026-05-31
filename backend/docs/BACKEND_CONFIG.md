@@ -297,8 +297,8 @@ if not self._model.startswith(("gpt-5", "o1", "o3", "o4")):
 
 ## See Also
 
-- [DEVELOPMENT.md](DEVELOPMENT.md) — Full development setup guide
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Backend engine layers and LLM
+- [../../DEVELOPMENT.md](../../DEVELOPMENT.md) — Full development setup guide
+- [../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) — Backend engine layers and LLM
   integration design
-- [GAMEPLAY.md](GAMEPLAY.md) — Game mechanics reference
-- `backend/.env.example` — Environment variable template
+- [../../GAMEPLAY.md](../../GAMEPLAY.md) — Game mechanics reference
+- `.env.example` — Environment variable template

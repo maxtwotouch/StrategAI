@@ -20,7 +20,7 @@ This is a **FastAPI-based game asset generation pipeline** (`TopDownMedievalPixe
 - **Generation Modes**: `comfyui` (real), `static` (pre-made PNG), `placeholder` (PIL-generated)
 - **Asset Families**: leader, tile (structure, nature_object, character_sprite, background_tile), unit
 - **Config**: `config.yaml` + env vars + `.env` file, nested via `__` delimiter
-- **Tests**: pytest (~345 tests), use `pytest -xvs` to run
+- **Tests**: pytest (547 tests), use `pytest -xvs` to run
 
 Key conventions:
 - All engines use `with SessionLocal() as db:` for DB sessions

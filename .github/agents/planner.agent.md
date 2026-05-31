@@ -151,7 +151,7 @@ User → Planner
 ## Tools
 
 - **read/search**: Explore codebase to understand current state
-- **edit**: Create plan documents in `docs/plans/` or update existing docs
+- **edit**: Create plan documents in `docs/` or update existing docs
 - **agent**: Delegate research to Research agent, execution to Orchestrator
 - **todo**: Track plan creation and execution progress
 - **web**: Research best practices, libraries, or patterns if needed

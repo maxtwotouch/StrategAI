@@ -1,5 +1,5 @@
 ---
-description: "Use when: working on the game engine, LLM integration (OpenAI tool-use), API design, pure functional architecture, combat/combat resolution, diplomacy system, tech tree, economy, or any backend-specific task. Covers backend/app/engine/ (27 modules), backend/app/api/ (14 endpoints), and backend/tests/ (339+ tests)."
+description: "Use when: working on the game engine, LLM integration (OpenAI tool-use), API design, pure functional architecture, combat/combat resolution, diplomacy system, tech tree, economy, or any backend-specific task. Covers backend/app/engine/ (27 modules), backend/app/api/ (16 endpoints), and backend/tests/ (339+ tests)."
 name: "Backend"
 tools: [read, search, edit, execute, agent, todo]
 agents: [Research]
@@ -29,7 +29,7 @@ VALIDATOR + ENGINE (pure functional, immutable state)
 |------|----------|
 | `backend/app/engine/` | 27 modules: hex coords, terrain, models, map gen, movement, combat, production, research, diplomacy, economy, borders, buildings, fog of war, victory, turn resolver, executor, serializer, playthrough, LLM goals, human source, intents, operations, directives, improvements, starting positions |
 | `backend/app/api/` | FastAPI routers (games, actions, turns), schemas (DTOs), validator, store, game factory |
-| `backend/app/api/routers/` | 14 REST endpoints |
+| `backend/app/api/routers/` | 16 REST endpoints |
 | `backend/tests/` | 315+ pytest tests |
 
 ## LLM Integration (`openai_goals.py`)

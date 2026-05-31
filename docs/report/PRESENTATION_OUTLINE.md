@@ -29,7 +29,7 @@
 
 **Visual**:
 - Split screen: Left side shows "Problem" with icons (GPU, dollar sign, complexity), Right side shows "Solution" with checkmarks
-- Key statistic: "Consumer GPU: 8-12 GB VRAM"
+- Key statistic: "Workstation GPU: 14-16 GB VRAM (FP8)"
 
 **Bullet Points**:
 - **Problem**: Independent developers lack access to advanced AI
@@ -37,14 +37,14 @@
   - Integration complexity (multiple AI systems)
   - Cost barriers (cloud APIs, recurring fees)
 - **Solution**: Demonstrate feasibility on consumer hardware
-  - GPT-4 for strategic reasoning
+  - GPT-5.4-mini for strategic reasoning
   - FLUX.2 Klein 4B Distilled for asset generation
-  - Real-time performance: 1.2-4 seconds per asset
+  - Real-time performance: 2.5-6 seconds per asset (Blackwell RTX 6000)
 
 **Speaker Notes** (45 seconds):
 "Independent game developers face two fundamental challenges when trying to incorporate advanced AI. First, computational constraints - state-of-the-art models often require enterprise-grade hardware with 24+ gigabytes of VRAM, far exceeding typical development budgets. Second, integration complexity - combining multiple AI systems like language models and image generators requires careful architectural design.
 
-Our solution demonstrates that these challenges can be overcome. By selecting appropriately-sized models - GPT-4 for reasoning and FLUX.2 Klein 4B Distilled for generation - and implementing robust system design, we achieve real-time performance on consumer hardware with 8 to 12 gigabytes of VRAM. Asset generation takes only 1.2 to 4 seconds, enabling near-interactive gameplay."
+Our solution demonstrates that these challenges can be overcome. By selecting appropriately-sized models - GPT-5.4-mini for reasoning and FLUX.2 Klein 4B Distilled for generation - and implementing robust system design, we achieve real-time performance on workstation hardware with 14 to 16 gigabytes of VRAM using FP8 precision. Asset generation takes only 2.5 to 6 seconds on a Blackwell RTX 6000, or 3.5 to 7 seconds on an RTX 3090, enabling near-interactive gameplay."
 
 **Transition**: "Let me show you the system architecture that makes this possible."
 
@@ -70,7 +70,7 @@ Our solution demonstrates that these challenges can be overcome. By selecting ap
 - **Key insight**: Microservices enable independent scaling
 
 **Speaker Notes** (60 seconds):
-"Our system follows a microservices architecture with four primary components. The backend, built with Python and FastAPI, implements a pure functional game engine with immutable state and integrates GPT-4 for AI decision-making. The frontend, using Next.js and React, renders the game state through an SVG-based hex map and coordinates asset loading.
+"Our system follows a microservices architecture with four primary components. The backend, built with Python and FastAPI, implements a pure functional game engine with immutable state and integrates GPT-5.4-mini for AI decision-making. The frontend, using Next.js and React, renders the game state through an SVG-based hex map and coordinates asset loading.
 
 The asset server is a separate FastAPI service that generates pixel-art assets on-demand using ComfyUI and FLUX.2 Klein 4B Distilled - a 4-billion parameter Diffusion Transformer. Finally, our training pipeline uses the Ostris AI Toolkit to fine-tune LoRA adapters that adapt the base model to our specific visual style.
 
@@ -205,7 +205,7 @@ At inference time, we activate the LoRA using the trigger token 'tdp' followed b
 
 **Bullet Points**:
 - **Performance**:
-  - Asset generation: 1.2-4 seconds (RTX 5090)
+  - Asset generation: 2.5-6 seconds (Blackwell RTX 6000); 3.5-7s (RTX 3090)
   - API response: <100ms (cached), 2-5s (generation)
   - Cache hit rate: ~80% (reduces generation load)
 - **Test coverage**: 886 tests, ~80% aggregate
@@ -329,7 +329,7 @@ Assign each team member specific question categories:
 A: The intent resolution layer validates all intents before execution. Invalid intents (e.g., targeting non-existent units) are silently dropped. The LLM receives feedback through the `last_turn_feedback` field, helping it avoid repeating failed actions. We also use `tool_choice="required"` to ensure the LLM always emits at least one intent.
 
 **Q: What's the cost of running this system?**
-A: GPT-4 API costs approximately $0.03 per AI turn at current prompt sizes. For a 100-turn game with 3 AI civilizations, that's about $9 total. Asset generation is self-hosted, so costs are limited to electricity and hardware depreciation. The system is significantly cheaper than cloud-based asset generation services.
+A: GPT-5.4-mini API costs approximately $0.03 per AI turn at current prompt sizes. For a 100-turn game with 3 AI civilizations, that's about $9 total. Asset generation is self-hosted, so costs are limited to electricity and hardware depreciation. The system is significantly cheaper than cloud-based asset generation services.
 
 **Q: How does this compare to traditional game AI?**
 A: Traditional game AI uses behavior trees or finite state machines, which require extensive manual authoring and struggle with novel situations. Our LLM-based approach enables emergent behavior and natural language diplomacy without scripting every scenario. The trade-off is higher computational cost and less predictable behavior.
