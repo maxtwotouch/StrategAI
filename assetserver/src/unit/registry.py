@@ -117,8 +117,7 @@ class UnitRegistry:
             if record is None:
                 return False
             image_id = record.image_id
-            db.delete(record)
-            # Also delete the parent AssetRecord to prevent orphan leaks
+            # Delete the parent AssetRecord; FK ON DELETE CASCADE removes the child row.
             db.query(AssetRecord).filter(AssetRecord.id == image_id).delete()
             _execute_with_busy_retry(db, db.commit)
             # Best-effort cleanup of the image file on disk
