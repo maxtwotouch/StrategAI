@@ -25,6 +25,7 @@ from app.api.actions import (
     validate,
 )
 from app.engine.city_founding import found_city
+from app.engine.city_names import next_city_name_from_view
 from app.engine.combat import attack
 from app.engine.diplomacy import (
     DiplomacyError,
@@ -207,7 +208,7 @@ class RandomGoalSource:
                 goals.append(FoundCityNear(
                     unit_id=unit_id,
                     target=loc,
-                    name=f"City-{unit_id}-{self._rng.randint(0, 999)}",
+                    name=next_city_name_from_view(view, civ_id),
                 ))
             elif utype in ("warrior", "scout"):
                 tiles = view.get("visible_tiles", [])

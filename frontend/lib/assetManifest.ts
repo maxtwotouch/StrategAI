@@ -30,7 +30,6 @@ import {
   generateBackgroundTile,
   generateLeaderProfile,
   generateLeaderSplash,
-  generateStructure,
   generateTerrainFeature,
   generateUnit,
   listLeaders,
@@ -39,7 +38,6 @@ import { leaderParamsFor } from "@/lib/leaderMapping";
 import {
   ELEVATION_TERRAINS,
   UNIT_TYPE_MAP,
-  cityStructureFor,
   unitDescriptionFor,
 } from "@/lib/assetMapping";
 
@@ -74,7 +72,7 @@ export interface AssetManifest {
   // civ id → game unit type → south-facing sprite URL.
   // Each civ gets its own per-culture variant of the four API unit types.
   units: Record<number, Record<string, string>>;
-  structures: Record<number, string>; // civ id → city building URL
+  structures: Record<number, string>; // legacy: no longer pre-generated
   leaders: Record<number, LeaderAssets>; // civ id → portrait/splash URLs
 }
 
@@ -151,7 +149,6 @@ export async function resolveManifest(
     distinctTerrains.length +
     elevationTerrains.length +
     civs.length * apiUnitTypes.length + // per-civ unit sprites
-    civs.length + // city structures
     leaders.length;
   let done = 0;
   const tick = () => options.onProgress?.((done += 1), total);
@@ -225,19 +222,6 @@ export async function resolveManifest(
     }),
   );
 
-  const structureWork = mapLimit(civs, 2, async ({ civId, leaderName }) => {
-    try {
-      structures[civId] = await generateStructure(
-        cityStructureFor(leaderName),
-        options.signal,
-      );
-    } catch {
-      // No building art → cities render as the colored marker.
-    } finally {
-      tick();
-    }
-  });
-
   // Pull the existing leader catalog once so we can fall back to it when a
   // POST fails (e.g., upstream generation errors). Best-match by
   // archetype+culture, then rotate by civ id so distinct civs get distinct
@@ -302,7 +286,6 @@ export async function resolveManifest(
     terrainWork,
     elevationWork,
     unitWork,
-    structureWork,
     leaderWork,
   ]);
 

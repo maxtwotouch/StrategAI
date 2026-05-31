@@ -22,6 +22,7 @@ from app.engine.diplomacy import (
     SetStance,
     met_civs,
 )
+from app.engine.city_names import next_city_name
 from app.engine.directives import Directive, QueueProduction, StartResearch
 from app.engine.executor import (
     AttackUnit,
@@ -172,7 +173,7 @@ def _do_expand(state: GameState, civ_id: int, intent: Expand) -> _Out:
     site = _pick_city_site(state, settler, intent.target)
     if site is None:
         return out
-    name = f"City-{civ_id}-{len(state.cities_for(civ_id)) + 1}"
+    name = next_city_name(state, civ_id)
     out.goals.append(FoundCityNear(unit_id=settler.id, target=site, name=name))
     return out
 

@@ -11,11 +11,21 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Union
 
+from app.engine.hex import Hex
 from app.engine.buildings import (
     PURCHASABLE_STRUCTURE_CATEGORIES,
     STRUCTURE_GOLD_COST,
 )
-from app.engine.models import BuildItem, BuildKind, BuildingType, City, GameState, UnitType
+from app.engine.models import (
+    BuildItem,
+    BuildKind,
+    BuildingType,
+    City,
+    CityStructure,
+    GameState,
+    UnitType,
+)
+from app.engine.terrain import is_passable
 from app.engine.research import (
     ResearchError,
     can_build_building,
@@ -57,6 +67,8 @@ class PurchaseStructure:
 
     city_id: int
     category: str
+    q: int
+    r: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +184,20 @@ def _purchase_structure(
         raise DirectiveError(
             f"not enough gold (need {STRUCTURE_GOLD_COST}, have {civ.gold})"
         )
+    location = Hex(directive.q, directive.r)
+    tile = state.map.get(location)
+    if tile is None:
+        raise DirectiveError(f"structure location {location} is off map")
+    if not is_passable(tile.terrain):
+        raise DirectiveError(f"cannot place structure on {tile.terrain.value}")
+    if state.tile_owner.get(location) != city.id:
+        raise DirectiveError("structure must be placed inside this city's borders")
+    if any(c.location == location for c in state.cities):
+        raise DirectiveError("structure tile already has a city")
+    if any(u.location == location for u in state.units):
+        raise DirectiveError("structure tile is occupied by a unit")
+    if any(s.location == location for s in state.structures):
+        raise DirectiveError("structure tile already has a structure")
 
     new_city = replace(
         city,
@@ -182,7 +208,18 @@ def _purchase_structure(
     )
     new_civ = replace(civ, gold=civ.gold - STRUCTURE_GOLD_COST)
     new_civs = tuple(new_civ if c.id == civ_id else c for c in state.civs)
-    return replace(state, cities=new_cities, civs=new_civs)
+    new_structure = CityStructure(
+        city_id=city.id,
+        owner=city.owner,
+        category=directive.category,
+        location=location,
+    )
+    return replace(
+        state,
+        cities=new_cities,
+        civs=new_civs,
+        structures=state.structures + (new_structure,),
+    )
 
 
 def _start_research(

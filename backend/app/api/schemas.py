@@ -82,6 +82,14 @@ class CityOut(BaseModel):
     worked_tiles: list[dict[str, int]] = Field(default_factory=list)
 
 
+class CityStructureOut(BaseModel):
+    city_id: int
+    owner: int
+    category: str
+    q: int
+    r: int
+
+
 class CivOut(BaseModel):
     id: int
     name: str
@@ -157,6 +165,7 @@ class GameStateOut(BaseModel):
     civs: list[CivOut]
     civ_roster: list[CivRosterEntry] = Field(default_factory=list)
     cities: list[CityOut]
+    structures: list[CityStructureOut] = Field(default_factory=list)
     units: list[UnitOut]
     known_civ_ids: list[int]
     messages: list[MessageOut]
@@ -222,6 +231,7 @@ def city_to_out(c: City) -> CityOut:
         max_health=c.max_health,
         is_capital=c.is_capital,
         buildings=sorted(b.value for b in c.buildings),
+        purchased_structures=sorted(c.purchased_structures),
         production_queue=[item.id for item in c.production_queue],
         border_radius=c.border_radius,
         culture_stored=c.culture_stored,
@@ -229,6 +239,16 @@ def city_to_out(c: City) -> CityOut:
             ({"q": h.q, "r": h.r} for h in c.worked_tiles),
             key=lambda d: (d["q"], d["r"]),
         ),
+    )
+
+
+def structure_to_out(s) -> CityStructureOut:
+    return CityStructureOut(
+        city_id=s.city_id,
+        owner=s.owner,
+        category=s.category,
+        q=s.location.q,
+        r=s.location.r,
     )
 
 
@@ -366,6 +386,11 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
             for c in state.cities
             if c.owner == human_civ.id or c.location in visible
         ] if human_civ is not None else [city_to_out(c) for c in state.cities],
+        structures=[
+            structure_to_out(s)
+            for s in state.structures
+            if human_civ is None or s.owner == human_civ.id or s.location in visible
+        ],
         units=[
             unit_to_out(u)
             for u in state.units
@@ -438,6 +463,8 @@ class PurchaseStructureRequest(BaseModel):
     civ_id: int
     city_id: int
     category: str
+    q: int
+    r: int
 
 
 class MessageRequest(BaseModel):

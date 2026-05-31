@@ -180,7 +180,29 @@ def test_random_source_produces_goals():
     decisions = source.decide(view, civ_id=0)
     assert len(decisions.goals) == 2
     assert isinstance(decisions.goals[0], FoundCityNear)
+    assert decisions.goals[0].name == "New Civ 0"
     assert isinstance(decisions.goals[1], MoveTo)
+
+
+@pytest.mark.unit
+def test_random_source_uses_civ_city_name_from_view():
+    source = RandomGoalSource(seed=42)
+    view = {
+        "self": {"name": "Mongolia"},
+        "visible_units": [
+            {"id": 1, "owner": 0, "type": "settler", "q": 0, "r": 0},
+        ],
+        "visible_cities": [
+            {"id": 10, "owner": 0, "name": "Karakorum", "q": 0, "r": 0},
+        ],
+        "visible_tiles": [],
+    }
+
+    decisions = source.decide(view, civ_id=0)
+
+    assert len(decisions.goals) == 1
+    assert isinstance(decisions.goals[0], FoundCityNear)
+    assert decisions.goals[0].name == "Khanbalyk"
 
 
 @pytest.mark.unit

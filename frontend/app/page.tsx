@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SquareMap } from "@/components/SquareMap";
+import { generateStructure } from "@/lib/assetApi";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
 import {
   CIV_COLORS,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/hex";
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
-import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS } from "@/lib/assetMapping";
+import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, cityStructureFor } from "@/lib/assetMapping";
 import { buildCustomLeaderParams } from "@/lib/leaderMapping";
 import { useAudio } from "@/lib/useAudio";
 
@@ -27,7 +28,29 @@ type Setup = {
   culture: string;
   leaderDescription: string;
 };
-type MapViewMode = "global" | "local";
+
+function AudioGlyph({ muted }: { muted: boolean }) {
+  return (
+    <svg
+      className="audio-toggle__icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        className="audio-toggle__speaker"
+        d="M4.5 9.25h3.35l5.05-4.2v13.9l-5.05-4.2H4.5z"
+      />
+      {!muted && (
+        <>
+          <path className="audio-toggle__wave" d="M15.5 8.1c1.1.9 1.7 2.25 1.7 3.9s-.6 3-1.7 3.9" />
+          <path className="audio-toggle__wave audio-toggle__wave--outer" d="M18 5.8c1.75 1.55 2.75 3.75 2.75 6.2S19.75 16.65 18 18.2" />
+        </>
+      )}
+      {muted && <path className="audio-toggle__slash" d="M16.2 8.1l4.1 7.8M20.3 8.1l-4.1 7.8" />}
+    </svg>
+  );
+}
 
 type TechDef = {
   id: string;
@@ -38,6 +61,10 @@ type TechDef = {
 
 function randomSeed(): number {
   return Math.floor(Math.random() * 1_000_000_000);
+}
+
+function placedStructureKey(cityId: number, category: string, q: number, r: number): string {
+  return `${cityId}:${category}:${tileKey(q, r)}`;
 }
 
 const TECHS: TechDef[] = [
@@ -62,6 +89,29 @@ const TECHS: TechDef[] = [
   { id: "philosophy", name: "Philosophy", cost: 120, prerequisites: ["writing"] },
   { id: "astronomy", name: "Astronomy", cost: 130, prerequisites: ["mathematics", "sailing"] },
 ];
+
+const TECH_EMOJIS: Record<string, string> = {
+  agriculture: "🌾",
+  pottery: "🏺",
+  mining: "⛏️",
+  fishing: "🎣",
+  archery: "🏹",
+  animal_husbandry: "🐎",
+  trapping: "🪤",
+  bronze_working: "🛡️",
+  sailing: "⛵",
+  wheel: "🛞",
+  masonry: "🧱",
+  writing: "📜",
+  horseback_riding: "🐴",
+  currency: "🪙",
+  calendar: "🗓️",
+  iron_working: "⚒️",
+  mathematics: "📐",
+  construction: "🏗️",
+  philosophy: "🧠",
+  astronomy: "🔭",
+};
 
 type BuildableUnit = {
   id: string;
@@ -93,7 +143,7 @@ const STRUCTURE_CATEGORIES: ReadonlyArray<{
   { id: "housing", label: "Housing District", hint: "Townhouse, longhouse, manor" },
   { id: "sacred", label: "Sacred Site", hint: "Temple, shrine, cathedral" },
 ];
-const STRUCTURE_GOLD_COST = 80;
+const STRUCTURE_GOLD_COST = 15;
 const STRUCTURE_PRODUCTION_BONUS = 2;
 
 const IMPROVEMENT_OPTIONS = [
@@ -147,10 +197,10 @@ export default function HomePage() {
   const [activeCityId, setActiveCityId] = useState<number | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [chronicleCollapsed, setChronicleCollapsed] = useState(false);
-  const [mapViewMode, setMapViewMode] = useState<MapViewMode>("local");
   const [bannerEvents, setBannerEvents] = useState<TurnEvent[] | null>(null);
   const [eventLog, setEventLog] = useState<TurnEvent[]>([]);
   const [assets, setAssets] = useState<AssetManifest | null>(null);
+  const [placedStructureAssets, setPlacedStructureAssets] = useState<Record<string, string>>({});
   const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
   const [introDismissed, setIntroDismissed] = useState(false);
   const [showSovereign, setShowSovereign] = useState(false);
@@ -174,6 +224,7 @@ export default function HomePage() {
     setHasStarted(true);
     setState(null);
     setAssets(null);
+    setPlacedStructureAssets({});
     setAssetProgress(null);
     setIntroDismissed(false);
     introNarratedRef.current = false;
@@ -186,7 +237,6 @@ export default function HomePage() {
     setMessageKind("chat");
     setMessageText("");
     setActiveConversationCivId(null);
-    setMapViewMode("local");
     setBannerEvents(null);
     setEventLog([]);
     try {
@@ -356,10 +406,7 @@ export default function HomePage() {
     [state?.visible_tile_keys],
   );
 
-  const activeVisibleTiles = useMemo(
-    () => (mapViewMode === "global" ? new Set<string>() : visibleTiles),
-    [mapViewMode, visibleTiles],
-  );
+  const activeVisibleTiles = visibleTiles;
 
   useEffect(() => {
     if (messageTargetId !== null) return;
@@ -615,9 +662,39 @@ export default function HomePage() {
     await run(() => api.cancelBuild(state.id, humanCiv.id, cityId, index));
   };
 
-  const purchaseStructure = async (cityId: number, category: string) => {
+  const purchaseStructure = async (
+    cityId: number,
+    category: string,
+    q: number,
+    r: number,
+  ) => {
     if (!state || !humanCiv || !isHumanTurn) return;
-    await run(() => api.purchaseStructure(state.id, humanCiv.id, cityId, category));
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await api.purchaseStructure(state.id, humanCiv.id, cityId, category, q, r);
+      ingestEvents(next);
+      setState(next);
+
+      const key = placedStructureKey(cityId, category, q, r);
+      if (assets) {
+        const city = next.cities.find((candidate) => candidate.id === cityId);
+        const leaderName =
+          next.civ_roster.find((civ) => civ.id === city?.owner)?.leader_name ??
+          humanCiv.leader_name;
+        generateStructure(cityStructureFor(leaderName, category))
+          .then((url) => {
+            setPlacedStructureAssets((current) => ({ ...current, [key]: url }));
+          })
+          .catch(() => {
+            // Keep the placed gameplay structure; the map will use its fallback marker.
+          });
+      }
+    } catch (e: unknown) {
+      setError(formatError(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const startImprovement = async (unitId: number, improvement: string) => {
@@ -988,24 +1065,8 @@ export default function HomePage() {
             aria-label={muted ? "Unmute music" : "Mute music"}
             aria-pressed={muted}
           >
-            {muted ? "🔇" : "🔊"}
+            <AudioGlyph muted={muted} />
           </button>
-          <div className="map-mode-toggle" role="tablist" aria-label="Map view mode">
-            <button
-              type="button"
-              className={`map-mode-toggle__button${mapViewMode === "global" ? " is-active" : ""}`}
-              onClick={() => setMapViewMode("global")}
-            >
-              Global
-            </button>
-            <button
-              type="button"
-              className={`map-mode-toggle__button${mapViewMode === "local" ? " is-active" : ""}`}
-              onClick={() => setMapViewMode("local")}
-            >
-              Local
-            </button>
-          </div>
           <div className="turn-box__meta">
             <span className="plate-label">Turn</span>
             <strong>{state.turn}</strong>
@@ -1118,12 +1179,75 @@ export default function HomePage() {
               humanCivId={humanCiv?.id ?? null}
               visibleTiles={activeVisibleTiles}
               assets={assets}
+              placedStructureAssets={placedStructureAssets}
               onTileClick={onTileClick}
               onTileHover={(q, r) =>
                 setHoveredTile(state.tiles.find((t) => t.q === q && t.r === r) ?? null)
               }
+              onStructureDrop={purchaseStructure}
               onUnitClick={onUnitClick}
             />
+
+            {otherCivs.length > 0 && (
+              <div
+                className="leader-ribbon"
+                role="toolbar"
+                aria-label="Diplomatic ribbon"
+              >
+                {otherCivs.map((civ) => {
+                  const stanceEntry = state.stances.find(
+                    (s) => s.other_civ_id === civ.id,
+                  );
+                  const stance = stanceEntry?.stance ?? "peace";
+                  const relationship = stanceEntry?.relationship ?? 0;
+                  const truceActive = stanceEntry?.truce_active ?? false;
+                  const inboxCount = inboxCounts.get(civ.id) ?? 0;
+                  const portrait =
+                    assets?.leaders[civ.id]?.profileUrl ??
+                    assets?.leaders[civ.id]?.splashUrl;
+                  const ringColor = relationshipColor(relationship);
+                  const factionColor = CIV_COLORS[civ.id % CIV_COLORS.length];
+                  const isActive = activeConversationCivId === civ.id;
+                  return (
+                    <button
+                      key={civ.id}
+                      type="button"
+                      className={`leader-ribbon__avatar${isActive ? " is-active" : ""}${truceActive ? " has-truce" : ""}`}
+                      onClick={() => setActiveConversationCivId(civ.id)}
+                      style={{
+                        background: factionColor,
+                        borderColor: ringColor,
+                      }}
+                      title={`${civ.name} · ${civ.leader_name}\n${capitalize(stance)} · ${relationship >= 0 ? "+" : ""}${relationship} ${relationshipLabel(relationship)}${truceActive ? " · Truce" : ""}${inboxCount > 0 ? ` · ${inboxCount} new` : ""}`}
+                    >
+                      {portrait ? (
+                        <img
+                          src={portrait}
+                          alt={`${civ.name} portrait`}
+                        />
+                      ) : (
+                        <span className="leader-ribbon__initial">
+                          {civ.name.slice(0, 1)}
+                        </span>
+                      )}
+                      <span
+                        className="leader-ribbon__stance"
+                        aria-hidden="true"
+                        style={{ background: ringColor }}
+                      />
+                      {inboxCount > 0 && (
+                        <span
+                          className="leader-ribbon__inbox"
+                          aria-label={`${inboxCount} unread message${inboxCount === 1 ? "" : "s"}`}
+                        >
+                          {inboxCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {bannerEvents && bannerEvents.length > 0 && (
               <div className="map-banner">
@@ -1195,7 +1319,12 @@ export default function HomePage() {
                     onClick={() => chooseResearch(tech.id)}
                     disabled={busy || !isHumanTurn || humanCiv?.researching === tech.id}
                   >
-                    <span>{tech.name}</span>
+                    <span className="tech-label">
+                      <span className="tech-label__emoji" aria-hidden="true">
+                        {TECH_EMOJIS[tech.id] ?? "✦"}
+                      </span>
+                      <span>{tech.name}</span>
+                    </span>
                     <span>{tech.cost}</span>
                   </button>
                 ))
@@ -1234,56 +1363,6 @@ export default function HomePage() {
                 ))}
               </div>
             )}
-          </Panel>
-
-          <Panel label="Other Leaders" title={`${otherCivs.length} met`}>
-            <div className="leader-stack">
-              {otherCivs.length === 0 ? (
-                <EmptyCopy>No rival leaders discovered yet.</EmptyCopy>
-              ) : (
-                otherCivs.map((civ) => {
-                  const stanceEntry = state.stances.find(
-                    (item) => item.other_civ_id === civ.id,
-                  );
-                  const stance = stanceEntry?.stance ?? "peace";
-                  const relationship = stanceEntry?.relationship ?? 0;
-                  const truceActive = stanceEntry?.truce_active ?? false;
-                  const truceUntil = stanceEntry?.truce_until;
-                  const inboxCount = inboxCounts.get(civ.id) ?? 0;
-                  return (
-                    <button
-                      key={civ.id}
-                      type="button"
-                      className={`leader-row${activeConversationCivId === civ.id ? " is-active" : ""}`}
-                      onClick={() => setActiveConversationCivId(civ.id)}
-                    >
-                      <LeaderPortrait
-                        className="leader-row__portrait"
-                        name={civ.name}
-                        color={CIV_COLORS[civ.id % CIV_COLORS.length]}
-                        url={
-                          assets?.leaders[civ.id]?.profileUrl ??
-                          assets?.leaders[civ.id]?.splashUrl
-                        }
-                      />
-                      <span className="leader-row__body">
-                        <strong>{civ.name}</strong>
-                        <span>
-                          {capitalize(stance)}
-                          {" · "}
-                          <span style={{ color: relationshipColor(relationship) }}>
-                            {relationship >= 0 ? "+" : ""}
-                            {relationship} {relationshipLabel(relationship)}
-                          </span>
-                          {truceActive ? ` · Truce T${truceUntil}` : ""}
-                          {inboxCount > 0 ? ` · ${inboxCount} new` : ""}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
           </Panel>
 
           <Panel label="Standings" title={`Goal · ${state.score_threshold}`}>
@@ -1674,14 +1753,27 @@ export default function HomePage() {
                       key={cat.id}
                       type="button"
                       className="list-row"
-                      onClick={() => purchaseStructure(activeCity.id, cat.id)}
+                      draggable={!disabled}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(
+                          "application/x-city-structure",
+                          JSON.stringify({
+                            cityId: activeCity.id,
+                            category: cat.id,
+                          }),
+                        );
+                      }}
+                      onClick={() =>
+                        setError("Drag a structure onto an empty tile inside this city's borders.")
+                      }
                       disabled={disabled}
                       title={
                         owned
                           ? "Already built in this city"
                           : !canAfford
                             ? `Need ${STRUCTURE_GOLD_COST} gold`
-                            : "Place this structure"
+                            : "Drag onto an empty tile inside this city's borders"
                       }
                     >
                       <span>
@@ -1886,6 +1978,7 @@ function MiniMap({
       className="minimap"
       style={{
         gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${height}, minmax(0, 1fr))`,
       }}
     >
       {Array.from({ length: width * height }, (_, index) => {

@@ -483,6 +483,25 @@ export function SquareMap(props: StrategyMapProps) {
     props.onTileClick?.(q, r);
   };
 
+  const handleStructureDrop = (
+    event: React.DragEvent<SVGRectElement>,
+    q: number,
+    r: number,
+  ) => {
+    event.preventDefault();
+    const raw = event.dataTransfer.getData("application/x-city-structure");
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw) as { cityId?: number; category?: string };
+      if (typeof payload.cityId !== "number" || typeof payload.category !== "string") {
+        return;
+      }
+      props.onStructureDrop?.(payload.cityId, payload.category, q, r);
+    } catch {
+      return;
+    }
+  };
+
   const viewBox = camera
     ? `${camera.x} ${camera.y} ${camera.width} ${camera.height}`
     : "0 0 1 1";
@@ -957,62 +976,82 @@ export function SquareMap(props: StrategyMapProps) {
             </g>
           )}
 
+          {/* Purchased city structures */}
+          <g pointerEvents="none">
+            {(props.state.structures ?? []).map((structure) => {
+              const key = tileKey(structure.q, structure.r);
+              const { x, y } = hexToPixel({ q: structure.q, r: structure.r });
+              const color = CIV_COLORS[structure.owner % CIV_COLORS.length];
+              const assetKey = `${structure.city_id}:${structure.category}:${key}`;
+              const rawBuildingUrl = props.placedStructureAssets?.[assetKey];
+              const buildingUrl =
+                rawBuildingUrl && !failedHrefs.has(rawBuildingUrl)
+                  ? rawBuildingUrl
+                  : undefined;
+              return (
+                <g key={`${key}:structure:${structure.city_id}:${structure.category}`}>
+                  {buildingUrl ? (
+                    <image
+                      href={buildingUrl}
+                      x={x - half}
+                      y={y - half}
+                      width={TILE_SIZE}
+                      height={TILE_SIZE}
+                      preserveAspectRatio="none"
+                      style={{ imageRendering: "pixelated" }}
+                      onError={() => markFailed(buildingUrl)}
+                    />
+                  ) : (
+                    <rect
+                      x={x - half + TILE_SIZE * 0.18}
+                      y={y - half + TILE_SIZE * 0.18}
+                      width={TILE_SIZE * 0.64}
+                      height={TILE_SIZE * 0.64}
+                      fill={color}
+                      stroke="#0a0f14"
+                      strokeWidth={strokeWidth}
+                    />
+                  )}
+                  <rect
+                    x={x - half + 1}
+                    y={y - half + 1}
+                    width={TILE_SIZE - 2}
+                    height={TILE_SIZE - 2}
+                    fill="none"
+                    stroke={color}
+                    strokeOpacity={0.72}
+                    strokeWidth={borderWidth * 0.52}
+                  />
+                </g>
+              );
+            })}
+          </g>
+
           {/* Cities */}
           <g pointerEvents="none">
             {props.state.cities.map((city) => {
               const key = tileKey(city.q, city.r);
               const { x, y } = hexToPixel({ q: city.q, r: city.r });
               const color = CIV_COLORS[city.owner % CIV_COLORS.length];
-              const rawBuildingUrl = props.assets?.structures?.[city.owner];
-              const buildingUrl =
-                rawBuildingUrl && !failedHrefs.has(rawBuildingUrl)
-                  ? rawBuildingUrl
-                  : undefined;
               return (
                 <g key={key + ":city"}>
-                  {buildingUrl ? (
-                    <>
-                      <image
-                        href={buildingUrl}
-                        x={x - half}
-                        y={y - half}
-                        width={TILE_SIZE}
-                        height={TILE_SIZE}
-                        preserveAspectRatio="none"
-                        style={{ imageRendering: "pixelated" }}
-                        onError={() => markFailed(buildingUrl)}
-                      />
-                      <rect
-                        x={x - half + 1}
-                        y={y - half + 1}
-                        width={TILE_SIZE - 2}
-                        height={TILE_SIZE - 2}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth={borderWidth * 0.7}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <rect
-                        x={x - half + 2}
-                        y={y - half + 4}
-                        width={TILE_SIZE - 4}
-                        height={TILE_SIZE - 6}
-                        fill={color}
-                        stroke="#0a0f14"
-                        strokeWidth={strokeWidth}
-                      />
-                      <rect
-                        x={x - half + 2}
-                        y={y - half + 4}
-                        width={TILE_SIZE - 4}
-                        height={2.5}
-                        fill="#fff"
-                        fillOpacity={0.22}
-                      />
-                    </>
-                  )}
+                  <rect
+                    x={x - half + 2}
+                    y={y - half + 4}
+                    width={TILE_SIZE - 4}
+                    height={TILE_SIZE - 6}
+                    fill={color}
+                    stroke="#0a0f14"
+                    strokeWidth={strokeWidth}
+                  />
+                  <rect
+                    x={x - half + 2}
+                    y={y - half + 4}
+                    width={TILE_SIZE - 4}
+                    height={2.5}
+                    fill="#fff"
+                    fillOpacity={0.22}
+                  />
                   <text
                     x={x}
                     y={y + half + TILE_SIZE * 0.2}
@@ -1186,6 +1225,10 @@ export function SquareMap(props: StrategyMapProps) {
                     setHover((current) => (current === key ? null : current))
                   }
                   onClick={() => handleTileClick(tile.q, tile.r)}
+                  onDragOver={(event) => {
+                    if (props.onStructureDrop) event.preventDefault();
+                  }}
+                  onDrop={(event) => handleStructureDrop(event, tile.q, tile.r)}
                 />
               );
             })}

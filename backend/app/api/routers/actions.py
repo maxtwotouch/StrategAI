@@ -149,7 +149,12 @@ def action_purchase_structure(
         new_state = apply_directive(
             state,
             req.civ_id,
-            PurchaseStructure(city_id=req.city_id, category=req.category),
+            PurchaseStructure(
+                city_id=req.city_id,
+                category=req.category,
+                q=req.q,
+                r=req.r,
+            ),
         )
     except (DirectiveError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -46,6 +46,13 @@ export type CityDTO = {
   worked_tiles: WorkedTileDTO[];
   purchased_structures: string[];
 };
+export type CityStructureDTO = {
+  city_id: number;
+  owner: number;
+  category: string;
+  q: number;
+  r: number;
+};
 export type CivDTO = {
   id: number;
   name: string;
@@ -111,6 +118,7 @@ export type GameStateDTO = {
   // Used by the asset resolver to pre-generate art for civs not yet met.
   civ_roster: CivRosterEntryDTO[];
   cities: CityDTO[];
+  structures: CityStructureDTO[];
   units: UnitDTO[];
   known_civ_ids: number[];
   messages: MessageDTO[];
@@ -197,10 +205,12 @@ export const api = {
     civ_id: number,
     city_id: number,
     category: string,
+    q: number,
+    r: number,
   ) =>
     req<GameStateDTO>(`/games/${id}/actions/purchase-structure`, {
       method: "POST",
-      body: JSON.stringify({ civ_id, city_id, category }),
+      body: JSON.stringify({ civ_id, city_id, category, q, r }),
     }),
   improve: (id: number, unit_id: number, improvement: string) =>
     req<GameStateDTO>(`/games/${id}/actions/improve`, {

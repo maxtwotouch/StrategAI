@@ -99,7 +99,7 @@ def trained_unit_health_bonus(city: City) -> int:
 PURCHASABLE_STRUCTURE_CATEGORIES: frozenset[str] = frozenset(
     {"fortification", "production", "housing", "sacred"}
 )
-STRUCTURE_GOLD_COST: int = 80
+STRUCTURE_GOLD_COST: int = 15
 STRUCTURE_PRODUCTION_BONUS_PER: int = 2
 
 

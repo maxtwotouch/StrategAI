@@ -106,13 +106,36 @@ const STRUCTURE_STYLE: Record<string, string> = {
 };
 const FALLBACK_STYLE = "anglo_saxon_stone";
 
-export function cityStructureFor(leaderName: string): StructureParams {
+const STRUCTURE_COPY: Record<string, { label: string; description: string }> = {
+  production: {
+    label: "production",
+    description:
+      "a compact medieval workshop with a forge chimney, stacked timber, an anvil yard, and practical work sheds, designed as a standalone production building",
+  },
+  fortification: {
+    label: "fortification",
+    description:
+      "a compact defensive gatehouse with crenellated stone walls, a watch platform, narrow arrow slits, and reinforced doors, designed as a standalone fortification",
+  },
+  housing: {
+    label: "housing",
+    description:
+      "a small residential district of clustered townhouses with pitched roofs, fenced yards, laundry lines, and warm domestic detail, designed as standalone housing",
+  },
+  sacred: {
+    label: "sacred",
+    description:
+      "a small sacred site with a shrine, carved stone altar, banners, and ceremonial details, designed as a standalone religious building",
+  },
+};
+
+export function cityStructureFor(leaderName: string, category: string): StructureParams {
+  const copy = STRUCTURE_COPY[category] ?? STRUCTURE_COPY.housing;
   return {
-    category: "housing",
+    category: copy.label,
     style: STRUCTURE_STYLE[leaderName] ?? FALLBACK_STYLE,
     condition: "pristine",
-    scale: "medium",
-    description:
-      "a medieval town center with a great hall under a tiled gabled roof, a stone-and-timber facade, a banner above the entrance, smaller dwellings clustered around it",
+    scale: "small",
+    description: copy.description,
   };
 }

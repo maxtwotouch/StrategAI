@@ -39,12 +39,18 @@ def _state(
         ),
         Civilization(id=1, name="B", leader_name="L", is_human=False),
     )
+    tile_owner = {
+        Hex(1, 0): city.id
+        for city in cities
+        if city.location == Hex(0, 0)
+    }
     return GameState(
         turn=1,
         map=generate_map(4, seed=0),
         civs=civs,
         cities=cities,
         units=(),
+        tile_owner=tile_owner,
     )
 
 
@@ -172,10 +178,12 @@ def test_purchase_structure_adds_category_and_deducts_gold():
     city = City(id=1, owner=0, name="Home", location=Hex(0, 0))
     state = _state(cities=(city,), civ_gold=100)
     new_state = apply_directive(
-        state, 0, PurchaseStructure(city_id=1, category="production")
+        state, 0, PurchaseStructure(city_id=1, category="production", q=1, r=0)
     )
     assert "production" in new_state.cities[0].purchased_structures
-    assert new_state.civs[0].gold == 20  # 100 - 80
+    assert new_state.civs[0].gold == 85  # 100 - 15
+    assert new_state.structures[0].category == "production"
+    assert new_state.structures[0].location == Hex(1, 0)
 
 
 @pytest.mark.unit
@@ -184,7 +192,7 @@ def test_purchase_structure_rejects_insufficient_gold():
     state = _state(cities=(city,), civ_gold=10)
     with pytest.raises(DirectiveError, match="not enough gold"):
         apply_directive(
-            state, 0, PurchaseStructure(city_id=1, category="production")
+            state, 0, PurchaseStructure(city_id=1, category="production", q=1, r=0)
         )
 
 
@@ -200,7 +208,7 @@ def test_purchase_structure_rejects_duplicate_category():
     state = _state(cities=(city,), civ_gold=200)
     with pytest.raises(DirectiveError, match="already has"):
         apply_directive(
-            state, 0, PurchaseStructure(city_id=1, category="production")
+            state, 0, PurchaseStructure(city_id=1, category="production", q=1, r=0)
         )
 
 
@@ -210,7 +218,17 @@ def test_purchase_structure_rejects_unknown_category():
     state = _state(cities=(city,), civ_gold=200)
     with pytest.raises(DirectiveError, match="unknown structure category"):
         apply_directive(
-            state, 0, PurchaseStructure(city_id=1, category="bogus")
+            state, 0, PurchaseStructure(city_id=1, category="bogus", q=1, r=0)
+        )
+
+
+@pytest.mark.unit
+def test_purchase_structure_rejects_tile_outside_city_borders():
+    city = City(id=1, owner=0, name="Home", location=Hex(0, 0))
+    state = _state(cities=(city,), civ_gold=200)
+    with pytest.raises(DirectiveError, match="inside this city's borders"):
+        apply_directive(
+            state, 0, PurchaseStructure(city_id=1, category="production", q=2, r=0)
         )
 
 
@@ -223,7 +241,7 @@ def test_purchase_structure_increases_production_yield():
     state = _state(cities=(city,), civ_gold=200)
     _, before_prod = _city_tile_yields(state, state.cities[0])
     new_state = apply_directive(
-        state, 0, PurchaseStructure(city_id=1, category="production")
+        state, 0, PurchaseStructure(city_id=1, category="production", q=1, r=0)
     )
     _, after_prod = _city_tile_yields(new_state, new_state.cities[0])
     assert after_prod == before_prod + 2

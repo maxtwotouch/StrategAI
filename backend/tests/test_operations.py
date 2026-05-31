@@ -78,6 +78,28 @@ def test_expand_with_settler_emits_found_city_goal():
     assert len(goals) == 1
     assert isinstance(goals[0], FoundCityNear)
     assert goals[0].unit_id == 1
+    assert goals[0].name == "New A"
+
+
+@pytest.mark.unit
+def test_expand_uses_civilization_city_roster():
+    settler = _unit(1, 0, UnitType.SETTLER, Hex(0, 0))
+    civs = (
+        Civilization(id=0, name="Egypt", leader_name="Cleopatra", is_human=False),
+    )
+    state = GameState(
+        turn=1,
+        map=generate_map(4, seed=0),
+        civs=civs,
+        cities=(),
+        units=(settler,),
+    )
+
+    goals, _, _ = resolve_intent(state, civ_id=0, intent=Expand())
+
+    assert len(goals) == 1
+    assert isinstance(goals[0], FoundCityNear)
+    assert goals[0].name == "Memphis"
 
 
 @pytest.mark.unit

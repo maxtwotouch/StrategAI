@@ -13,7 +13,9 @@ export interface StrategyMapProps {
   humanCivId?: number | null;
   visibleTiles: Set<string>;
   assets?: AssetManifest | null;
+  placedStructureAssets?: Record<string, string>;
   onTileClick?: (q: number, r: number) => void;
   onTileHover?: (q: number, r: number) => void;
+  onStructureDrop?: (cityId: number, category: string, q: number, r: number) => void;
   onUnitClick?: (unit: UnitDTO) => void;
 }
