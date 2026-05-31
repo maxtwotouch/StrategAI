@@ -1094,6 +1094,36 @@ select:focus {
   cursor: pointer;
 }
 
+.intro-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.intro-screen__actions .intro-screen__cta {
+  margin-top: 0;
+}
+
+.intro-screen__replay {
+  border-color: rgba(215, 180, 102, 0.38);
+  background: rgba(10, 16, 22, 0.62);
+  color: rgba(245, 238, 219, 0.86);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  padding: 0.82rem 1rem;
+  text-transform: uppercase;
+}
+
+.intro-screen__narration {
+  color: rgba(245, 238, 219, 0.62);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .intro-screen__hint {
   color: rgba(245, 238, 219, 0.5);
   font-size: 0.74rem;

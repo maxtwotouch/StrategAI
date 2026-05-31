@@ -14,7 +14,9 @@ const MUSIC_TRACKS = [
 // Volume targets and crossfade duration. Tweak here.
 const INTRO_VOLUME = 0.6;
 const AMBIENT_VOLUME = 0.22;
+const NARRATION_DUCK_VOLUME = 0.18;
 const INTRO_FADE_IN_MS = 1200;
+const NARRATION_DUCK_MS = 650;
 const CROSSFADE_MS = 2400;
 
 const MUTE_KEY = "inf3600:audioMuted";
@@ -26,6 +28,10 @@ export interface UseAudio {
   toggleMute: () => void;
   /** Call from the user gesture that begins the session (Begin Campaign). */
   startIntro: () => void;
+  /** Play generated campaign narration over the current intro music. */
+  playNarration: (src: string) => void;
+  /** Stop any active spoken intro. */
+  stopNarration: () => void;
   /** Call when the intro is dismissed — crossfades intro → ambient. */
   startAmbient: () => void;
 }
@@ -57,6 +63,7 @@ function rampVolume(
 
 export function useAudio(): UseAudio {
   const musicRef = useRef<HTMLAudioElement | null>(null);
+  const narrationRef = useRef<HTMLAudioElement | null>(null);
   const phaseRef = useRef<Phase>("silent");
   const trackIndexRef = useRef(0);
   const targetVolumeRef = useRef(INTRO_VOLUME);
@@ -81,14 +88,33 @@ export function useAudio(): UseAudio {
       // ignore
     }
     if (musicRef.current) musicRef.current.muted = muted;
+    if (narrationRef.current) narrationRef.current.muted = muted;
   }, [muted]);
 
   // Pause everything on unmount so HMR + navigation don't leak playback.
   useEffect(() => {
     return () => {
+      narrationRef.current?.pause();
       musicRef.current?.pause();
     };
   }, []);
+
+  const restoreTargetVolume = useCallback(() => {
+    const music = musicRef.current;
+    if (!music) return;
+    rampVolume(music, targetVolumeRef.current, NARRATION_DUCK_MS);
+  }, []);
+
+  const stopNarration = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const narration = narrationRef.current;
+    if (narration) {
+      narration.pause();
+      narration.src = "";
+      narrationRef.current = null;
+    }
+    restoreTargetVolume();
+  }, [restoreTargetVolume]);
 
   const ensureAudio = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -126,8 +152,29 @@ export function useAudio(): UseAudio {
     rampVolume(music, INTRO_VOLUME, INTRO_FADE_IN_MS);
   }, [ensureAudio]);
 
+  const playNarration = useCallback(
+    (src: string) => {
+      if (typeof window === "undefined" || muted || !src) return;
+      stopNarration();
+      const narration = new Audio(src);
+      narration.preload = "auto";
+      narration.volume = 1;
+      narration.muted = muted;
+      narration.addEventListener("play", () => {
+        const music = musicRef.current;
+        if (music) rampVolume(music, NARRATION_DUCK_VOLUME, NARRATION_DUCK_MS);
+      });
+      narration.addEventListener("ended", restoreTargetVolume);
+      narration.addEventListener("error", restoreTargetVolume);
+      narrationRef.current = narration;
+      narration.play().catch(() => restoreTargetVolume());
+    },
+    [muted, restoreTargetVolume, stopNarration],
+  );
+
   const startAmbient = useCallback(() => {
     if (phaseRef.current === "ambient") return;
+    stopNarration();
     phaseRef.current = "ambient";
     targetVolumeRef.current = AMBIENT_VOLUME;
     ensureAudio();
@@ -135,9 +182,9 @@ export function useAudio(): UseAudio {
     if (!music) return;
     if (music.paused) music.play().catch(() => {});
     rampVolume(music, AMBIENT_VOLUME, CROSSFADE_MS);
-  }, [ensureAudio]);
+  }, [ensureAudio, stopNarration]);
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
-  return { muted, toggleMute, startIntro, startAmbient };
+  return { muted, toggleMute, startIntro, playNarration, stopNarration, startAmbient };
 }

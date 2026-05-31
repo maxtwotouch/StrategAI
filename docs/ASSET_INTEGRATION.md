@@ -29,6 +29,21 @@ and letter-initial portraits. No asset requests are made.
 
 A `frontend/.env.example` shows the expected shape.
 
+### Same-origin proxy (CORS shield)
+
+POST and JSON GET calls from the browser route through a Next.js API route at
+**`/api/asset/[...path]`** (`frontend/app/api/asset/[...path]/route.ts`) which
+forwards server-to-server to `NEXT_PUBLIC_ASSET_API_URL`. The browser only
+ever talks to its own origin, so CORS is never a factor — including when the
+upstream returns 5xx (typical CORS gotcha: error responses don't include
+`Access-Control-Allow-Origin` headers, and browsers report that as a CORS
+failure even though the real problem is the 5xx).
+
+**PNG fetches do not go through the proxy.** `<img src>` and SVG
+`<image href>` aren't CORS-restricted for display, so `absoluteAssetUrl()`
+still returns direct `https://…/assets/{uuid}.png` URLs — no extra Next.js
+hop on every map tile.
+
 ---
 
 ## 2. Endpoints We Use
@@ -73,10 +88,9 @@ hills | mountain | tundra | snow → stone
 desert                          → sand
 ```
 
-### Units (`assetMapping.ts:UNIT_TYPE_MAP`)
+### Units (`assetMapping.ts:UNIT_TYPE_MAP` + `unitDescriptionFor`)
 
-7 game units collapse onto 4 service types; the resolver POSTs once per
-distinct service type then expands the URL back across every game type.
+7 game units collapse onto 4 service types:
 
 ```
 warrior, swordsman, horseman → warrior
@@ -85,8 +99,15 @@ scout                        → scout
 settler, worker              → settler
 ```
 
-`assetMapping.ts:UNIT_DESCRIPTION` carries a 20+ char description per service
-type that satisfies the API's validation.
+**Per-civ unique sprites.** The resolver fans out across **every civ × every
+service unit type** (so 4 civs × 4 types = 16 POSTs per game start), passing a
+culture-flavored description so each civilization's units look distinct.
+`unitDescriptionFor(apiType, culture)` prepends a culture word (e.g.
+`"an East Asian imperial"`, `"a Nordic Viking"`) to the base unit description.
+The manifest stores units as `Record<civId, Record<gameUnitType, url>>`, and
+`SquareMap` looks up `assets.units[unit.owner]?.[unit.type]` so each civ's
+units render with their own sprite even when they happen to be the same
+gameplay type.
 
 ### Elevation overlays (`assetMapping.ts:ELEVATION_TERRAINS`)
 
@@ -132,31 +153,33 @@ resolveManifest({ gameId, terrains, civs, leaders }, { onProgress }) ──┐
                                                                        │
 1.  assetApiConfigured() ──── false ──► return null  ◄─── NEXT_PUBLIC_… unset
                                                                        │
-2.  loadCachedManifest(gameId) ──── hit ──► return cached            ◄─┘
-                                                                  
-3.  Compute work items:
+2.  Compute work items:                                              ◄─┘
        distinctTerrains   = unique(terrains) ∩ TERRAIN_TO_TILE_TYPE
        elevationTerrains  = unique(terrains) ∩ ELEVATION_TERRAINS
        apiUnitTypes       = unique(values(UNIT_TYPE_MAP))     // = 4
-       civs               // for /structure
+       civs               // for /structure AND per-civ /unit batches
        leaders            // for /leader (splash+profile)
 
-4.  Fetch leader pool once:    listLeaders()  GET /leader
+3.  Fetch leader pool once:    listLeaders()  GET /leader
 
-5.  Run all batches concurrently via mapLimit():
+4.  Run all batches concurrently via mapLimit():
        terrainWork    limit 4   → POST /background_tile     × distinctTerrains
        elevationWork  limit 2   → POST /terrain             × elevationTerrains
-       unitWork       limit 2   → POST /unit                × apiUnitTypes (4)
+       unitWork                 → per civ in parallel, each civ runs
+                                  mapLimit(apiUnitTypes, 2) so up to
+                                  civs × 2 unit POSTs are in flight at once
+                                  (descriptions are culture-flavored per civ)
        structureWork  limit 2   → POST /structure           × civs
        leaderWork     limit 2   → POST /leader splash → POST /leader profile
                                   (per civ; falls back to pool on POST failure)
 
-6.  Stitch units: for each gameType, units[gameType] = apiUnitUrls[mappedType].
-
-7.  Build the manifest object, save to localStorage if anything resolved.
-
-8.  Return manifest to loadGame() → setAssets(manifest).
+5.  Build the manifest object and return it to loadGame() → setAssets(manifest).
 ```
+
+There is **no caching layer** — every game start (and every page refresh that
+triggers a new game) re-resolves from the asset service. This keeps the game
+honest about backend restarts that reuse a `gameId`: stale URLs from a
+previous deploy can never linger in `localStorage`.
 
 `mapLimit(items, limit, worker)` is a small concurrency-limited iterator —
 keeps in-flight requests under control even when the asset server is GPU-bound
@@ -196,47 +219,37 @@ service base URL.
 
 ---
 
-## 6. Caching
+## 6. No Caching
 
-### Per-game `localStorage` cache
-
-Key format:
-
-```
-inf3600:assetManifest:{hostTag}:{gameId}
-```
-
-- `hostTag` is derived from `NEXT_PUBLIC_ASSET_API_URL` (lowercased, host part,
-  non-alphanumerics replaced). **Swapping asset servers automatically
-  invalidates older entries** — no stale URLs from the previous host can leak
-  into the new session.
-- `gameId` comes from the backend's `state.id`. Each `createGame` returns a
-  fresh id (monotonic per backend lifetime), so each game start gets a unique
-  art set within the same host.
+The asset manifest is **not persisted**. Every game start hits the asset
+service fresh. Earlier iterations cached the manifest in `localStorage` keyed
+by `{hostTag}:{gameId}`, but that masked a real problem: when the backend
+restarted and reused a `gameId`, the cache served URLs the asset server had
+since rotated out — and that looked identical to "the resolver never fired."
+The performance win of skipping fetches at game start (a few seconds behind
+the load screen) wasn't worth that hazard.
 
 ### What happens on:
 
-- **New game.** Backend assigns a new `gameId`. Cache miss → full resolution.
-- **Reload of the same game.** Same `gameId`. Cache hit → instant manifest
-  reuse, zero network requests.
-- **Backend restarts and `gameId` collides.** Different `hostTag` would
-  invalidate; same `hostTag` + same id would reuse stale URLs. The host tag
-  doesn't protect this scenario — clear `localStorage` if you're seeing
-  stale art after backend resets.
+- **New game.** Full resolution every time.
+- **Page refresh during a game.** Lost React state forces the user back to
+  the start screen; the next Begin Campaign creates a new game and a new
+  resolution.
+- **Backend restart that reuses a `gameId`.** Doesn't matter — there's nothing
+  cached to reuse.
+
+`lib/assetManifest.ts` includes a one-off `localStorage` housekeeping block
+that wipes `inf3600:assetManifest:*` entries left over from the cached era.
+Safe to delete after a release or two.
 
 ### Browser-console helpers
 
 ```js
-// list every cached manifest
-Object.keys(localStorage).filter(k => k.startsWith("inf3600:assetManifest:"));
-
-// nuke them all
-Object.keys(localStorage)
-  .filter(k => k.startsWith("inf3600:assetManifest:"))
-  .forEach(k => localStorage.removeItem(k));
-
 // verify the env var made it into the bundle
 console.log(process.env.NEXT_PUBLIC_ASSET_API_URL);
+
+// confirm no stale manifests linger (should always be empty now)
+Object.keys(localStorage).filter(k => k.startsWith("inf3600:assetManifest:"));
 ```
 
 ---

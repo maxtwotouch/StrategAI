@@ -366,6 +366,10 @@ class CreateGameRequest(BaseModel):
     human_name: str = Field(default="Athens", min_length=1, max_length=40)
 
 
+class IntroNarrationRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1200)
+
+
 class MoveRequest(BaseModel):
     unit_id: int
     q: int

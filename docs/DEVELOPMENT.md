@@ -294,19 +294,18 @@ cd ../frontend && npm run typecheck && npm run build
 
 ## 9. Useful Console + Shell Snippets
 
-### Browser console — asset manifest cache
+### Browser console — env + state inspection
+
+The asset manifest is no longer persisted (see
+[ASSET_INTEGRATION.md §6](ASSET_INTEGRATION.md#6-no-caching)), so cache
+clearing is rarely needed. Useful checks:
 
 ```js
-// inspect
-Object.keys(localStorage).filter(k => k.startsWith("inf3600:"));
-
-// clear all
-Object.keys(localStorage)
-  .filter(k => k.startsWith("inf3600:assetManifest:"))
-  .forEach(k => localStorage.removeItem(k));
-
 // see what env was inlined
 console.log("ASSET URL:", process.env.NEXT_PUBLIC_ASSET_API_URL);
+
+// confirm no stale manifests linger from an earlier release
+Object.keys(localStorage).filter(k => k.startsWith("inf3600:"));
 ```
 
 ### Shell — list which dev processes are running

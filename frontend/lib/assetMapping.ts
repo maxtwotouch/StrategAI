@@ -44,19 +44,40 @@ export const UNIT_TYPE_MAP: Record<string, ApiUnitType> = {
   worker: "settler",
 };
 
-const UNIT_DESCRIPTION: Record<ApiUnitType, string> = {
+// Base shape + gear per unit, expressed without a culture so the per-civ
+// generator can vary the styling.
+const UNIT_BASE: Record<ApiUnitType, string> = {
   warrior:
-    "a medieval foot soldier in leather and mail armor, holding a sword and a round wooden shield, helmeted, alert standing stance",
+    "foot soldier in armor, holding a sword and a round wooden shield, helmeted, alert standing stance",
   archer:
-    "a medieval archer in light leather armor drawing a longbow, a quiver of arrows on the back, hooded, focused stance",
+    "archer drawing a longbow, a quiver of arrows on the back, hooded, focused stance",
   scout:
-    "a lightly equipped medieval scout in a hooded traveling cloak, holding a short spear, a satchel at the hip, watchful posture",
+    "lightly equipped scout in a hooded traveling cloak, holding a short spear, a satchel at the hip, watchful posture",
   settler:
-    "a medieval settler in plain peasant clothes carrying tools and a bundle of supplies, a walking staff in hand, weary but resolute",
+    "settler in plain peasant clothes carrying tools and a bundle of supplies, a walking staff in hand, weary but resolute",
 };
 
-export function unitDescriptionFor(apiType: ApiUnitType): string {
-  return UNIT_DESCRIPTION[apiType];
+// Cultural flavor prepended to the base description so each civ gets a
+// distinct sprite for the same gameplay unit type. Matches the asset
+// service's Culture enum.
+const CULTURE_FLAVOR: Record<string, string> = {
+  ancient_egyptian: "an Ancient Egyptian",
+  classical_greek: "a Classical Greek",
+  roman_imperial: "a Roman imperial",
+  medieval_european: "a medieval European",
+  east_asian_imperial: "an East Asian imperial",
+  mesopotamian: "a Mesopotamian",
+  mesoamerican: "a Mesoamerican",
+  nordic_viking: "a Nordic Viking",
+  persian: "a Persian",
+  sub_saharan_african: "a Sub-Saharan African",
+  south_asian: "a South Asian",
+  islamic_golden_age: "an Islamic Golden Age",
+};
+
+export function unitDescriptionFor(apiType: ApiUnitType, culture: string): string {
+  const flavor = CULTURE_FLAVOR[culture] ?? "a medieval";
+  return `${flavor} ${UNIT_BASE[apiType]}`;
 }
 
 // --- Terrain elevation: which terrains get a relief sprite layered on top ---

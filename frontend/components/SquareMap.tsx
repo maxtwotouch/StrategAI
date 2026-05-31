@@ -1040,7 +1040,7 @@ export function SquareMap(props: StrategyMapProps) {
               const color = CIV_COLORS[unit.owner % CIV_COLORS.length];
               const isSelected = unit.id === props.selectedUnitId;
               const size = TILE_SIZE * 0.62;
-              const rawSpriteUrl = props.assets?.units?.[unit.type];
+              const rawSpriteUrl = props.assets?.units?.[unit.owner]?.[unit.type];
               const spriteUrl =
                 rawSpriteUrl && !failedHrefs.has(rawSpriteUrl)
                   ? rawSpriteUrl

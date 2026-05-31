@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SquareMap } from "@/components/SquareMap";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
@@ -113,6 +113,16 @@ const MESSAGE_KINDS = [
   { id: "reject", label: "Reject" },
 ];
 
+function buildIntroNarration(civName: string, leaderName: string): string {
+  return [
+    `In the long silence before empire, the people of ${civName} gathered beneath strange stars and dreamed of dominion.`,
+    `Now, beneath the hand of ${leaderName}, their first banners rise against the darkness of an unclaimed world.`,
+    "Stone will answer to your will. Rivers will carry your name. Enemies yet unborn will learn to fear the sound of your drums.",
+    "Found the capital. Send forth the scouts. Claim knowledge, gold, and steel before the rival thrones awaken.",
+    "For from one fragile settlement may rise an empire whose shadow falls across the ages.",
+  ].join(" ");
+}
+
 export default function HomePage() {
   const [state, setState] = useState<GameStateDTO | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<UnitDTO | null>(null);
@@ -144,7 +154,12 @@ export default function HomePage() {
   const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
   const [introDismissed, setIntroDismissed] = useState(false);
   const [showSovereign, setShowSovereign] = useState(false);
-  const { muted, toggleMute, startIntro, startAmbient } = useAudio();
+  const { muted, toggleMute, startIntro, playNarration, startAmbient } = useAudio();
+  const introNarratedRef = useRef(false);
+  const introNarrationUrlRef = useRef<string | null>(null);
+  const [introNarrationStatus, setIntroNarrationStatus] = useState<
+    "idle" | "generating" | "playing" | "unavailable"
+  >("idle");
 
   const dismissIntro = () => {
     setIntroDismissed(true);
@@ -161,6 +176,8 @@ export default function HomePage() {
     setAssets(null);
     setAssetProgress(null);
     setIntroDismissed(false);
+    introNarratedRef.current = false;
+    setIntroNarrationStatus("idle");
     setSelectedUnit(null);
     setHoveredTile(null);
     setPending(null);
@@ -251,6 +268,54 @@ export default function HomePage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [introDismissed, state]);
+
+  useEffect(() => {
+    return () => {
+      if (introNarrationUrlRef.current) {
+        URL.revokeObjectURL(introNarrationUrlRef.current);
+      }
+    };
+  }, []);
+
+  const playIntroNarration = useCallback(
+    async (civName: string, leaderName: string) => {
+      if (muted) {
+        setIntroNarrationStatus("idle");
+        return;
+      }
+      setIntroNarrationStatus("generating");
+      try {
+        const audio = await api.generateIntroNarration(
+          buildIntroNarration(civName, leaderName),
+        );
+        if (introNarrationUrlRef.current) {
+          URL.revokeObjectURL(introNarrationUrlRef.current);
+        }
+        const url = URL.createObjectURL(audio);
+        introNarrationUrlRef.current = url;
+        playNarration(url);
+        setIntroNarrationStatus("playing");
+      } catch {
+        setIntroNarrationStatus("unavailable");
+      }
+    },
+    [muted, playNarration],
+  );
+
+  useEffect(() => {
+    if (!state || introDismissed || introNarratedRef.current) return;
+    const civ = state.civs.find((c) => c.is_human);
+    const civName = civ?.name ?? setup.humanName;
+    const leaderName = setup.leaderName.trim() || civ?.leader_name || civName;
+    introNarratedRef.current = true;
+    void playIntroNarration(civName, leaderName);
+  }, [
+    introDismissed,
+    playIntroNarration,
+    setup.humanName,
+    setup.leaderName,
+    state,
+  ]);
 
   const humanCiv = useMemo(
     () => state?.civs.find((c) => c.is_human) ?? null,
@@ -813,16 +878,37 @@ export default function HomePage() {
             <br />
             History will remember what is forged here.
           </p>
-          <button
-            type="button"
-            className="button-primary intro-screen__cta"
-            onClick={(e) => {
-              e.stopPropagation();
-              dismissIntro();
-            }}
-          >
-            Begin the Age
-          </button>
+          <div className="intro-screen__actions">
+            <button
+              type="button"
+              className="button-primary intro-screen__cta"
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissIntro();
+              }}
+            >
+              Begin the Age
+            </button>
+            <button
+              type="button"
+              className="intro-screen__replay"
+              onClick={(e) => {
+                e.stopPropagation();
+                void playIntroNarration(civName, leaderName);
+              }}
+            >
+              Replay Proclamation
+            </button>
+          </div>
+          <div className="intro-screen__narration">
+            {muted && "AI narration muted"}
+            {!muted && introNarrationStatus === "idle" && "AI narration ready"}
+            {!muted && introNarrationStatus === "generating" && "Generating AI voice..."}
+            {!muted && introNarrationStatus === "playing" &&
+              "AI-generated voice playing over campaign music"}
+            {!muted && introNarrationStatus === "unavailable" &&
+              "AI voice unavailable; check backend OPENAI_API_KEY"}
+          </div>
           <div className="intro-screen__hint">click backdrop · esc · enter · space</div>
         </section>
         {error && <div className="toast">{error}</div>}
@@ -840,15 +926,25 @@ export default function HomePage() {
           title="View sovereign portrait"
         >
           <div className="empire-badge__seal" style={{ background: humanColor }}>
-            {humanCiv && assets?.leaders[humanCiv.id]?.profileUrl ? (
-              <img
-                className="leader-portrait__img"
-                src={assets.leaders[humanCiv.id].profileUrl}
-                alt={setup.leaderName || humanCiv.leader_name}
-              />
-            ) : (
-              humanCiv?.name?.slice(0, 1) ?? "A"
-            )}
+            {(() => {
+              if (!humanCiv) return "A";
+              // Prefer the square profile; if the server's profile stage
+              // failed, fall back to the splash so the badge still shows
+              // real art rather than an initial.
+              const portrait =
+                assets?.leaders[humanCiv.id]?.profileUrl ??
+                assets?.leaders[humanCiv.id]?.splashUrl;
+              if (portrait) {
+                return (
+                  <img
+                    className="leader-portrait__img"
+                    src={portrait}
+                    alt={setup.leaderName || humanCiv.leader_name}
+                  />
+                );
+              }
+              return humanCiv.name?.slice(0, 1) ?? "A";
+            })()}
           </div>
           <div className="empire-badge__copy">
             <div className="empire-badge__name">{humanCiv?.name ?? "Civilization"}</div>
@@ -1161,7 +1257,10 @@ export default function HomePage() {
                         className="leader-row__portrait"
                         name={civ.name}
                         color={CIV_COLORS[civ.id % CIV_COLORS.length]}
-                        url={assets?.leaders[civ.id]?.profileUrl}
+                        url={
+                          assets?.leaders[civ.id]?.profileUrl ??
+                          assets?.leaders[civ.id]?.splashUrl
+                        }
                       />
                       <span className="leader-row__body">
                         <strong>{civ.name}</strong>
@@ -1330,7 +1429,10 @@ export default function HomePage() {
                   className="leader-row__portrait diplomacy-audience__portrait"
                   name={activeConversationCiv.name}
                   color={CIV_COLORS[activeConversationCiv.id % CIV_COLORS.length]}
-                  url={assets?.leaders[activeConversationCiv.id]?.profileUrl}
+                  url={
+                    assets?.leaders[activeConversationCiv.id]?.profileUrl ??
+                    assets?.leaders[activeConversationCiv.id]?.splashUrl
+                  }
                 />
                 <div className="diplomacy-audience__heading">
                   <div className="plate-label">Diplomatic Audience</div>

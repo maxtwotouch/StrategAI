@@ -129,6 +129,19 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function reqBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+  }
+  return await res.blob();
+}
+
 export const api = {
   createGame: (radius = 5, seed = 0, human_name = "Athens") =>
     req<GameStateDTO>("/games", {
@@ -195,5 +208,10 @@ export const api = {
     req<GameStateDTO>(`/games/${id}/actions/message`, {
       method: "POST",
       body: JSON.stringify({ from_civ_id, to_civ_id, kind, text }),
+    }),
+  generateIntroNarration: (text: string) =>
+    reqBlob("/audio/intro", {
+      method: "POST",
+      body: JSON.stringify({ text }),
     }),
 };
