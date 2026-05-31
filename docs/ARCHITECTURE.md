@@ -1,8 +1,8 @@
 # Architecture
 
 AI Civilization-style game with a deterministic Python game engine driven by
-LLM-emitted strategic goals.  This document summarizes the system as it stands
-today (151 tests green, end-to-end playthroughs runnable).
+LLM-emitted strategic intents.  This document summarizes the system as it stands
+today (339+ tests, end-to-end playthroughs runnable).
 
 ---
 
@@ -11,26 +11,33 @@ today (151 tests green, end-to-end playthroughs runnable).
 The system is split into three layers:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  STRATEGIC LAYER     (LLM via OpenAI tool-use API)      │
-│  Sees fog-filtered local view → emits Goals             │
-└──────────────────────┬──────────────────────────────────┘
-                       │ Goal (MoveTo / FoundCityNear / AttackUnit)
+┌──────────────────────────────────────────────────────────┐
+│  STRATEGIC LAYER     (LLM via OpenAI tool-use API)       │
+│  Sees fog-filtered local view → emits Intents            │
+└──────────────────────┬───────────────────────────────────┘
+                       │ Intent (Expand / Scout / Engage / …)
                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  TACTICAL LAYER      (deterministic Python)             │
-│  A* pathfinding, move-budget, occupancy → Actions       │
-└──────────────────────┬──────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  OPERATIONS LAYER    (deterministic Python)              │
+│  Intents → Goals + DiplomaticActions + Directives        │
+└──────────────────────┬───────────────────────────────────┘
+                       │ Goal (MoveTo / FoundCityNear / AttackUnit / …)
+                       ▼
+┌──────────────────────────────────────────────────────────┐
+│  TACTICAL LAYER      (deterministic Python)              │
+│  A* pathfinding, move-budget, occupancy → Actions        │
+└──────────────────────┬───────────────────────────────────┘
                        │ Action (Move / FoundCity / Attack / …)
                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  VALIDATOR + ENGINE  (pure functional, immutable state) │
-│  Legality check → apply → new GameState                 │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  VALIDATOR + ENGINE  (pure functional, immutable state)  │
+│  Legality check → apply → new GameState                  │
+└──────────────────────────────────────────────────────────┘
 ```
 
 Key principle: the LLM never touches `GameState` directly.  Every LLM
-intent passes through the executor (which knows pathfinding rules) and the
+intent passes through the operations layer (which resolves high-level intents
+into concrete goals), the executor (which knows pathfinding rules), and the
 validator (which knows game rules) before any state mutation.
 
 ---
@@ -38,7 +45,7 @@ validator (which knows game rules) before any state mutation.
 ## 2. Repository Layout
 
 ```
-INF-3600/
+StrategAI/
 ├── backend/
 │   ├── app/
 │   │   ├── api/                    FastAPI routes + DTOs
@@ -58,17 +65,27 @@ INF-3600/
 │   │   │   ├── production.py       City growth + unit building
 │   │   │   ├── research.py         Tech tree + science ticks
 │   │   │   ├── combat.py           Melee combat resolution
+│   │   │   ├── diplomacy.py        Stances, messaging, relationships
 │   │   │   ├── fog_of_war.py       Per-civ visibility
 │   │   │   ├── victory.py          Domination + score victory
 │   │   │   ├── turn_resolver.py    End-of-turn bookkeeping
+│   │   │   ├── intents.py          Strategic intent dataclasses (9 types)
+│   │   │   ├── operations.py       Intents → Goals + Diplomacy + Directives
+│   │   │   ├── directives.py       City/civ directives (queue, research)
 │   │   │   ├── executor.py         Goals → primitive Actions (A*)
 │   │   │   ├── serialize.py        GameState → JSON local view
 │   │   │   ├── playthrough.py      Headless game loop + GoalSources
-│   │   │   └── openai_goals.py     OpenAI tool-use GoalSource
+│   │   │   ├── openai_goals.py     OpenAI tool-use GoalSource
+│   │   │   ├── human_source.py     Human player input source
+│   │   │   ├── improvements.py     Tile improvements (farm, mine, road)
+│   │   │   ├── buildings.py        City buildings / structures
+│   │   │   ├── economy.py          Gold income, upkeep, tile yields
+│   │   │   ├── borders.py          Cultural border expansion
+│   │   │   └── city_names.py       Procedural city name generator
 │   │   └── main.py                 FastAPI app entry
 │   ├── scripts/
 │   │   └── run_playthrough.py      CLI playthrough runner
-│   ├── tests/                      151 tests, pytest
+│   ├── tests/                      339+ tests, pytest
 │   └── pyproject.toml
 └── frontend/                       Next.js viewer (separate workstream)
 ```
@@ -143,6 +160,21 @@ LLM-facing legality is handled separately by the validator.
 | `victory.py`    | `check_victory(state)` — domination + score   |
 | `turn_resolver.py` | `end_turn(state)` — production + research + refresh moves |
 
+### Additional modules
+
+| Module            | Purpose                                                |
+|-------------------|--------------------------------------------------------|
+| `diplomacy.py`    | Diplomatic stances, messaging, relationship scores, truces |
+| `intents.py`      | 9 strategic intent dataclasses (Expand, Scout, …)      |
+| `operations.py`   | Translates Intents → Goals + DiplomaticActions + Directives |
+| `directives.py`   | City/civ-level orders: queue production, set research  |
+| `improvements.py` | Tile improvements: farm, mine, road                     |
+| `buildings.py`    | City buildings and structures                           |
+| `economy.py`      | Gold income, upkeep, tile yield calculations            |
+| `borders.py`      | Cultural border expansion from cities                   |
+| `city_names.py`   | Procedural civilization-themed city name generator      |
+| `human_source.py` | Human player input source for GoalSource protocol       |
+
 ### Tech tree
 
 20 techs across 4 tiers with prerequisites (e.g. `iron_working` needs
@@ -184,14 +216,49 @@ rejection before any deeper validation.
 
 ---
 
-## 7. Tactical Executor (`engine/executor.py`)
+## 7. Intents & Operations (`engine/intents.py`, `engine/operations.py`)
 
-Translates strategic goals into validated primitive actions.
+The LLM no longer emits Goals directly.  Instead it emits high-level
+**Intents** — semantic declarations like "expand" or "engage Egypt".
+The **operations layer** (`operations.py`) translates each Intent plus the
+current `GameState` into one or more concrete Goals, DiplomaticActions,
+and Directives.
 
-**Goals** the LLM can express:
+### The 9 Intent Types (`intents.py`)
+
+| Intent           | Purpose                                                     |
+|------------------|-------------------------------------------------------------|
+| `Expand`         | Found a city (settler + site picked deterministically)      |
+| `Scout`          | Explore unknown territory                                   |
+| `Engage`         | Wage war on a target civ (auto-declares war if needed)      |
+| `Reinforce`      | March a military unit toward a friendly position            |
+| `Speak`          | Send a diplomatic message to another leader                 |
+| `AdjustStance`   | Set diplomatic stance (peace/war/alliance)                   |
+| `Build`          | Queue a unit at a city                                      |
+| `Research`       | Set the civ's currently-researching tech                    |
+| `Improve`        | Send a worker to build a tile improvement (farm/mine/road)  |
+
+### Operations Layer (`operations.py`)
+
+`resolve_intents(state, civ_id, intents) → Decisions` is a pure function that:
+- Picks the best unit for each intent (closest-to-target, lowest-id tiebreak)
+- Auto-declares war before `Engage` if not already at war
+- Drops self-targeted `Speak` / `AdjustStance` / `Engage`
+- Emits `MoveTo`, `FoundCityNear`, `AttackUnit`, or `BuildImprovementGoal` goals
+- Emits `SendMessage` / `SetStance` diplomatic actions
+- Emits `QueueProduction` / `StartResearch` directives
+
+---
+
+## 8. Tactical Executor (`engine/executor.py`)
+
+Translates concrete Goals into validated primitive actions.
+
+**Goals** produced by the operations layer:
 - `MoveTo(unit_id, target_hex)`
 - `FoundCityNear(unit_id, target_hex, name)`
 - `AttackUnit(attacker_id, target_id)`
+- `BuildImprovementGoal(unit_id, target, improvement)`
 
 **`find_path(state, start, goal)`** — A* on the hex grid using `heapq`.
 Treats impassable terrain and occupied tiles as obstacles, but allows the
@@ -201,12 +268,13 @@ Treats impassable terrain and occupied tiles as obstacles, but allows the
 - `MoveTo` walks along the shortest path up to `unit.moves_remaining`.
 - `FoundCityNear` walks then appends a `FoundCityAction` if it arrives.
 - `AttackUnit` walks adjacent (reserving 1 move) then appends an `AttackAction`.
+- `BuildImprovementGoal` walks a worker to the target tile then appends a `BuildImprovementAction`.
 
 The executor never mutates state — it only proposes actions.
 
 ---
 
-## 8. Local View Serializer (`engine/serialize.py`)
+## 9. Local View Serializer (`engine/serialize.py`)
 
 `local_view(state, civ_id) -> dict` produces the **single payload** consumed
 by both:
@@ -231,15 +299,20 @@ Deterministic ordering (sorted by coord/id) for diff-friendly outputs.
 
 ---
 
-## 9. Playthrough Harness (`engine/playthrough.py`)
+## 10. Playthrough Harness (`engine/playthrough.py`)
 
 The full headless game loop.
 
 ### `GoalSource` Protocol
 
 ```python
+class Decisions:
+    goals: tuple[Goal, ...]
+    diplomacy: tuple[DiplomaticAction, ...]
+    directives: tuple[Directive, ...]
+
 class GoalSource(Protocol):
-    def goals(self, view: dict, civ_id: int) -> list[Goal]: ...
+    def decide(self, view: dict, civ_id: int) -> Decisions: ...
 ```
 
 Implementations:
@@ -249,6 +322,7 @@ Implementations:
 | `RandomGoalSource`  | Smoke testing — settlers found cities, military randomly walks |
 | `ScriptedGoalSource`| Deterministic integration scenarios — goals keyed by `(turn, civ_id)` |
 | `OpenAIGoalSource`  | Real LLM gameplay via tool-use API       |
+| `HumanGoalSource`   | Human player input via API               |
 
 ### Loop
 
@@ -257,7 +331,15 @@ while state.turn <= max_turns:
     if check_victory(state): return
     civ = state.current_civ()
     view = local_view(state, civ.id)
-    for goal in goal_source.goals(view, civ.id):
+    decisions = goal_source.decide(view, civ.id)
+    # 1. Apply directives (queue production, set research)
+    for directive in decisions.directives:
+        state = apply_directive(state, civ.id, directive)
+    # 2. Apply diplomatic actions
+    for da in decisions.diplomacy:
+        state = apply_diplomatic_action(state, da)
+    # 3. Execute goals → actions → validate → apply
+    for goal in decisions.goals:
         for action in execute_goal(state, civ.id, goal):
             result = validate(action, state, civ.id)
             if isinstance(result, ValidationOk):
@@ -276,27 +358,52 @@ Returns a `PlaythroughResult` with `turns_played`, `actions_applied`,
 
 ---
 
-## 10. OpenAI Goal Source (`engine/openai_goals.py`)
+## 11. OpenAI Goal Source (`engine/openai_goals.py`)
 
 Uses the OpenAI Chat Completions API with `tool_choice="required"`.
 
-Three tools mirror the Goal types: `move_to`, `found_city_near`, `attack_unit`.
-Each takes integer `unit_id` and target `(q, r)` (and `name` for founding).
+### 9 Intent Tools
+
+The LLM calls high-level intent tools — it never picks unit IDs or coordinates.
+
+| Tool             | Intent Class     | Description                                              |
+|------------------|------------------|----------------------------------------------------------|
+| `expand`         | `Expand`         | Found a city (engine picks settler + site)               |
+| `scout`          | `Scout`          | Explore unknown territory                                |
+| `engage`         | `Engage`         | Wage war on a civ (auto-declares if needed)              |
+| `reinforce`      | `Reinforce`      | March a military unit toward a friendly position         |
+| `speak`          | `Speak`          | Send a diplomatic message (chat/threat/offer_peace/…)    |
+| `adjust_stance`  | `AdjustStance`   | Set peace/war/alliance with another civ                  |
+| `build`          | `Build`          | Queue a unit at a city                                   |
+| `research`       | `Research`       | Pick the tech to study                                   |
+| `improve`        | `Improve`        | Send a worker to build farm/mine/road                    |
+
+### Prompt & Memory
 
 The LLM receives:
-- A static system prompt describing the game and strategy hints.
-- The user message is the JSON `local_view` payload.
+- A detailed system prompt (base tactical rules + per-leader persona).
+- The user message is the JSON `local_view` payload augmented with:
+  - `recent_actions` — last 8 turns of intents this leader issued
+  - `recent_messages` — last 32 diplomatic messages this leader has seen
+  - `last_turn_feedback` — engine rejection reasons from previous turn
 
-Tool calls are parsed back into `Goal` objects.  Errors (API failure, bad
-JSON, unknown tool name) are logged and degrade to "no goals this turn"
-rather than crashing the loop.
+### Pipeline
 
-Configurable: `model` (default `gpt-4o-mini`), `temperature` (default 0.7),
-explicit `api_key` (else `OPENAI_API_KEY` from env).
+1. LLM calls intent tools → parsed into `Intent` dataclasses via `_parse_tool_call`
+2. `bind_state()` provides the live `GameState` (called each turn by playthrough loop)
+3. `resolve_intents(state, civ_id, intents)` → `Decisions(goals, diplomacy, directives)`
+4. Playthrough loop executes goals, applies diplomatic actions and directives
+
+Tool-call parse errors (bad JSON, unknown tool name, invalid enum values) are
+logged and degrade to "no intents this turn" rather than crashing the loop.
+
+Configurable: `model` (default `gpt-5.4-mini`), `temperature` (default 0.7),
+explicit `api_key` (else `OPENAI_API_KEY` from env), `persona` (per-leader
+prompt), `memory_turns` (default 8).
 
 ---
 
-## 11. HTTP Layer (`app/api/routers/`)
+## 12. HTTP Layer (`app/api/routers/`)
 
 FastAPI surface for the future frontend:
 
@@ -312,15 +419,19 @@ demos and tests, would swap for persistent storage in production.
 
 ---
 
-## 12. Testing
+## 13. Testing
 
-`pytest` with `unit` / `integration` markers.  151 tests covering:
+`pytest` with `unit` / `integration` markers.  339+ tests covering:
 
 - Hex math, terrain yields, map gen invariants
 - Movement, founding, combat, production, research edge cases
+- Diplomacy: stances, messaging, relationships, truces
+- Tile improvements (farm, mine, road)
+- City buildings, borders, economy
 - Fog of war + serializer determinism
 - Validator rejection codes
 - A* pathfinding (open map, blocked, impassable)
+- Intents → operations resolution
 - Random + scripted full-loop playthroughs
 - OpenAI source with mocked client (no real API calls in CI)
 
@@ -332,11 +443,13 @@ cd backend
 
 ---
 
-## 13. Design Decisions Worth Knowing
+## 14. Design Decisions Worth Knowing
 
-1. **Two-layer AI** — letting the LLM emit *goals* not *primitive actions*
-   keeps tool calls compact, hides hex-math grunt work from the model, and
-   gives the validator a single sane place to enforce rules.
+1. **Three-layer AI** — the LLM emits *intents* (semantic), the operations
+   layer resolves them into *goals* (concrete unit/target pairs), and the
+   executor produces *actions* (primitive moves).  This keeps tool calls
+   compact, hides hex-math grunt work from the model, and gives the validator
+   a single sane place to enforce rules.
 2. **Result types over exceptions for LLM-facing code** — the validator must
    be safe to call on garbage input from a model, so `ValidationError`
    carries a machine-readable code instead of bubbling a stack trace.
@@ -350,23 +463,19 @@ cd backend
 
 ---
 
-## 14. What's Not Built Yet
+## 15. What's Not Built Yet
 
-- **Production / research as Goals** — engine supports queues + research,
-  but there's no `BuildUnit` / `Research` Goal type yet, so the LLM can't
-  drive them.
 - **Replay/trace logging** — playthrough events go to `logging` at DEBUG;
   no structured trace artifact for diffing runs.
 - **Token/cost telemetry** for OpenAI runs.
-- **Diplomacy actions** — stance is in state, but no actions to declare
-  war / make peace.
-- **Persistent store** — games live in-memory only.
+- **Persistent store** — games live in-memory only (in-memory `GameStore`
+  with threading lock).
 - **Frontend wiring** — the renderer consumes `local_view` JSON but isn't
-  hooked up to the live engine yet.
+  fully hooked up to the live engine yet.
 
 ---
 
-## 15. Quick Start
+## 16. Quick Start
 
 ```bash
 # Test suite

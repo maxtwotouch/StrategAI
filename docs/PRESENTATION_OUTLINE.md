@@ -208,7 +208,7 @@ At inference time, we activate the LoRA using the trigger token 'tdp' followed b
   - Asset generation: 1.2-4 seconds (RTX 5090)
   - API response: <100ms (cached), 2-5s (generation)
   - Cache hit rate: ~80% (reduces generation load)
-- **Test coverage**: 932 tests, ~80% aggregate
+- **Test coverage**: 886 tests, ~80% aggregate
   - Backend: 315 tests, 85% coverage
   - Asset Server: 547 tests, 82% coverage
   - Frontend: 35 tests, 70% coverage
@@ -227,7 +227,7 @@ At inference time, we activate the LoRA using the trigger token 'tdp' followed b
 
 Performance-wise, asset generation takes 1.2 to 4 seconds depending on complexity, with leader portraits taking longest due to the three-stage pipeline. API responses are under 100 milliseconds for cached assets, and we achieve an 80 percent cache hit rate during typical gameplay, significantly reducing generation load.
 
-We implemented comprehensive testing with 932 tests achieving 80 percent aggregate coverage. The backend has 315 tests including property tests that validate invariants like state immutability. The asset server has 547 tests including concurrency tests for the load balancer. The frontend uses TypeScript strict mode for compile-time validation.
+We implemented comprehensive testing with 886 tests achieving 80 percent aggregate coverage. The backend has 339+ tests including property tests that validate invariants like state immutability. The asset server has 547 tests including concurrency tests for the load balancer. The frontend uses TypeScript strict mode for compile-time validation.
 
 AI behavior quality exceeded our expectations. Each civilization exhibits distinct strategies aligned with its persona - Genghis pursues aggressive expansion, Cleopatra forms diplomatic alliances, Gandhi focuses on peaceful development. We observed emergent behaviors like coalition formation and revenge mechanics that weren't explicitly programmed.
 

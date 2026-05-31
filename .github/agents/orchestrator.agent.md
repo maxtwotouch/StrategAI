@@ -15,7 +15,7 @@ You are the **Root Orchestrator** for StrategAI — an INF-3600 Generative AI st
 |-----------|------|------|---------|
 | **Backend** | `backend/` | Python 3.11+, FastAPI, OpenAI API | Game engine (pure functional, frozen dataclasses), LLM-driven AI civs, REST API |
 | **Frontend** | `frontend/` | Next.js 15, React 19, TypeScript, SVG | Game UI, hex map rendering, asset integration, diplomacy chat |
-| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 33 endpoints) |
+| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 35 endpoints) |
 | **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled on medieval pixel art |
 | **Docs** | `docs/` | Markdown | Architecture, gameplay, development, UI, asset integration guides |
 | **Scripts** | `scripts/` | Python | Smoke tests, utilities |

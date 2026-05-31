@@ -36,7 +36,7 @@ The game features 3 AI civilizations (Mongolia/Genghis Khan, Egypt/Cleopatra, In
 
 **Location**: `assetserver/src/`
 
-A FastAPI microservice generates top-down medieval pixel-art game assets on-demand using ComfyUI + FLUX2 Klein 4B Distilled (a Diffusion Transformer / DiT model). 6 asset families (leader, structure, nature_object, character_sprite, background_tile, unit) with 33 REST endpoints.
+A FastAPI microservice generates top-down medieval pixel-art game assets on-demand using ComfyUI + FLUX2 Klein 4B Distilled (a Diffusion Transformer / DiT model). 6 asset families (leader, structure, nature_object, character_sprite, background_tile, unit) with 35 REST endpoints.
 
 **Key architectural decisions:**
 - **3 generation modes**: `comfyui` (real DiT inference), `static` (pre-made PNGs), `placeholder` (PIL-generated) — graceful degradation

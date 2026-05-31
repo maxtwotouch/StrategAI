@@ -61,6 +61,42 @@ These LoRAs were purpose-built for the [StrategAI](https://github.com/maxtwotouc
 
 ---
 
+## Why LoRA Fine-Tuning Was Necessary
+
+The base [FLUX.2 Klein 4B Distilled](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) model — a 4-billion-parameter Diffusion Transformer (DiT) — is not incapable of producing top-down perspectives. When prompted with the phrase `top-down view.`, the base model *sometimes* generates assets from an overhead camera angle. It also produces recognizably medieval architectural forms: stone towers, timber frames, crenellated battlements. In principle, one might ask: why invest in LoRA training when prompt engineering on the base model already yields some top-down medieval outputs?
+
+The answer lies in the gap between *occasional capability* and *production reliability*. The StrategAI asset pipeline requires generating hundreds of game assets across six families (structures, units, terrain tiles, nature objects, character sprites, background tiles), all of which must share a consistent visual language. A camera angle that works ~60% of the time is a camera angle that fails ~40% of the time — and in an automated pipeline, failure at that rate is unacceptable. Four specific failure modes observed in the base model motivated the LoRA approach.
+
+### Failure Mode 1: Inconsistent Perspective
+
+The most critical failure mode was camera-angle inconsistency. With identical `top-down view.` prompts, the base DiT model produced a mixture of perspectives: occasionally true orthogonal top-down, but also isometric angles, ¾ overhead views, and slight oblique tilts. This variation occurred not only *across* different prompts but also *within* repeated generations of the same prompt (different seeds). For a strategy game where every asset on a hex grid must share the same camera plane, this inconsistency would produce visually jarring results — a watchtower rendered from directly above sitting next to a watermill rendered from a 45° angle breaks the illusion of a unified game world. The evaluation battery (prompts S1–T3, see [Evaluation](#evaluation)) confirmed this: base model outputs showed meaningful perspective variation, while LoRA-conditioned generations converged to consistent top-down orientation across all tested categories.
+
+### Failure Mode 2: Style Drift
+
+The base model's medieval aesthetic was broad but uncontrolled. Depending on the seed, the same prompt could produce a photorealistic stone tower, a cartoonish castle with exaggerated proportions, a painterly watercolor interpretation, or an abstract geometric structure. This stylistic entropy is a well-known property of large generative models — they sample from a distribution that encompasses many valid interpretations of "medieval." But for game asset generation, this diversity is detrimental: a knight sprite rendered in a painterly style does not visually cohere with a castle rendered photorealistically, even when both are individually high-quality outputs. The LoRA constrains this entropy by binding the model to a specific, consistent medieval architectural style learned from the curated training dataset.
+
+### Failure Mode 3: No Selective Control
+
+Even if the base model were more reliable, prompt engineering alone provides no mechanism to *selectively* apply the top-down medieval style. The base model always generates from its full, unconditional distribution — there is no way to produce a styled asset in one generation and an unstyled asset in the next from the same model. LoRA introduces the `<tdp>` trigger token, which acts as a gating mechanism: when present, the adapter weights influence the generation toward top-down medieval style; when absent, the base model's native behavior is fully preserved. This selective control is verified by the L1 style probe (modern red sports car; see [Style Leakage Analysis](#style-leakage-analysis)), which demonstrated that the LoRA's influence is contained within the trigger token's scope — the base model's full generative range remains available when `<tdp>` is omitted.
+
+### Failure Mode 4: Production Reliability Gap
+
+Taken together, these failure modes created a reliability gap that prompt engineering alone could not close. Qualitative assessment of base model outputs against the 8-prompt evaluation battery (S1, S2, U1, U2, T1, T2, T3, L1; see [Qualitative Results](#qualitative-results)) revealed that while the base model occasionally produced excellent top-down medieval assets, the hit rate was well below the >95% consistency threshold required for an automated game asset pipeline. Most generations required manual curation — discarding isometric outputs, rejecting style outliers, and re-rolling until the dice landed favorably. For a pipeline designed to generate assets on-demand during gameplay, this manual gating step would be a bottleneck.
+
+### The LoRA Solution
+
+LoRA fine-tuning addresses all four failure modes simultaneously by injecting a low-rank adaptation into the model's attention and convolution layers. The adapter learns the top-down perspective constraint and medieval architectural style from a compact but carefully curated dataset of 100 images, binding these properties to the `<tdp>` trigger token. Because the adaptation is low-rank (32–128 for linear layers, 16–64 for convolution layers), the added parameters represent less than 0.1% of the base model's 4 billion weights — the adapter modifies *how* the model interprets specific concepts without overwriting its general image generation capability.
+
+The result, as demonstrated across all 6 LoRA variants and the 8-prompt evaluation battery (see [Qualitative Results](#qualitative-results)), is:
+- **Perspective consistency**: All 6 variants reliably enforced top-down orientation across in-distribution structures (S1, S2) and out-of-distribution units (U1, U2) and terrain (T1–T3).
+- **Style coherence**: The medieval architectural vocabulary (crenellations, timber framing, stone masonry) was consistently applied, eliminating the style drift observed in the base model.
+- **Trigger-based gating**: The `<tdp>` token provides selective control — verified cleanly by the L1 style probe, where all variants preserved modern sports car identity with minimal medieval contamination (see [Style Leakage Analysis](#style-leakage-analysis)).
+- **Production reliability**: The LoRA-conditioned generations achieved qualitatively consistent, game-ready outputs across the full evaluation battery — eliminating the need for manual curation and enabling the automated asset pipeline that StrategAI requires.
+
+The systematic 3×2 experiment matrix (caption detail × LoRA rank) further validated that LoRA training is not a binary on/off decision but a tunable process: different configurations trade off in-distribution fidelity against out-of-distribution generalization (see [Caption Detail × Rank Trade-off](#caption-detail--rank-trade-off)). This tunability is itself evidence that LoRA is the correct approach — prompt engineering offers no comparable mechanism for controlling the fidelity–generalization balance.
+
+---
+
 ## Model Variants
 
 The six LoRA variants span a 3×2 experiment matrix: three caption detail levels (detailed, minimal, ultra-minimal) × two LoRA rank configurations (high, low), plus one ultra-low-rank outlier. Each variant is a `.safetensors` file at its optimal training checkpoint. All six variants are published to enable comparison across the full matrix — there are no per-variant usage prescriptions beyond what the experiment design reveals.

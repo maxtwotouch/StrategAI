@@ -306,7 +306,7 @@ This document provides detailed descriptions of all figures needed for the Strat
 
 ## Fig. 10. Test Coverage and Quality Metrics
 
-**Caption**: Comprehensive test suite across all components with 932 tests achieving ~80% aggregate coverage.
+**Caption**: Comprehensive test suite across all components with 886 tests achieving ~80% aggregate coverage.
 
 **Visual Elements**:
 - **Bar chart** showing test counts by component:
@@ -314,7 +314,7 @@ This document provides detailed descriptions of all figures needed for the Strat
   - Asset Server: 547 tests (orange bar)
   - Frontend: 35 tests (green bar)
   - Training Pipeline: 35 tests (purple bar)
-  - Total: 932 tests (black line)
+  - Total: 886 tests (black line)
 - **Line chart** overlay showing coverage percentages:
   - Backend: 85% (blue line)
   - Asset Server: 82% (orange line)

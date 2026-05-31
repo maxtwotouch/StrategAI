@@ -1,5 +1,5 @@
 ---
-description: "Use when: working on the game engine, LLM integration (OpenAI tool-use), API design, pure functional architecture, combat/combat resolution, diplomacy system, tech tree, economy, or any backend-specific task. Covers backend/app/engine/ (27 modules), backend/app/api/ (14 endpoints), and backend/tests/ (315+ tests)."
+description: "Use when: working on the game engine, LLM integration (OpenAI tool-use), API design, pure functional architecture, combat/combat resolution, diplomacy system, tech tree, economy, or any backend-specific task. Covers backend/app/engine/ (27 modules), backend/app/api/ (14 endpoints), and backend/tests/ (339+ tests)."
 name: "Backend"
 tools: [read, search, edit, execute, agent, todo]
 agents: [Research]

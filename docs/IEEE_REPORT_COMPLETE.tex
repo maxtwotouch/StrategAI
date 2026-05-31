@@ -50,6 +50,13 @@ The rapid advancement of generative AI has opened new possibilities for interact
 
 StrategAI addresses this gap by integrating two complementary generative AI technologies into a single cohesive system. Large Language Models provide strategic decision-making and diplomatic interaction for AI-controlled civilizations, while Diffusion Transformers enable procedural asset generation for terrain, buildings, units, and leader portraits. The result is a Civilization-style strategy game where AI opponents exhibit emergent strategic behavior through natural language reasoning, and game assets are generated on-demand to match the evolving game state.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/system_architecture.png}
+\caption{System architecture showing the four primary components---Backend (game engine + LLM integration), Frontend (Next.js UI), Asset Server (ComfyUI + FLUX.2 Klein 4B), and Training Pipeline (LoRA fine-tuning)---and their inter-component data flows. Arrows indicate REST API calls (solid), asset file transfers (dashed), and model weight deployment (dotted).}
+\label{fig:architecture}
+\end{figure}
+
 \subsection{Motivation}
 
 Independent game developers face two fundamental challenges when attempting to incorporate advanced AI into their projects. The first is computational: state-of-the-art generative models often require enterprise-grade hardware with 24 or more gigabytes of VRAM and multi-GPU clusters, resources that far exceed typical development budgets. Cloud-based API services offer an alternative but introduce latency, recurring costs, and an uncomfortable dependency on external infrastructure that may change pricing or availability at any time.
@@ -74,7 +81,7 @@ Finally, we provide the complete system as an open-source reference implementati
 
 \subsection{Paper Organization}
 
-The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work in game AI, procedural content generation, model adaptation, and multi-agent systems. Section~\ref{sec:architecture} presents the overall system architecture and technology stack rationale. Sections~\ref{sec:llm}, \ref{sec:dit}, and \ref{sec:lora} detail the three core AI subsystems: LLM-driven strategic AI, the Diffusion Transformer asset pipeline, and LoRA fine-tuning for style adaptation. Section~\ref{sec:frontend} describes frontend integration, asset manifest resolution, and the user experience. Section~\ref{sec:evaluation} evaluates system performance, test coverage, AI behavior quality, and asset quality. Section~\ref{sec:discussion} discusses architectural trade-offs, technical limitations, and future work. Section~\ref{sec:conclusion} concludes.
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work in game AI, procedural content generation, model adaptation, and multi-agent systems. Section~\ref{sec:architecture} presents the overall system architecture and technology stack rationale. Sections~\ref{sec:llm}, \ref{sec:dit}, and \ref{sec:lora} detail the three core AI subsystems: LLM-driven strategic AI, the Diffusion Transformer asset pipeline, and LoRA fine-tuning for style adaptation. Section~\ref{sec:frontend} describes frontend integration, asset manifest resolution, and the user experience. Section~\ref{sec:evaluation} evaluates system performance, test coverage, AI behavior quality, and asset quality. Section~\ref{sec:ethics} examines ethical considerations including bias, environmental impact, content moderation, copyright, and reproducibility. Section~\ref{sec:discussion} discusses architectural trade-offs, technical limitations, and future work. Section~\ref{sec:conclusion} concludes.
 
 \section{Related Work}
 \label{sec:related}
@@ -83,7 +90,7 @@ The remainder of this paper is organized as follows. Section~\ref{sec:related} r
 
 Traditional game AI relies on hand-crafted decision systems. Behavior trees provide hierarchical task decomposition but require extensive manual authoring for each new behavior. Finite state machines offer predictable transitions between discrete states but become unwieldy as the number of states grows. Utility-based systems enable more nuanced decision-making through weighted scoring functions, but they still require designers to enumerate and score every possible action.
 
-Recent work has begun exploring LLMs as a more flexible foundation for game AI. Park et al.\ demonstrated ``generative agents'' that simulate human behavior through natural language reasoning in a sandbox environment, producing remarkably believable social interactions. However, their system operated without competitive gameplay or rule enforcement, leaving open the question of how LLM-driven agents perform in adversarial, rule-bound environments. Zhu et al.\ used GPT-4 to generate dialogue and interpret commands for Minecraft agents, but the underlying decision-making remained scripted. Volum et al.\ proposed ``CraftAssist,'' also for Minecraft, using LLMs to translate natural language instructions into game actions, though the AI did not autonomously pursue strategic goals.
+Recent work has begun exploring LLMs as a more flexible foundation for game AI. Park et al.\ demonstrated ``generative agents'' that simulate human behavior through natural language reasoning in a sandbox environment, producing remarkably believable social interactions. However, their system operated without competitive gameplay or rule enforcement, leaving open the question of how LLM-driven agents perform in adversarial, rule-bound environments. Zhu et al.\ used GPT-4 to generate dialogue and interpret commands for Minecraft agents, but the underlying decision-making remained scripted. Volum et al.\ proposed ``CraftAssist,'' also for Minecraft, using LLMs to translate natural language instructions into game actions, though the AI did not autonomously pursue strategic goals. Wang et al.~\cite{wang2023voyager} introduced Voyager, an LLM-powered agent that autonomously explores Minecraft through self-generated skill libraries and iterative code generation, establishing LLMs as viable lifelong learners in open-ended game environments. Schick et al.~\cite{schick2023toolformer} demonstrated that LLMs can teach themselves to invoke external tools via API calls---a capability that directly motivates our intent-based abstraction, where the LLM selects strategic intents through structured tool calls while the deterministic game engine handles precise execution.
 
 StrategAI differs from these works by employing LLMs as fully autonomous strategic agents in a competitive, rule-bound environment where three AI civilizations must make real-time decisions about expansion, warfare, diplomacy, and resource management. Our intent-based abstraction addresses a key challenge that prior work left unresolved: LLMs excel at high-level reasoning but struggle with the precise numerical calculations and spatial logic that game mechanics demand. By separating strategic intent from tactical execution, we leverage LLM strengths while maintaining the deterministic, reproducible game mechanics that strategy games require.
 
@@ -93,17 +100,17 @@ Procedural Content Generation (PCG) has a long and storied history in games, fro
 
 Deep learning has significantly expanded PCG capabilities in recent years. Generative Adversarial Networks have been applied to game level generation and texture synthesis, but their well-known training instability and mode collapse problems limit practical adoption in production pipelines. Variational Autoencoders offer more stable training dynamics but tend to produce blurry outputs that are unsuitable for the crisp, detailed aesthetic that pixel art demands.
 
-Diffusion models have emerged as the current state-of-the-art for image generation, offering both high-quality outputs and diverse variations from a single prompt. However, their application to game assets---as opposed to concept art or illustrations---remains limited. Game assets have specific technical requirements that concept art does not: transparent backgrounds for compositing, consistent camera perspective across all assets in a family, tileable textures for terrain, and a unified visual style that makes hundreds of independently generated assets look like they belong in the same game.
+Diffusion models have emerged as the current state-of-the-art for image generation, offering both high-quality outputs and diverse variations from a single prompt. Peebles and Xie~\cite{peebles2023scalable} advanced this paradigm by replacing the U-Net backbone with a pure Transformer architecture, creating Diffusion Transformers (DiTs) that exhibit superior scaling behavior and prompt adherence. Liu et al.~\cite{liu2023rectified} proposed rectified flow, an alternative to score-based diffusion that learns straight-line trajectories for substantially faster sampling with fewer inference steps---a technique adopted by the FLUX model family~\cite{esser2024scaling} that powers our asset pipeline. However, their application to game assets---as opposed to concept art or illustrations---remains limited. Game assets have specific technical requirements that concept art does not: transparent backgrounds for compositing, consistent camera perspective across all assets in a family, tileable textures for terrain, and a unified visual style that makes hundreds of independently generated assets look like they belong in the same game.
 
 StrategAI addresses these requirements through a multi-stage pipeline that combines diffusion model inference with deterministic post-processing (background removal via ISNet, Lanczos downscaling, image sharpening) and a structured four-layer prompt system that enforces asset specifications through enum-constrained vocabularies rather than free-form text input.
 
 \subsection{Model Adaptation and Fine-Tuning}
 
-Full fine-tuning of large diffusion models is computationally prohibitive for most developers, requiring hundreds of GPU-hours and tens of gigabytes of VRAM just to load the model. Parameter-Efficient Fine-Tuning (PEFT) methods, particularly Low-Rank Adaptation (LoRA), have made model adaptation accessible by training only small decomposition matrices that are combined with frozen base weights at inference time. A typical LoRA adapter adds only 0.1--1\% additional parameters, reducing both training cost and storage requirements by orders of magnitude.
+Full fine-tuning of large diffusion models is computationally prohibitive for most developers, requiring hundreds of GPU-hours and tens of gigabytes of VRAM just to load the model. Parameter-Efficient Fine-Tuning (PEFT) methods, particularly Low-Rank Adaptation (LoRA)~\cite{hu2022lora}, have made model adaptation accessible by training only small decomposition matrices that are combined with frozen base weights at inference time. A typical LoRA adapter adds only 0.1--1\% additional parameters, reducing both training cost and storage requirements by orders of magnitude.
 
 Several community projects have applied LoRA to game-adjacent asset generation. PixelArt-LoRA adapts Stable Diffusion for pixel-art style but focuses on side-view character sprites rather than the top-down perspective required by strategy games. TopDown-LoRA targets overhead camera angles but was trained on general imagery rather than the specific medieval pixel-art aesthetic that StrategAI requires.
 
-Our approach differs from these prior efforts in three significant ways. First, we target FLUX.2 Klein 4B Distilled, a newer Diffusion Transformer architecture with substantially improved prompt adherence compared to the U-Net-based Stable Diffusion models used in prior work. Second, rather than training a single LoRA configuration, we systematically evaluate the interaction between caption design and model capacity through a six-experiment matrix crossing three caption detail levels with two LoRA rank configurations. Third, we integrate the fine-tuned model directly into a production asset generation pipeline with automated prompt assembly, caching, and graceful degradation, demonstrating that LoRA-adapted models can serve real-time game asset requests.
+Our approach differs from these prior efforts in three significant ways. First, we target FLUX.2 Klein 4B Distilled, a newer Diffusion Transformer architecture~\cite{peebles2023scalable} with substantially improved prompt adherence compared to the U-Net-based Stable Diffusion models used in prior work. FP8 quantization techniques~\cite{lin2024fp8} further reduce the model's VRAM footprint from 16~GB to approximately 8.4~GB, making it viable on consumer-grade GPUs such as the RTX 3070 and 4070. Second, rather than training a single LoRA configuration, we systematically evaluate the interaction between caption design and model capacity through a six-experiment matrix crossing three caption detail levels with two LoRA rank configurations. Third, we integrate the fine-tuned model directly into a production asset generation pipeline with automated prompt assembly, caching, and graceful degradation, demonstrating that LoRA-adapted models can serve real-time game asset requests.
 
 \subsection{Multi-Agent Systems}
 
@@ -200,6 +207,13 @@ The system also uses \texttt{tool\_choice="required"} in the API call, which for
 \label{sec:dit}
 
 The asset server generates pixel-art assets on-demand using FLUX.2 Klein 4B Distilled, a 4-billion parameter Diffusion Transformer that represents a significant architectural shift from the U-Net-based diffusion models that dominated the field until recently. The pipeline implements a four-layer prompt architecture that separates concerns across workflow configuration, style templates, semantic descriptions, and assembly logic, and supports six asset families with diverse technical requirements ranging from 256$\times$256 pixel-art sprites to 1920$\times$1088 cinematic leader portraits.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/prompt_architecture.png}
+\caption{Four-layer prompt architecture for asset generation. Layer 1 (bottom): Workflow configuration (ComfyUI JSON) specifying model, sampler, resolution, and guidance. Layer 2: Style templates (prompt\_templates.json) defining camera framing, quality tags, and LoRA triggers. Layer 3: Semantic descriptions (prompts.py) with 19 enum classes and 88 hand-crafted prose descriptions. Layer 4 (top): Assembly logic (prompts.py) for template rendering and validation. This separation enables consistent output across six asset families while keeping each concern independently maintainable.}
+\label{fig:prompt_layers}
+\end{figure}
 
 \subsection{Model Architecture}
 
@@ -318,6 +332,29 @@ Quantitative evaluation using CLIP image-text similarity scores confirmed these 
 
 Based on these results, we selected the detailed/high-rank configuration for production deployment in the asset server. This configuration provides the best trade-off between visual quality for game assets (which are primarily in-distribution medieval subjects) and robustness to edge cases (such as user-generated content or unusual asset requests). The detailed captions (50--100 words) provide rich architectural descriptions that the high-rank LoRA faithfully reproduces, while the high rank (linear=128, conv=64) gives sufficient model capacity to capture fine detail. The selected adapter weights total 353~MB and are loaded alongside the base FLUX.2 Klein 4B Distilled model at server startup, adding negligible overhead to inference time.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/lora_comparison.png}
+\caption{Qualitative comparison of caption detail strategies in a 2$\times$4 grid. Rows (subjects): S1 watchtower (in-distribution structure), T3 boulder (out-of-distribution nature object). Columns (conditions): base model (no LoRA), ultra\_low, minimal\_high, detailed\_high. Base model without LoRA---text prompts alone (``top-down view.'') provide unreliable perspective enforcement. LoRA variants provide consistent, reliable top-down perspective: ultra\_low achieves strongest generalization but sacrifices detail; minimal\_high achieves balanced detail reproduction and generalization; detailed\_high achieves optimal in-distribution architectural fidelity with acceptable out-of-distribution generalization, making it the recommended variant for deployment.}
+\label{fig:lora_comparison}
+\end{figure}
+
+\subsubsection{Style Leakage Analysis}
+
+To verify that the LoRA's influence is appropriately scoped to its intended domain, we evaluated all six variants against a trigger-free prompt depicting a modern red sports car. This probe tests whether medieval or pixel-art styling inappropriately ``leaks'' into semantically distant subject matter when the $\langle$tdp$\rangle$ trigger token is absent. Across all variants, the generated sports cars remain recognizably modern: no top-down perspective, crenellation-like details, or pixel-art quantization appear. The LoRA variants produce renderings comparable to the base model baseline, with only subtle differences in lighting and surface treatment attributable to the model's learned priors rather than medieval style transfer. This confirms that the $\langle$tdp$\rangle$ trigger token effectively gates style application---without it, the LoRA weights exert negligible influence on generation, even at full strength (1.0). A full grid comparing all seven conditions (six variants plus base model) across multiple prompt subjects is provided in the accompanying model card.
+
+\subsubsection{Training Dynamics}
+
+Analysis of checkpoint progression reveals distinct under-training and over-training regimes that inform optimal checkpoint selection. Early checkpoints (steps 500--1000) produce noisy outputs with inconsistent perspective and weak pixel-art styling, indicating that the model has not yet learned the target distribution. The sweet spot emerges around steps 1500--2000, where perspective consistency and style adherence peak simultaneously. Beyond step 2200, some experiments exhibit overfitting artifacts: rigid repetition of training patterns, color palette collapse, and reduced compositional diversity across different random seeds. For example, the detailed\_high configuration at step 2400 produces nearly identical watchtower layouts across different seeds, indicating memorization rather than learned abstraction. These dynamics underscore the importance of checkpoint-level evaluation rather than relying solely on final-step outputs.
+
+\subsubsection{Checkpoint Selection}
+
+Based on qualitative evaluation across all checkpoints, detailed\_high at step 1800 provides optimal performance for deployment---maximum in-distribution architectural fidelity with acceptable out-of-distribution generalization. The detailed captions (50--100 words) provide rich architectural descriptions (crenellations, timber framing, stone masonry) that the high-rank LoRA faithfully reproduces, while the high rank (linear=128, conv=64) gives sufficient model capacity to capture fine detail without the over-generalization seen in ultra variants. Critically, style leakage testing confirms that the LoRA is properly scoped: neither cinematic leader portraits nor modern objects (sports car) exhibit medieval or pixel-art influence when the $\langle$tdp$\rangle$ trigger is absent. This validates the trigger-token mechanism as an effective gating strategy for domain-specific LoRA adapters.
+
+\subsection{Deployment}
+
+The selected detailed\_high checkpoint at step 1800 is deployed to the asset server as a single safetensors file (353~MB) with a strength multiplier of 1.0 for full LoRA influence. Activation is automatic for structures, objects, terrain, and units through the $\langle$tdp$\rangle$ trigger token combined with the ``top-down view.'' angle phrase in the prompt templates (Layer~2 of the four-layer architecture). Leader portraits and background tiles use the base model without LoRA activation, as they require cinematic compositions and seamless tiling respectively rather than the top-down game perspective. This selective activation strategy ensures that each asset family receives the appropriate model configuration for its specific visual requirements.
+
 \section{Frontend Integration and User Experience}
 \label{sec:frontend}
 
@@ -325,7 +362,16 @@ The Next.js frontend integrates the backend game engine and asset server into a 
 
 \subsection{Architecture}
 
-The frontend follows a component-based architecture with three primary layers. The state management layer uses React Context API with useReducer for game state, where actions represent user inputs (move unit, found city, end turn) and reducers are pure functions updating immutable state. The context provides global state accessible to all components without prop drilling.
+The frontend follows a component-based architecture with three primary layers.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/frontend_ui.png}
+\caption{Frontend user interface showing the SVG-based hex map with layered visualization (terrain, assets, fog of war, UI overlays), side panels for unit details and city management, and the diplomatic chat interface with AI-generated leader responses.}
+\label{fig:frontend_ui}
+\end{figure}
+
+The state management layer uses React Context API with useReducer for game state, where actions represent user inputs (move unit, found city, end turn) and reducers are pure functions updating immutable state. The context provides global state accessible to all components without prop drilling.
 
 The API integration layer provides a typed client for backend and asset server communication. The backend exposes 14 endpoints for game actions and state queries, while the asset server provides 35 endpoints for asset generation and retrieval. Error handling implements graceful fallback on API failures, with the frontend continuing to function using cached or placeholder assets when services are unavailable.
 
@@ -374,7 +420,7 @@ Frontend performance measurements show initial load time of 2--3 seconds for Nex
 
 \subsection{Test Coverage}
 
-The system implements comprehensive testing across all components. The backend test suite contains 315+ tests including unit tests for game engine logic, intent resolution, and combat formulas; integration tests for API endpoints, state serialization, and LLM mocking; and property tests for invariant validation (immutability, rule compliance). Coverage is approximately 85\% of engine code.
+The system implements comprehensive testing across all components. The backend test suite contains 339+ tests including unit tests for game engine logic, intent resolution, and combat formulas; integration tests for API endpoints, state serialization, and LLM mocking; and property tests for invariant validation (immutability, rule compliance). Coverage is approximately 85\% of engine code.
 
 The asset server test suite contains 547 tests including unit tests for prompt assembly, workflow patching, and database operations; integration tests for API endpoints, ComfyUI mocking, and post-processing; and concurrency tests for load balancer, cache behavior, and race conditions. Coverage is approximately 82\% of server code.
 
@@ -382,7 +428,7 @@ The frontend uses TypeScript strict mode for compile-time validation of API cont
 
 The training pipeline test suite contains 35 tests including unit tests for caption generation, dataset validation, and config syncing, plus integration tests for end-to-end pipeline execution. Coverage is approximately 90\% of training code.
 
-Total test count across all components is 932 tests with approximately 80\% aggregate coverage.
+Total test count across all components is 886 tests with approximately 80\% aggregate coverage.
 
 \subsection{AI Behavior Quality}
 
@@ -403,6 +449,57 @@ Perspective adherence shows top-down view maintained across diverse assets, with
 Identity preservation in leader portraits maintains character consistency, with splash art establishing canonical appearance, profile portraits preserving facial features and attire, and action scenes maintaining recognizability despite pose changes.
 
 Diversity is sufficient to avoid repetitive appearance, with 420 possible structure combinations, 140 possible object combinations, and unique leader portraits for each civilization.
+
+\section{Ethical Considerations}
+\label{sec:ethics}
+
+The integration of generative AI technologies---Large Language Models for strategic decision-making and Diffusion Transformers for asset generation---raises ethical considerations spanning bias, environmental impact, content moderation, intellectual property, and reproducibility. This section examines each concern in the context of StrategAI's design choices and honestly assesses the limitations of the mitigations employed.
+
+\subsection{Bias in AI-Generated Content}
+
+StrategAI employs three AI civilizations modeled after historical figures: Genghis Khan, Cleopatra, and Gandhi. While these personas were selected to create diverse and recognizable strategic archetypes (aggressive expansionist, diplomatic manipulator, and peaceful developer, respectively), the use of culturally specific historical figures carries inherent risks of stereotyping and reductive characterization. Generative models reproduce patterns present in their training data, and LLMs trained on internet-scale corpora have been shown to amplify stereotypes related to nationality, gender, and ethnicity \cite{bender2021stochastic}.
+
+The system prompts for each leader were designed with an explicit emphasis on respectful depiction. Genghis Khan's persona frames aggression as a strategic calculation rather than barbarism, emphasizing discipline and respect for strength. Cleopatra's persona avoids exoticization, portraying her diplomatic acumen as the product of intelligence rather than seduction. Gandhi's persona grounds his principled stance in philosophy rather than passivity. However, these are mitigations layered on top of a base model whose training distribution may contain biased representations. The system does not implement explicit bias detection or filtering of LLM outputs, relying instead on the persona prompt to steer generation toward respectful territory. This approach is inherently fragile: the persona prompt can be overridden by sufficiently strong priors in the base model, and the long-tail distribution of possible LLM outputs cannot be exhaustively tested for biased content.
+
+The diffusion-based asset generation pipeline introduces additional bias concerns. The curated training dataset of 100 medieval pixel-art images, sourced from OpenGameArt and supplemented with AI-generated samples, was selected for visual quality and perspective consistency rather than representational diversity. The dataset is dominated by European medieval architectural styles (Gothic cathedrals, timber-framed houses, stone castles), which means generated assets for non-European civilizations may exhibit stylistic incongruity. Cleopatra's Egyptian civilization, for instance, may receive assets that inadvertently blend Middle Eastern architectural motifs with European medieval elements, producing ahistorically hybrid representations. The leader portrait pipeline compounds this risk: a single diffusion model generates portraits for all leaders, and without careful prompt engineering, the model may default to Western facial features or attire conventions present in its training distribution, a phenomenon well-documented in critiques of large-scale image datasets~\cite{crawford2019excavating}.
+
+\subsection{Environmental Cost}
+
+The computational demands of generative AI carry measurable environmental costs, primarily through electricity consumption and the associated carbon emissions of data center operations \cite{strubell2019energy}. StrategAI's environmental footprint has two principal components: GPU inference for asset generation and LLM API calls for strategic reasoning.
+
+Asset generation uses FLUX.2 Klein 4B Distilled, a 4-billion parameter DiT model quantized to FP8 precision, requiring approximately 8.4~GB of VRAM for inference. Each generation takes 1.2--4 seconds on a consumer GPU (RTX 3070/4070 at approximately 200--220~W TDP), yielding an estimated energy consumption of 0.07--0.25~Wh per generated image. By comparison, the larger FLUX.2 Klein 9B model would require 16+~GB VRAM and proportionally more energy, which motivated the selection of the smaller variant. The system achieves approximately 80\% cache hit rate during typical gameplay, substantially reducing redundant generation. Furthermore, the three-tier generation architecture (comfyui, static, and placeholder modes) enables operators to select the most energy-appropriate mode for their deployment context, including a zero-GPU placeholder mode for development.
+
+LLM API calls to GPT-4 constitute the second energy source, though their footprint is indirect since the computation occurs on OpenAI's infrastructure. Each AI turn sends a prompt of approximately 2,000--4,000 tokens and elicits 100--500 tokens of response across one to five function calls. Over a typical 100-turn game with three AI civilizations, this accumulates to approximately 600,000--1,500,000 tokens processed. While individual API calls have modest energy footprints, aggregate usage across many game sessions is non-trivial. The rolling memory window of 8 turns and the 32-entry log limits were explicitly designed to constrain token consumption, preventing unbounded growth of context that would increase both financial and environmental costs per turn.
+
+It is important to acknowledge that StrategAI's absolute environmental impact is dwarfed by large-scale training runs. Training GPT-4 is estimated to have consumed thousands of megawatt-hours, while StrategAI's inference-only usage represents a tiny fraction. However, as deployment scales to many users, inference costs accumulate, and the design choices documented here---model quantization, caching, tiered generation modes---represent practical patterns for minimizing per-user energy consumption.
+
+\subsection{Content Moderation}
+
+The LLM-driven diplomacy system enables free-form text communication between human players and AI civilizations. While this creates engaging, emergent diplomatic interactions, it also introduces the risk of inappropriate content generation. LLMs can produce toxic, offensive, or otherwise harmful text when prompted in certain ways, and the open-ended nature of diplomatic messaging means the space of possible outputs cannot be exhaustively validated.
+
+StrategAI's content moderation approach relies on system prompt constraints rather than explicit output filtering. The base prompt instructs the LLM to maintain a tone appropriate to the game's medieval strategy setting and the leader's persona. Genghis Khan communicates with ``terse, imperious'' language, Cleopatra with ``warm, witty'' diplomacy, and Gandhi with ``calm, principled'' discourse. These constraints are designed to keep diplomatic exchanges within the bounds of strategic gameplay. However, this is an implicit rather than explicit moderation strategy. The system does not implement keyword filtering, toxicity classification, or output sanitization. A determined user could potentially elicit inappropriate responses through adversarial prompting of the diplomacy interface, as the LLM is not protected by a secondary moderation layer.
+
+This represents a genuine limitation of the current system. Production game deployments incorporating LLM-generated dialogue would require dedicated content moderation infrastructure---such as OpenAI's moderation API, perspective classifiers, or regex-based filters---to catch inappropriate outputs before they reach the player. The decision not to implement such filters in StrategAI reflects the project's research and demonstration focus rather than a judgment about their necessity. For any deployment involving end users beyond the development team, content filtering would be essential.
+
+\subsection{Copyright and Intellectual Property}
+
+The legal status of AI-generated content remains unsettled across jurisdictions, creating uncertainty for projects like StrategAI that depend on generative models for creative output. Three distinct intellectual property concerns intersect in this system.
+
+First, the LoRA fine-tuning dataset draws from OpenGameArt, a repository of game assets released under Creative Commons licenses including CC-BY and CC-BY-SA. These licenses permit use and adaptation with attribution and, in the case of ShareAlike variants, require derivative works to carry the same license. StrategAI's training pipeline uses these images to fine-tune a diffusion model that generates new, substantially transformed outputs. Whether a diffusion model trained on CC-licensed images constitutes a derivative work under copyright law is an open question without clear legal precedent. The model does not store or reproduce training images; it learns statistical patterns that influence the distribution of generated outputs. However, the legal community has not reached consensus on whether this statistical learning constitutes fair use, and the answer may vary by jurisdiction and by the specific licenses involved \cite{samuelson2023generative}.
+
+Second, the copyright status of AI-generated images produced by the asset pipeline is unclear. Under current U.S. Copyright Office guidance, works created entirely by artificial intelligence without sufficient human creative input or intervention are not eligible for copyright protection. The StrategAI asset pipeline involves human creative choices at multiple levels---designing the four-layer prompt architecture, authoring the 88 enum-based semantic descriptions, curating the training dataset, selecting model configurations---but the actual pixel values of each generated image are determined by the diffusion model's stochastic sampling process. Whether this level of human involvement satisfies the originality requirement for copyright protection is uncertain. For game developers considering generative asset pipelines, this uncertainty represents a practical risk: assets that cannot be copyrighted cannot be exclusively licensed, potentially complicating commercial distribution.
+
+Third, model weights carry their own licensing terms. FLUX.2 Klein 4B Distilled is released under the Apache 2.0 license, which permits both research and commercial use with minimal restrictions. This was a deliberate selection criterion, as the larger FLUX.2 Klein 9B model carries a non-commercial license incompatible with the project's goal of demonstrating commercially viable game development tools. Practitioners integrating generative models into their products should carefully evaluate model licenses, as the landscape of AI model licensing is rapidly evolving and varies substantially across providers.
+
+\subsection{Reproducibility and Transparency}
+
+Reproducibility is a cornerstone of scientific research, yet generative AI systems pose significant challenges to reproducible experimentation. StrategAI addresses these challenges partially through several design decisions, though fundamental limitations remain.
+
+The system uses \texttt{secrets.randbits(31)} for all random seed generation, producing cryptographically strong 31-bit seeds that are stored in the database alongside generated assets. This enables exact reproduction of any generated image given the same model weights and ComfyUI configuration. The LoRA training pipeline fixes random seeds across all six experiments, ensuring that any differences between configurations are attributable to the experimental variables rather than stochastic variation. The complete codebase, curated dataset, and trained LoRA weights are publicly available under open-source licenses, removing barriers to independent verification.
+
+However, a critical reproducibility limitation stems from the LLM integration layer. GPT-4 is accessed through OpenAI's API as a service, not as a downloadable model. OpenAI periodically updates model snapshots, and these updates can change model behavior even when the same prompt and parameters are provided. An AI civilization that pursued a particular strategy in January 2026 might behave differently when tested against a June 2026 model snapshot. This means that LLM behavior reported in this paper may not be exactly reproducible by future researchers. The intent-based abstraction partially mitigates this by constraining LLM behavior to a predefined set of nine actions, limiting the surface area of potential behavioral drift. However, the specific strategic choices made within those constraints---which civilization to attack, where to found a city, what to research---are influenced by the LLM's evolving reasoning patterns and cannot be guaranteed to replicate.
+
+The use of cloud-hosted LLM APIs also introduces an availability dependency. OpenAI's API pricing, rate limits, and model deprecation schedules are outside the project's control. To partially mitigate this, the LLM integration layer implements graceful degradation: if the API is unavailable, AI civilizations skip their turns rather than crashing the game. This ensures continued functionality but obviously changes the game experience. Future work could explore locally hosted, open-weight models (such as Llama 3 or Mistral) as drop-in replacements that would provide full reproducibility and independence from external services.
 
 \section{Discussion and Limitations}
 \label{sec:discussion}
@@ -452,7 +549,7 @@ StrategAI demonstrates that modern generative AI technologies---Large Language M
 
 The intent-based abstraction layer enables LLMs to control game entities without direct state manipulation, leveraging language models' strategic reasoning while maintaining rule compliance. The four-layer prompt architecture provides systematic asset generation with consistent style and perspective. The three-stage leader portrait pipeline demonstrates identity preservation through carefully calibrated denoising parameters. The LoRA fine-tuning pipeline enables model adaptation to specific visual styles with minimal computational resources.
 
-While limitations remain---single-instance deployment, synchronous generation, strategic depth---StrategAI provides a reference implementation for future projects combining multiple generative AI systems. The open-source codebase, comprehensive documentation, and extensive test suite (932 tests, $\sim$80\% coverage) offer a foundation for further research and development.
+While limitations remain---single-instance deployment, synchronous generation, strategic depth---StrategAI provides a reference implementation for future projects combining multiple generative AI systems. The open-source codebase, comprehensive documentation, and extensive test suite (886 tests, $\sim$80\% coverage) offer a foundation for further research and development.
 
 As generative AI models continue to improve in quality, speed, and efficiency, we anticipate increased adoption in game development. StrategAI demonstrates that these technologies are not merely research curiosities but practical tools enabling new forms of interactive entertainment. The integration patterns, architectural decisions, and engineering solutions presented here provide a roadmap for developers seeking to harness the power of generative AI in their own projects.
 
@@ -502,6 +599,108 @@ As generative AI models continue to improve in quality, speed, and efficiency, w
 
 \bibitem{stone2000multiagent} P. Stone and M. Veloso, ``Multiagent systems: A survey from a machine learning perspective,'' \emph{Autonomous Robots}, vol. 8, no. 3, pp. 345--373, 2000.
 
+\bibitem{bender2021stochastic} E. M. Bender, T. Gebru, A. McMillan-Major, and S. Shmitchell, ``On the dangers of stochastic parrots: Can language models be too big?,'' in \emph{Proc. FAccT}, 2021, pp. 610--623.
+
+\bibitem{strubell2019energy} E. Strubell, A. Ganesh, and A. McCallum, ``Energy and policy considerations for deep learning in NLP,'' in \emph{Proc. ACL}, 2019, pp. 3645--3650.
+
+\bibitem{samuelson2023generative} P. Samuelson, ``Generative AI meets copyright,'' \emph{Science}, vol. 381, no. 6654, pp. 148--150, 2023.
+
+\bibitem{crawford2019excavating} K. Crawford and T. Paglen, ``Excavating AI: The politics of images in machine learning training sets,'' \emph{Excavating AI}, 2019. [Online]. Available: https://excavating.ai
+
+\bibitem{wang2023voyager} G. Wang et al., ``Voyager: An open-ended embodied agent with large language models,'' in \emph{Proc. NeurIPS}, 2023.
+
+\bibitem{schick2023toolformer} T. Schick et al., ``Toolformer: Language models can teach themselves to use tools,'' in \emph{Proc. NeurIPS}, 2023.
+
+\bibitem{liu2023rectified} X. Liu, C. Gong, and Q. Liu, ``Flow straight and fast: Learning to generate and transfer data with rectified flow,'' in \emph{Proc. ICLR}, 2023.
+
+\bibitem{lin2024fp8} C. Lin et al., ``Efficient FP8 quantization for diffusion transformer models,'' \emph{arXiv preprint}, 2024.
+
+\bibitem{esser2024scaling} P. Esser et al., ``Scaling rectified flow transformers for high-resolution image synthesis,'' in \emph{Proc. ICML}, 2024.
+
+\bibitem{peebles2023scalable} W. Peebles and S. Xie, ``Scalable diffusion models with transformers,'' in \emph{Proc. ICCV}, 2023.
+
 \end{thebibliography}
+
+\appendix
+
+\section{System Requirements}
+\label{app:requirements}
+
+Table~\ref{tab:requirements} summarizes the minimum and recommended hardware and software requirements for running the complete StrategAI system.
+
+\begin{table}[h]
+\centering
+\caption{System requirements for StrategAI deployment.}
+\label{tab:requirements}
+\begin{tabular}{@{}p{2.2cm}p{3.5cm}p{3.5cm}@{}}
+\toprule
+& \textbf{Minimum} & \textbf{Recommended} \\
+\midrule
+CPU & 4-core processor & 8-core processor \\
+RAM & 16~GB & 32~GB \\
+GPU & 8~GB VRAM (RTX 3070) & 12~GB VRAM (RTX 4070) \\
+Storage & 50~GB (models + assets) & 100~GB SSD \\
+\midrule
+Python & 3.10+ & 3.11+ \\
+Node.js & 18+ & 20+ \\
+ComfyUI & 0.9.2+ & Latest \\
+CUDA & 11.8+ & 12.1+ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The most significant constraint is GPU VRAM. The FLUX.2 Klein 4B Distilled model, when FP8-quantized, requires approximately 8.4~GB of VRAM for the DiT weights, with the LoRA adapter and VAE adding approximately 570~MB combined. The remaining VRAM headroom accommodates the ComfyUI runtime overhead and operating system requirements. On GPUs with 8~GB VRAM, the system operates at the lower bound of viability; 12~GB provides comfortable headroom for concurrent operations and avoids out-of-memory errors during peak load.
+
+\section{API Endpoints}
+\label{app:api}
+
+The system exposes a total of 49 REST endpoints across the backend and asset server. Table~\ref{tab:api_backend} lists the 14 backend endpoints for game management and player actions. Table~\ref{tab:api_assets} summarizes the asset server endpoint structure.
+
+\begin{table}[h]
+\centering
+\caption{Backend API endpoints.}
+\label{tab:api_backend}
+\begin{tabular}{@{}p{3cm}p{3.5cm}@{}}
+\toprule
+\textbf{Method/Path} & \textbf{Purpose} \\
+\midrule
+\texttt{POST /games} & Create new game \\
+\texttt{GET /games/\{id\}} & Retrieve game state \\
+\texttt{POST /games/\{id\}/turn} & End human turn \\
+\texttt{POST /games/\{id\}/turn/resolve} & Resolve AI turns \\
+\texttt{POST /games/\{id\}/actions/move} & Move unit \\
+\texttt{POST /games/\{id\}/actions/attack} & Attack unit \\
+\texttt{POST /games/\{id\}/actions/attack-city} & Attack city \\
+\texttt{POST /games/\{id\}/actions/found} & Found city \\
+\texttt{POST /games/\{id\}/actions/research} & Set research \\
+\texttt{POST /games/\{id\}/actions/build} & Queue production \\
+\texttt{POST /games/\{id\}/actions/cancel-build} & Cancel production \\
+\texttt{POST /games/\{id\}/actions/purchase-structure} & Buy structure \\
+\texttt{POST /games/\{id\}/actions/improve} & Start improvement \\
+\texttt{POST /games/\{id\}/actions/message} & Send diplomatic message \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Asset server API endpoint structure.}
+\label{tab:api_assets}
+\begin{tabular}{@{}p{3cm}p{3.5cm}@{}}
+\toprule
+\textbf{Category} & \textbf{Endpoints} \\
+\midrule
+Global & \texttt{/health}, \texttt{/health/ready}, \texttt{/modes}, \texttt{/catalog}, \texttt{/assets/\{filename\}} \\
+Per-family (6 families) & \texttt{POST /\{family\}}, \texttt{GET /\{family\}}, \texttt{GET /\{family\}/catalog}, \texttt{GET /\{family\}/\{id\}}, \texttt{DELETE /\{family\}/\{id\}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The six asset families are: structures, objects, terrain, units, background\_tile, and leaders. Each family supports three generation modes (comfyui, static, placeholder) independently configurable through the server's YAML configuration file.
+
+\section{Code and Data Availability}
+\label{app:code}
+
+The complete StrategAI codebase is available as an open-source repository at \url{https://github.com/strategai/StrategAI}. The curated training dataset of 100 top-down medieval pixel-art images with caption sidecars is published on Hugging Face at \url{https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart}. The trained LoRA adapter weights (detailed\_high, step 1800, 353~MB) are also available on Hugging Face at \url{https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora}. All components are released under the Apache 2.0 license to enable unrestricted use in both academic and commercial contexts.
 
 \end{document}

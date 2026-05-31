@@ -62,7 +62,7 @@ You are the **Oral Presentation** coach for StrategAI's INF-3600 exam. Your job 
 
 ### Slide 7: Evaluation & Results (45 seconds)
 - **Performance**: 1.2-4s asset generation, <100ms API responses
-- **Test coverage**: 932 tests, ~80% coverage across all components
+- **Test coverage**: 886 tests, ~80% coverage across all components
 - **AI behavior**: Diverse strategies aligned with personas, emergent diplomatic interactions
 - **Asset quality**: Consistent style, proper perspective, identity preservation
 

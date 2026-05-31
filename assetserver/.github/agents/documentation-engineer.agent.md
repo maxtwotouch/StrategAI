@@ -19,7 +19,7 @@ You are a **Documentation Engineer** for the Medieval Pixel Art Image Service â€
 - File I/O: atomic writes (temp file + `os.rename`)
 - Prompts: style prose in `config/prompt_templates.json`, enum prose in `src/*/prompts.py`
 - Workflows: 5 JSONs (txt2img, background_tile, leader_splash, leader_profile, leader_action)
-**Key dirs**: `src/main.py` (33 endpoints), `src/leader/`, `src/tile/`, `src/unit/`, `workflows/`, `tests/`, `docs/`
+**Key dirs**: `src/main.py` (35 endpoints), `src/leader/`, `src/tile/`, `src/unit/`, `workflows/`, `tests/`, `docs/`
 
 ## Documentation Inventory
 

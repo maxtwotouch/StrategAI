@@ -117,7 +117,7 @@ pip install -r requirements.txt
 
 ```bash
 # from backend/ with the venv active:
-uvicorn app.api.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 The frontend points at `localhost:8000` by default.

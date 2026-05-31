@@ -383,7 +383,7 @@ Frontend performance measurements show initial load time of 2--3 seconds for Nex
 
 \subsection{Test Coverage}
 
-The system implements comprehensive testing across all components. The backend test suite contains 315+ tests including unit tests for game engine logic, intent resolution, and combat formulas; integration tests for API endpoints, state serialization, and LLM mocking; and property tests for invariant validation (immutability, rule compliance). Coverage is approximately 85\% of engine code.
+The system implements comprehensive testing across all components. The backend test suite contains 339+ tests including unit tests for game engine logic, intent resolution, and combat formulas; integration tests for API endpoints, state serialization, and LLM mocking; and property tests for invariant validation (immutability, rule compliance). Coverage is approximately 85\% of engine code.
 
 The asset server test suite contains 547 tests including unit tests for prompt assembly, workflow patching, and database operations; integration tests for API endpoints, ComfyUI mocking, and post-processing; and concurrency tests for load balancer, cache behavior, and race conditions. Coverage is approximately 82\% of server code.
 
@@ -391,7 +391,7 @@ The frontend uses TypeScript strict mode for compile-time validation of API cont
 
 The training pipeline test suite contains 35 tests including unit tests for caption generation, dataset validation, and config syncing, plus integration tests for end-to-end pipeline execution. Coverage is approximately 90\% of training code.
 
-Total test count across all components is 932 tests with approximately 80\% aggregate coverage.
+Total test count across all components is 886 tests with approximately 80\% aggregate coverage.
 
 \subsection{AI Behavior Quality}
 
@@ -461,7 +461,7 @@ StrategAI demonstrates that modern generative AI technologies---Large Language M
 
 The intent-based abstraction layer enables LLMs to control game entities without direct state manipulation, leveraging language models' strategic reasoning while maintaining rule compliance. The four-layer prompt architecture provides systematic asset generation with consistent style and perspective. The three-stage leader portrait pipeline demonstrates identity preservation through carefully calibrated denoising parameters. The LoRA fine-tuning pipeline enables model adaptation to specific visual styles with minimal computational resources.
 
-While limitations remain---single-instance deployment, synchronous generation, strategic depth---StrategAI provides a reference implementation for future projects combining multiple generative AI systems. The open-source codebase, comprehensive documentation, and extensive test suite (932 tests, $\sim$80\% coverage) offer a foundation for further research and development.
+While limitations remain---single-instance deployment, synchronous generation, strategic depth---StrategAI provides a reference implementation for future projects combining multiple generative AI systems. The open-source codebase, comprehensive documentation, and extensive test suite (886 tests, $\sim$80\% coverage) offer a foundation for further research and development.
 
 As generative AI models continue to improve in quality, speed, and efficiency, we anticipate increased adoption in game development. StrategAI demonstrates that these technologies are not merely research curiosities but practical tools enabling new forms of interactive entertainment. The integration patterns, architectural decisions, and engineering solutions presented here provide a roadmap for developers seeking to harness the power of generative AI in their own projects.
 

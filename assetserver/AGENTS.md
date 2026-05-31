@@ -10,7 +10,7 @@ FastAPI microservice that generates top-down medieval pixel-art game assets on-d
 
 | Path | Contents |
 |------|----------|
-| `src/main.py` | FastAPI routes and lifespan (33 endpoints) |
+| `src/main.py` | FastAPI routes and lifespan (35 endpoints) |
 | `src/leader/` | Leader generation engine (3-stage pipeline: splash→profile→action) |
 | `src/tile/` | Tile engines (structure, object, sprite, background) |
 | `src/unit/` | Unit generation engine |

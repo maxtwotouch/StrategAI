@@ -15,7 +15,7 @@ You are a specialist at **cross-project codebase research and exploration** for 
 |-----------|------|------|---------|
 | **Backend** | `backend/` | Python 3.11+, FastAPI, OpenAI API | Game engine (pure functional, frozen dataclasses), LLM-driven AI civs, REST API (14 endpoints) |
 | **Frontend** | `frontend/` | Next.js 15, React 19, TypeScript, SVG | Game UI, hex map rendering, asset integration, diplomacy chat |
-| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 33 endpoints) |
+| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 Klein 4B Distilled | Generative pixel-art service (6 asset families, 35 endpoints) |
 | **Dataset/Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit, ComfyUI | LoRA fine-tuning pipeline for FLUX2 Klein 4B Distilled |
 | **Docs** | `docs/` | Markdown | Architecture, gameplay, development, UI, asset integration guides |
 
@@ -24,7 +24,7 @@ You are a specialist at **cross-project codebase research and exploration** for 
 - **Backend API**: `backend/app/main.py` → routers in `backend/app/api/routers/`
 - **Backend Engine**: `backend/app/engine/` (27 modules) — `openai_goals.py` is the LLM integration
 - **Frontend**: `frontend/app/page.tsx` (main game page), `frontend/lib/api.ts` (API client), `frontend/lib/assetManifest.ts` (asset resolution)
-- **Asset Server**: `assetserver/src/main.py` (33 endpoints), `assetserver/src/` (per-family engines)
+- **Asset Server**: `assetserver/src/main.py` (35 endpoints), `assetserver/src/` (per-family engines)
 - **Dataset/Training**: `dataset-gen-train/src/generation/` + `dataset-gen-train/src/training/`
 
 ## Inter-Service Contracts

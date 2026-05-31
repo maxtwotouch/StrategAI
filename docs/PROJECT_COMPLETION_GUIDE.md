@@ -266,7 +266,7 @@ Use the descriptions in `docs/FIGURE_DESCRIPTIONS.md` to create actual diagrams:
 - **Asset server tests**: 547 tests, 82% coverage
 - **Frontend tests**: 35 tests, 70% coverage
 - **Training tests**: 35 tests, 90% coverage
-- **Total tests**: 932 tests, ~80% aggregate coverage
+- **Total tests**: 886 tests, ~80% aggregate coverage
 - **API endpoints**: 49 total (14 backend + 35 asset server)
 - **Asset families**: 6 (structures, objects, terrain, units, background tiles, leaders)
 - **AI civilizations**: 3 (Genghis Khan, Cleopatra, Gandhi)
@@ -362,7 +362,7 @@ Have the Research agent find all LoRA training configurations
 - [ ] All 12 figures created and inserted
 - [ ] Report proofread and formatted
 - [ ] GitHub repository is clean and organized
-- [ ] All tests pass (932 tests)
+- [ ] All tests pass (886 tests)
 - [ ] README files are complete
 - [ ] Code committed and pushed to GitHub
 - [ ] Repository accessible to instructors

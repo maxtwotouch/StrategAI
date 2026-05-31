@@ -1,437 +1,258 @@
 # StrategAI
 
-A Civilization-style turn-based strategy game where rival civs are driven by
-LLM-emitted goals and illustrated with on-demand generative pixel art. The
-repository contains the full system: the Python game engine and FastAPI
-backend (`backend/`), the Next.js frontend (`frontend/`), the self-hosted
-generative pixel-art microservice (`assetserver/`), and the LoRA training
-pipeline that produced the model the microservice runs (`dataset-gen-train/`).
+<div align="center">
+
+**LLM-Driven Strategy Game · Generative Pixel Art · LoRA Style Adaptation**
+
+[![Python](https://img.shields.io/badge/python-3.11+-blue)](backend/)
+[![Next.js](https://img.shields.io/badge/next.js-15-black)](frontend/)
+[![React](https://img.shields.io/badge/react-19-61dafb)](frontend/)
+[![ComfyUI](https://img.shields.io/badge/model-FLUX2_Klein_4B-red)](assetserver/)
+[![License](https://img.shields.io/badge/license-Apache_2.0-green)](LICENSE)
+
+</div>
 
 ---
 
-## The Game
+## What is StrategAI?
 
-### What you do
+StrategAI is a **Civilization-style turn-based strategy game** where AI opponents are controlled by Large Language Models (LLMs) making strategic decisions through natural language reasoning, and every game asset — terrain, buildings, units, leader portraits — is generated on-demand by a Diffusion Transformer (DiT) model. Built for the **INF-3600 Generative AI** course at UiT The Arctic University of Norway.
 
-A deterministic 4X game played on a square-tile map under fog of war. Each
-turn you move and fight with four unit types — archer, scout, settler,
-warrior — found cities with settlers, fill a per-city production queue
-(units, buildings, gold-purchased structures placed directly on tiles),
-research along a 21-node tech tree, dispatch workers to lay improvements
-(farms, mines, roads), and negotiate with the rival civs. The match ends on
-a score-based victory. The complete mechanics — every cost, yield, terrain
-modifier, combat formula and turn-phase ordering — is documented in
-[docs/GAMEPLAY.md](docs/GAMEPLAY.md).
+### AI Technologies at a Glance
 
-### Engine architecture
-
-The backend is a pure-functional engine wrapped in a FastAPI HTTP layer.
-Game state is built from frozen dataclasses, every rule is a pure function
-that returns a new `GameState`, and state transitions are organized into
-three layers:
-
-1. **Strategic layer (LLM).** The AI civ sees a fog-filtered local view
-   serialized by `serialize.py` and emits `Intents` via the OpenAI tool-use
-   API (nine intent tools — move, attack, found city, queue production,
-   research, send message, etc.).
-2. **Tactical layer (Python).** `operations.py` lowers `Intents` to `Goals`;
-   `executor.py` resolves goals against current state (A\* pathfinding,
-   move budget, occupancy, line-of-sight) and emits concrete `Actions`.
-3. **Validator + engine.** Each `Action` is legality-checked, then applied
-   by the appropriate engine module (`combat.py`, `city_founding.py`,
-   `production.py`, `economy.py`, `diplomacy.py`, …) which returns a brand
-   new `GameState`.
-
-The LLM never touches `GameState` directly. All inputs to the model are
-serialized views; all outputs go through the validator before any state
-change. This makes the AI civs cheat-resistant, fog-of-war-respecting, and
-fully replayable from a seed. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-### LLM-driven AI civs
-
-Each AI civ has a per-leader persona (`backend/app/api/game_factory.py:_AI_ROSTER`)
-appended to a shared system prompt (`backend/app/engine/openai_goals.py`).
-A rolling memory window of recent turn outcomes is included on every call
-so the LLM can reason about its own history. Validation errors are returned
-to the LLM as machine-readable error codes (`not_your_turn`, `not_owner`,
-`no_moves`, …) so the model can self-correct on the next intent. With no
-`OPENAI_API_KEY` set, AI civs fall back to a deterministic stub goal source
-that keeps the engine fully exercisable for offline development.
-
-### Diplomacy
-
-Civs track per-pair **stance** (peace, war), a numeric **relationship**
-score, and active **truces**. The diplomacy module persists a message log
-between every pair and exposes a free-form chat: the human player opens an
-audience with a met civ, sends a message, and the rival civ's LLM replies
-in-character with the same persona it uses for strategic play. Recent UI
-work added a **diplomatic ribbon** along the top of the map that surfaces
-every met leader as a portrait — relationship-coloured ring, stance dot,
-truce halo, inbox pill — clickable to open the audience overlay.
-
-### Frontend
-
-The UI is a single Next.js 15 / React 19 / TypeScript client. The map is
-rendered in SVG by `SquareMap.tsx`; the war-room layout, city drawer,
-diplomatic audience, sovereign portrait and the ribbon are all in
-`page.tsx` + `globals.css`. State is local React (`useState` / `useRef` /
-`useMemo`, no external library). Audio is a three-track playlist with
-narration ducking via a `useAudio` hook.
-
-Every asset surface degrades gracefully: missing assets fall back to flat
-colours, glyph rendering, or letter-initial portraits, so the game is
-fully playable without the asset server running. When the asset server is
-configured, the frontend talks to it through a **same-origin proxy** at
-`/api/asset/[...path]` (see [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md)),
-which sidesteps CORS even when upstream returns a 5xx without
-`Access-Control-Allow-Origin` headers.
+| Component | AI Technology | What it Does |
+|-----------|--------------|--------------|
+| 🧠 **AI Civilizations** | LLM (OpenAI tool-use API) | 9 intent tools, per-leader personas, rolling memory — autonomous strategic play |
+| 💬 **Diplomacy Chat** | LLM with persistent conversation | Free-form chat with AI leaders, relationship scoring, truce negotiation |
+| 🎨 **Generative Pixel Art** | ComfyUI + FLUX2 Klein 4B Distilled (DiT) | On-demand generation of 6 asset families across 35 endpoints |
+| 🖌️ **Style Adaptation** | LoRA fine-tuning | 100-image curated medieval pixel-art dataset, 6-experiment matrix |
 
 ---
 
-## The Asset Server
+## Architecture
 
-A FastAPI microservice that drives ComfyUI workflows over **FLUX2 Klein 4B
-Distilled** to generate top-down medieval pixel-art game assets on demand.
-Lives under `assetserver/` and is independently runnable — full deep-dive in
-[`assetserver/README.md`](assetserver/README.md).
+```mermaid
+flowchart LR
+    subgraph Browser["🖥️ Browser"]
+        UI["Next.js 15 + React 19\nSVG Map, Diplomacy, Audio"]
+    end
 
-### Six asset families
+    subgraph Backend["🎮 Game Backend :8000"]
+        Engine["Pure-Functional Engine\nFrozen Dataclasses"]
+        LLM["OpenAI Tool-Use\nAI Civs + Diplomacy"]
+        API["FastAPI REST\n14 Endpoints"]
+    end
 
-| Family | Purpose | Key fields |
-|---|---|---|
-| `leader` | Leader portraits (splash / profile / action) | archetype, culture, time_of_day, mood, action_category |
-| `structure` | Buildings: fortification, production, housing, sacred | category, style, condition, scale |
-| `object` | Nature objects + world props | category (vegetation/geological/rural/urban/debris), biome, season |
-| `terrain` | Elevation features | category (hill/slope/cliff/ridge/depression), scale, material |
-| `unit` | South-facing top-down character sprites | unit_type (archer/scout/settler/warrior) |
-| `background_tile` | Seamless terrain tiles | tile_type (water/grass/sand/stone/dirt) |
+    subgraph Assets["🎨 Asset Server :8001"]
+        Comfy["ComfyUI Client\nMulti-Node Load Balancer"]
+        Gen["6 Asset Families\n35 Endpoints"]
+        DB["SQLite + Alembic\nLRU Cache"]
+    end
 
-Each family supports the full CRUD set — `POST` to generate, `GET` to list
-(with `?limit=` / `?offset=` pagination, max 200), `GET /{id}` to fetch one,
-`DELETE /{id}` to remove. Combined with health, discovery, catalog and
-asset-download endpoints the service exposes 33 routes total.
+    subgraph Training["🧪 Dataset & Training"]
+        DataGen["Prompt → ComfyUI → PNGs"]
+        LoRA["Ostris AI Toolkit\n6-Experiment Matrix"]
+    end
 
-### The leader pipeline
-
-The leader family is a **three-stage img2img chain** that preserves visual
-identity across multiple portraits of the same character:
-
-```
-POST /leader  asset_type=splash    → reference image stored
-POST /leader  asset_type=profile   → uses splash as img2img reference
-POST /leader  asset_type=action    → uses splash as img2img reference
-```
-
-Splash creates the leader's identity (full-body promo art). Profile and
-action stages run with the splash as an img2img reference so face, clothing
-and palette stay consistent. The action stage accepts an `action_category`
-(military / diplomatic / civic / …) and a free-form `action_description`,
-and can take a `leader_ids` array to put multiple leaders in the same scene
-(treaty signings, war councils). All other families use a single
-text-to-image generation.
-
-### ComfyUI integration
-
-A multi-node load balancer (`COMFYUI__NODES`) routes generations across
-GPUs with health checks, automatic failover, and configurable retry counts.
-Every workflow JSON in `workflows/` is structurally validated at startup;
-a missing output node or malformed prompt-injection target is a fatal
-error in production mode. A warm-up generation runs at boot to preload
-GPU VRAM. The WebSocket protocol is preferred with automatic fallback to
-HTTP polling.
-
-### Three generation modes
-
-Per family, in `config.yaml` or via `GENERATION__MODES__*` env vars:
-
-- `comfyui` — real GPU generation through the load-balanced ComfyUI pool
-- `static` — serve from a pre-curated PNG catalog
-- `placeholder` — procedural rectangle with the requested label
-
-`placeholder` lets the **entire API** (client contracts, validation, pagination,
-errors) be exercised with zero external dependencies. The drop-in preset
-`assetserver/.env.testing` flips every family to placeholder mode for tests.
-
-### Storage, caching, security
-
-SQLite with WAL journal for safe concurrent reads/writes. Alembic
-migrations run automatically at startup. An in-memory LRU cache (configurable
-`SERVER__CACHE_MAX_ENTRIES` / `SERVER__CACHE_MAX_MB`) accelerates asset
-serving; atomic temp-file + rename writes prevent half-flushed files; orphan
-records are cleaned up on persist failure. Rate limiting (global POST and
-GET budgets with burst size) is on by default. Production mode adds API-key
-auth, explicit CORS origins (no `*`), fatal schema-mismatch checks at
-startup, and blocks the dev-only `DATABASE_RESET=true` switch.
-
----
-
-## The Dataset and LoRA Training
-
-The visual style of the generated art comes from a LoRA fine-tuned on a
-curated top-down medieval pixel-art dataset. The full pipeline that
-produced both the dataset and the trained weights lives in
-`dataset-gen-train/`. Two independent phases connected by a single
-`metadata.jsonl` handoff file. Deep-dive in
-[`dataset-gen-train/README.md`](dataset-gen-train/README.md).
-
-### Phase 1 — Dataset generation
-
-```
-generate-prompts      → dataset/prompts/*.jsonl
-bash scripts/generate_images.sh   (drives ComfyUI from the prompt file)
-                      → dataset/raw/*.png  (with sidecar metadata)
-<manual curation: delete bad PNGs>
-prepare-dataset       → dataset/hf/  (clean PNGs + metadata.jsonl manifest)
+    UI -->|"REST JSON"| API
+    UI -->|"Same-Origin Proxy\n/api/asset/[...path]"| Gen
+    API --> Engine
+    API --> LLM
+    Gen --> Comfy
+    LoRA -.->|".safetensors\nLoRA weights"| Comfy
+    DataGen -.->|"metadata.jsonl\nhandoff"| LoRA
 ```
 
-Prompts are sampled from `config/prompt_templates.json` (categories, biomes,
-styles, conditions), images are generated through a fixed ComfyUI workflow
-preset, hand-curated for quality, then packaged as a Hugging Face dataset.
-The curated dataset is published at
-[`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart).
+### Subprojects
 
-### Phase 2 — LoRA training
+| Subproject | Path | Stack | Purpose |
+|-----------|------|-------|---------|
+| **Backend** | `backend/` | Python 3.11+, FastAPI, OpenAI API | Game engine, LLM-driven AI civs, REST API |
+| **Frontend** | `frontend/` | Next.js 15, React 19, TypeScript, SVG | Game UI, map rendering, asset integration, diplomacy chat |
+| **Asset Server** | `assetserver/` | Python 3.10+, FastAPI, ComfyUI, FLUX2 | Generative pixel-art service (6 families, 35 endpoints) |
+| **Dataset & Training** | `dataset-gen-train/` | Python 3.10+, Ostris AI Toolkit | LoRA fine-tuning pipeline for top-down medieval style |
 
-```
-extract-training-set        → .txt caption sidecars per PNG
-validate-dataset            → schema + image-integrity checks
-derive-captions             → 3 caption variants (minimal/detailed/ultra_minimal)
-sync-validation-prompts     → inject sample prompts into training YAMLs
-bash scripts/train_experiments.sh   → batch launch via Ostris AI Toolkit
-                            → output/*.safetensors
-```
+### How Services Communicate
 
-Training uses the [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit)
-over **FLUX2 Klein 4B Distilled** as the base. The repo ships a six-experiment
-matrix in `config/training/` so caption-density, learning-rate and rank
-variations can be compared on a single dataset. Each console command is also
-runnable as a `python -m src.training.*` module.
-
-### The trigger token
-
-The trained LoRA is activated with the token `<tdp>` followed by the angle
-phrase `top-down view.`:
-
-```
-<tdp> top-down view. a medieval granary in steampunk industrial style,
-16x16 pixel art, white background
-```
-
-Both must be present at inference. The asset server's prompt templates
-prepend this automatically; if you call the underlying ComfyUI workflow
-directly you have to include it yourself.
-
-### Hand-off to the asset server
-
-The output of this pipeline is the `.safetensors` LoRA file loaded into
-the ComfyUI workflows the asset server submits. The two services share
-their ComfyUI infrastructure and base model; the training pipeline never
-talks to the asset server directly.
+- **Frontend ↔ Backend**: REST at `http://localhost:8000` — 14 game endpoints (DTOs in `backend/app/api/schemas.py`, consumed by `frontend/lib/api.ts`)
+- **Frontend ↔ Asset Server**: Same-origin proxy at `/api/asset/[...path]` — POST generation, GET asset files (manifest resolution in `frontend/lib/assetManifest.ts`)
+- **Backend ↔ Asset Server**: No direct contract — frontend mediates all asset requests
+- **Asset Server ↔ Training**: Shared ComfyUI + FLUX2 infrastructure; LoRA `.safetensors` loaded at inference
 
 ---
 
 ## Quick Start
 
-Game only — backend + frontend, no GPU required:
+### Prerequisites
+
+- **Python 3.11+** (backend, asset server)
+- **Node.js 18+** (frontend)
+- **GPU optional** — the game runs fully without GPU; the asset server has a zero-dependency placeholder mode
+
+### Run the Game (Backend + Frontend)
 
 ```bash
-# Backend
+# Terminal 1 — Backend
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.api.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 
-# Frontend (separate terminal)
+# Terminal 2 — Frontend
 cd frontend
 npm install
 echo 'NEXT_PUBLIC_API_URL=http://localhost:8000' > .env.local
-# Optional, to pull generated art:
-# echo 'NEXT_PUBLIC_ASSET_API_URL=https://your-asset-host' >> .env.local
 npm run dev
-
-open http://localhost:3000
 ```
 
-Asset server (GPU-free placeholder mode):
+Open **http://localhost:3000** — you're playing. AI civs use a deterministic stub when no `OPENAI_API_KEY` is set, so the engine is fully exercisable offline.
+
+### (Optional) Asset Server
 
 ```bash
 cd assetserver
 pip install -e ".[dev]"
-cp .env.testing .env       # flips every family to placeholder mode
+cp .env.testing .env          # placeholder mode — no GPU needed
 uvicorn src.main:app --host 127.0.0.1 --port 8001
 ```
 
-For real generation set `COMFYUI__BASE_URL` (single node) or
-`COMFYUI__NODES` (multi-node) to a ComfyUI server with the required
-models and custom nodes loaded — see
-[`assetserver/README.md`](assetserver/README.md) for the exact list.
+Then add to `frontend/.env.local`: `NEXT_PUBLIC_ASSET_API_URL=http://localhost:8001`
 
-LoRA training is a multi-step pipeline with its own prerequisites
-(Hugging Face CLI auth, Ostris AI Toolkit, ComfyUI for dataset
-generation) — follow
-[`dataset-gen-train/README.md`](dataset-gen-train/README.md).
+For GPU generation, configure ComfyUI — see [`assetserver/README.md`](assetserver/README.md).
 
-A consolidated walk-through for all four parts together lives in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+> 📖 **Full setup guide**: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) covers all four subprojects, environment variables, testing, and workflows.
 
 ---
 
-## Repository Layout
+## Key Features
 
-```
-INF-3600/
-├── backend/                    Python game engine + FastAPI API
-│   ├── app/api/                routes, Pydantic schemas, game store
-│   ├── app/engine/             pure-functional rules layer (22 modules)
-│   ├── scripts/                headless playthrough runner
-│   └── tests/                  pytest suite (339 passing)
-├── frontend/                   Next.js + React + TypeScript UI
-│   ├── app/                    App Router (page.tsx, globals.css,
-│   │                           api/asset/[...path] same-origin proxy)
-│   ├── components/             SquareMap SVG renderer
-│   ├── lib/                    game + asset clients, manifest resolver,
-│   │                           audio hook, hex math
-│   └── public/audio/           music tracks (ATTRIBUTION.md inside)
-├── assetserver/                Medieval Pixel Art Image Service (FastAPI)
-│   ├── src/                    asset-family engines, ComfyUI client +
-│   │                           load balancer, storage, config
-│   ├── workflows/              ComfyUI workflow JSONs (txt2img, img2img,
-│   │                           leader splash/profile/action, background)
-│   ├── config/                 prompt templates + per-family modes
-│   ├── docs/                   pipeline + architecture deep-dive
-│   └── tests/                  pytest suite
-├── dataset-gen-train/          LoRA training pipeline
-│   ├── src/generation/         prompt + dataset generation
-│   ├── src/training/           Ostris AI Toolkit integration
-│   ├── config/training/        6 LoRA experiment YAMLs
-│   ├── config/comfyui/         ComfyUI workflow API JSONs
-│   ├── dataset/                raw → hf handoff folders
-│   ├── docs/                   generation + training deep-dives
-│   └── tests/                  pytest suite (35 tests)
-├── docs/                       game-system documentation
-│   ├── ARCHITECTURE.md         engine layers + LLM goal source
-│   ├── GAMEPLAY.md             every mechanic with engine-exact numbers
-│   ├── UI_GUIDE.md             frontend lifecycle, layout, overlays, audio
-│   ├── ASSET_INTEGRATION.md    asset service contract + resolver + fallback
-│   ├── DEVELOPMENT.md          run, env, test, hook-in points
-│   └── REPORT_HANDOFF.md       summary + source map for AI report writers
-├── scripts/
-│   └── asset_api_smoke.py      stdlib smoke test against a live asset host
-├── AGENTS.md                   multi-agent development system overview
-├── GAME_BACKLOG.md             outstanding game-design work
-├── TIER1_PLAN.md               Tier-1 mechanics implementation record
-└── planning.md                 original concept doc
-```
+### 🧠 LLM-Driven AI Civilizations
+- **9 intent types**: Expand, Scout, Engage, Reinforce, Develop, Turtle, Diplomacy, Research, Idle
+- **Per-leader personas**: Each AI civ has a unique personality prompt from the roster in `_AI_ROSTER`
+- **Rolling memory**: Recent turn outcomes included on every LLM call for historical reasoning
+- **Self-correcting**: Validation errors returned as machine-readable codes (`not_your_turn`, `not_owner`, `no_moves`) — the LLM adjusts its next intent
+- **Cheat-resistant**: LLM never touches `GameState` directly — all inputs are fog-filtered serialized views
+
+### 💬 Diplomatic Chat
+- Per-civ-pair **stance** (peace/war), numeric **relationship** score, and active **truces**
+- Free-form chat: send a message → AI leader replies in-character with the same persona used for strategic play
+- **Diplomatic ribbon** UI: portrait ring (relationship color), stance dot, truce halo, inbox pill
+
+### 🎨 Generative Pixel Art
+- **6 asset families**: leaders (3-stage img2img pipeline), structures, objects, terrain, units, background tiles
+- **33 REST endpoints** with full CRUD, pagination, and catalog discovery
+- **3 generation modes**: `comfyui` (GPU), `static` (pre-curated), `placeholder` (procedural — no dependencies)
+- **Multi-node ComfyUI** load balancer with health checks, auto-failover, WebSocket + HTTP fallback
+
+### 🖌️ LoRA Style Adaptation
+- **100-image curated dataset** [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart)
+- **6-experiment matrix**: caption density × learning rate × rank variations
+- **Trigger token** `<tdp>` + angle phrase `top-down view.` for consistent overhead perspective
+- **FLUX2 Klein 4B Distilled** base model — consumer GPU friendly (8–12 GB VRAM)
+
+### ⚙️ Pure-Functional Game Engine
+- All state in **frozen dataclasses** — every mutation returns a new `GameState`
+- **Three-layer architecture**: Strategic (LLM intents) → Tactical (A\* pathfinding, move budget) → Validator (legality checks)
+- **Fully deterministic**: replayable from seed, testable without side effects
+- **22 engine modules**: combat, economy, production, research (21-node tech tree), diplomacy, fog of war, map generation, victory scoring
 
 ---
 
-## Documentation
+## Documentation Hub
 
-| Guide | What's in it |
-|---|---|
-| [docs/GAMEPLAY.md](docs/GAMEPLAY.md) | Every mechanic: setup, civs, terrain, units (stats + costs), cities (yields + growth), production queue, buildings + gold-purchased structures, the 21-tech tree, workers, combat, diplomacy, turn flow, victory. |
-| [docs/UI_GUIDE.md](docs/UI_GUIDE.md) | Frontend lifecycle (Start → Load → Intro → War Room), every panel and overlay (city drawer, diplomatic audience + ribbon, sovereign portrait), map rendering layers, audio plumbing. |
-| [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md) | Contract between the game and the asset server, taxonomy mapping, manifest resolver, same-origin proxy, graceful fallback, smoke test. |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Prerequisites, setup for all four parts, env vars, tests, common workflows, where to hook new things in. |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Backend engine architecture — pure-functional state, intent → goal → action lowering, LLM goal source. |
-| [docs/REPORT_HANDOFF.md](docs/REPORT_HANDOFF.md) | Concise project summary and source map for AI agents writing reports about what has been implemented. |
-| [`assetserver/README.md`](assetserver/README.md) + [`assetserver/docs/`](assetserver/docs/) | Asset-server pipeline deep-dive, architecture notes, ComfyUI setup, prompt-writing guides per family, deployment + production hardening. |
-| [`dataset-gen-train/README.md`](dataset-gen-train/README.md) + [`dataset-gen-train/docs/`](dataset-gen-train/docs/) | Generation pipeline, training pipeline, ComfyUI workflows, experiment design. |
-| [GAME_BACKLOG.md](GAME_BACKLOG.md) | Outstanding game-design work. |
-| [TIER1_PLAN.md](TIER1_PLAN.md) | Tier-1 mechanics implementation record. |
-| [planning.md](planning.md) | Original concept doc. |
+| Document | Contents |
+|----------|----------|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Backend engine layers, intent→goal→action lowering, LLM goal source design |
+| [`docs/GAMEPLAY.md`](docs/GAMEPLAY.md) | Complete game mechanics — units, cities, tech tree, combat, diplomacy, victory |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Setup, env vars, testing, common workflows, where to hook new features |
+| [`docs/ASSET_INTEGRATION.md`](docs/ASSET_INTEGRATION.md) | Asset service contract, manifest resolution, same-origin proxy, graceful fallback |
+| [`docs/UI_GUIDE.md`](docs/UI_GUIDE.md) | Frontend lifecycle, panel breakdown, map rendering, audio plumbing |
+| [`docs/IEEE_REPORT.md`](docs/IEEE_REPORT.md) | Academic report — abstract, introduction, architecture, evaluation |
+| [`assetserver/docs/project-report.md`](assetserver/docs/project-report.md) | Main student technical report — DiT pipeline, design rationale, evaluation |
+| [`dataset-gen-train/docs/`](dataset-gen-train/docs/) | Training pipeline deep-dives, experiment design, model card |
+| [`GAME_BACKLOG.md`](GAME_BACKLOG.md) | Outstanding game-design work and known issues |
+| [`TIER1_PLAN.md`](TIER1_PLAN.md) | Shipped Tier-1 mechanics implementation record |
+| [`planning.md`](planning.md) | Original concept document |
 
 ---
 
-## Stack
+## Deployment
 
-| Layer | Tech |
-|---|---|
-| Game engine | Python 3.11+, frozen dataclasses, pure functional state transitions |
-| Backend HTTP | FastAPI, Pydantic, in-memory store, OpenAI tool-use for AI civs |
-| Frontend | Next.js 15 (App Router), React 19, TypeScript strict, SVG-rendered map |
-| Asset service | Python 3.10+, FastAPI, SQLite (WAL) + Alembic, ComfyUI client with multi-node load balancer |
-| Generative model | FLUX2 Klein 4B Distilled (Diffusion Transformer) via ComfyUI + custom LoRA |
-| LoRA training | Ostris AI Toolkit, ComfyUI for dataset generation, 6-experiment matrix |
-| Dataset hosting | Hugging Face Hub (`stixxert/topdown-medieval-pixelart`) |
-| Audio | `HTMLAudioElement` + `useAudio` hook (playlist + narration ducking + mute) |
+The system is designed for **separation of concerns**:
+
+| Component | Deployment Notes |
+|-----------|-----------------|
+| **Backend + Frontend** | Standard web app — deploy anywhere (Vercel, Railway, Fly.io). Frontend serves static assets; backend needs Python runtime + OpenAI API access. |
+| **Asset Server** | Runs on infrastructure **near ComfyUI/GPU servers**. Requires persistent storage for generated assets and low-latency access to ComfyUI nodes. |
+| **ComfyUI Nodes** | GPU instances (8–12 GB VRAM minimum per node). Multi-node pool configured via `COMFYUI__NODES` env var. |
+| **Training Pipeline** | Offline batch process — not part of the runtime system. |
+
+> 📖 Coming soon: `docs/DEPLOYMENT.md` with full production deployment guide, Docker Compose setup, and infrastructure recommendations.
 
 ---
 
 ## Testing
 
 ```bash
-# Game backend (339 tests)
+# Backend — 339+ tests
 cd backend && .venv/bin/python -m pytest
 
-# Frontend (typecheck + production build)
+# Frontend — type check + build
 cd frontend && npm run typecheck && npm run build
 
-# Asset server (~345 tests, runs in placeholder mode without ComfyUI)
+# Asset Server — ~345 tests (placeholder mode, no GPU needed)
 cd assetserver && python -m pytest tests/ -v
 
-# Dataset/training pipeline (35 tests)
+# Dataset/Training — 35 tests
 cd dataset-gen-train && python -m pytest tests/ -v
 
-# External asset service smoke test (hits a live host)
+# Integration smoke test (against live asset host)
 python3 scripts/asset_api_smoke.py --fast
 ```
 
-See [docs/DEVELOPMENT.md §5](docs/DEVELOPMENT.md#5-testing) for the full
-playbook.
+---
+
+## Contributing
+
+StrategAI uses a **multi-agent development system** supporting both GitHub Copilot and Claude Code. See [`AGENTS.md`](AGENTS.md) for the full agent roster and delegation model.
+
+### Quick Start for Contributors
+
+1. **Read the docs**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
+2. **Pick a task**: Browse [`GAME_BACKLOG.md`](GAME_BACKLOG.md) for outstanding work
+3. **Follow conventions**: Each subproject README lists domain-specific rules (frozen dataclasses, atomic writes, config patterns)
+4. **Run tests before submitting**: See testing commands above
+5. **Use agents for cross-project work**: `@Orchestrator implement X across backend, frontend, and assetserver`
+
+### Subproject Conventions
+
+| Subproject | Key Rules |
+|-----------|-----------|
+| Backend | Frozen dataclasses, pure functions, `ValidationResult` (never throws), `secrets.randbits(31)` for seeds |
+| Frontend | `useState`/`useRef`/`useMemo` (no external state lib), all API calls through `api.*`, graceful asset fallback |
+| Asset Server | `with SessionLocal() as db:` context manager, atomic temp-file + rename writes, orphan cleanup on persist failure |
+| Dataset/Training | Pipeline phases connected by `metadata.jsonl` handoff, ComfyUI workflow JSONs validated at each stage |
 
 ---
 
-## Status & Known Issues
+## License & Credits
 
-- The asset service is reached through a Next.js same-origin proxy at
-  `/api/asset/[...path]`. The browser only talks to its own origin, so CORS
-  is never a factor — even when the upstream returns a 5xx without
-  `Access-Control-Allow-Origin` headers. See
-  [docs/ASSET_INTEGRATION.md §1](docs/ASSET_INTEGRATION.md#1-configuration).
-- The leader profile pipeline is the asset service's only remaining trouble
-  spot. `POST /leader` (splash) is healthy; the chained profile stage
-  occasionally returns HTTP 500. The frontend catches that silently and
-  falls back to the splash, cropped via `object-position: center 20%`, so
-  the empire badge and portrait surfaces still show real art.
-- `backend/tests/test_playthrough.py::test_playthrough_with_generated_map`
-  intermittently fails with a city-capture move error. Pre-existing and
-  unrelated to recent work; tracked in the backlog.
-- No automated CI. Manual checks before opening a PR are described in
-  [docs/DEVELOPMENT.md §8](docs/DEVELOPMENT.md#8-ci--quality).
+### Code License
+This project is licensed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) for details.
+
+### Model License
+The LoRA adapters in `dataset-gen-train/` inherit a **non-commercial** restriction from the FLUX.2 [dev] base model. See [`dataset-gen-train/docs/MODEL_CARD.md`](dataset-gen-train/docs/MODEL_CARD.md) for the full license dependency chain.
+
+### Academic Context
+Created for the **INF-3600 Generative AI** course at UiT The Arctic University of Norway.
+
+### Links
+- **Curated Dataset**: [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) on Hugging Face
+- **Base Model**: [FLUX.2 Klein 4B Distilled](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) by Black Forest Labs
+- **Training Toolkit**: [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit)
 
 ---
 
-## AI Agent System
-
-The repository includes a multi-agent development system that supports both
-**GitHub Copilot** and **Claude Code** harnesses.
-
-| Harness | Format | Location |
-|---|---|---|
-| GitHub Copilot | `.agent.md` files | `.github/agents/` (root + each area) |
-| Claude Code | `AGENTS.md` files | Root + each area |
-
-**Root-level agents** (Orchestrator, Planner, AI Showcase, Research,
-Integration Tester, Backend Specialist, Frontend Specialist, Report Writer,
-Oral Presentation) coordinate cross-area work. **Area-specific agents**
-specialise per directory: backend (3), frontend (2), asset server (11),
-dataset/training (5). Delegation graph and cross-harness invocation guide
-in [`.github/agents/README.md`](.github/agents/README.md); per-area context
-in each `AGENTS.md`.
-
-Usage:
-
-```
-# GitHub Copilot
-@Orchestrator Add a new unit type across backend, frontend, and asset server
-
-# Claude Code
-Use the Orchestrator agent to coordinate adding a new unit type
-```
-
----
-
-## License
-
-TBD.
+<div align="center">
+<sub>Built with ❤️ for INF-3600 · UiT The Arctic University of Norway · 2025–2026</sub>
+</div>
