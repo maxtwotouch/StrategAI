@@ -184,6 +184,24 @@ class ComfyUILoadBalancer:
             + "\n".join(errors)
         )
 
+    async def upload_image(self, image: Image.Image, filename: str) -> str:
+        """Upload an image to the ``input/`` folder of a healthy ComfyUI node.
+
+        Returns the stored filename.
+        """
+        node = await self._select_node()
+        return await node.client.upload_image(image, filename)
+
+    async def upload_reference_image(
+        self, image: Image.Image, filename: str
+    ) -> str:
+        """Upload a reference image to the ``input/`` folder of a healthy ComfyUI node.
+
+        Returns the stored filename.
+        """
+        node = await self._select_node()
+        return await node.client.upload_reference_image(image, filename)
+
     async def health_check(self) -> bool:
         """Return ``True`` if at least one node is reachable.
 
