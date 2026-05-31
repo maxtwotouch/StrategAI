@@ -94,6 +94,12 @@ export type StandingDTO = {
   name: string;
   score: number;
 };
+export type CivRosterEntryDTO = {
+  id: number;
+  name: string;
+  leader_name: string;
+  is_human: boolean;
+};
 export type GameStateDTO = {
   id: number;
   turn: number;
@@ -101,6 +107,9 @@ export type GameStateDTO = {
   map_radius: number;
   tiles: TileDTO[];
   civs: CivDTO[];
+  // Full civ identity list (every civ in the game, fog-of-war-independent).
+  // Used by the asset resolver to pre-generate art for civs not yet met.
+  civ_roster: CivRosterEntryDTO[];
   cities: CityDTO[];
   units: UnitDTO[];
   known_civ_ids: number[];

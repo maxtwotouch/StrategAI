@@ -203,11 +203,15 @@ export default function HomePage() {
         culture: nextSetup.culture,
         description: nextSetup.leaderDescription,
       });
-      const civs: CivInput[] = next.civs.map((c) => ({
+      // Use civ_roster so we resolve art for AI civs even before the human
+      // has met them. state.civs is filtered by fog of war and only contains
+      // discovered civs, which is the wrong set for pre-generation.
+      const roster = next.civ_roster.length > 0 ? next.civ_roster : next.civs;
+      const civs: CivInput[] = roster.map((c) => ({
         civId: c.id,
         leaderName: c.leader_name,
       }));
-      const leaders: CivInput[] = next.civs.map((c) => {
+      const leaders: CivInput[] = roster.map((c) => {
         const base: CivInput = { civId: c.id, leaderName: c.leader_name };
         return c.is_human ? { ...base, customLeaderParams: humanCustomParams } : base;
       });

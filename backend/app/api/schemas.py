@@ -134,6 +134,20 @@ class TileOwnerOut(BaseModel):
     city_id: int
 
 
+class CivRosterEntry(BaseModel):
+    """Minimal civ identity used for asset pre-generation.
+
+    Includes every civ regardless of whether the human has met them, so the
+    frontend can pre-resolve leader / structure / unit art at game start. Does
+    not leak any gameplay state — name, leader name, and id only.
+    """
+
+    id: int
+    name: str
+    leader_name: str
+    is_human: bool
+
+
 class GameStateOut(BaseModel):
     id: int
     turn: int
@@ -141,6 +155,7 @@ class GameStateOut(BaseModel):
     map_radius: int
     tiles: list[TileOut]
     civs: list[CivOut]
+    civ_roster: list[CivRosterEntry] = Field(default_factory=list)
     cities: list[CityOut]
     units: list[UnitOut]
     known_civ_ids: list[int]
@@ -337,6 +352,15 @@ def state_to_out(game_id: int, state: GameState) -> GameStateOut:
             if coord in explored
         ],
         civs=[civ_to_out(c, state) for c in state.civs if c.id in visible_civ_ids],
+        civ_roster=[
+            CivRosterEntry(
+                id=c.id,
+                name=c.name,
+                leader_name=c.leader_name,
+                is_human=c.is_human,
+            )
+            for c in state.civs
+        ],
         cities=[
             city_to_out(c)
             for c in state.cities

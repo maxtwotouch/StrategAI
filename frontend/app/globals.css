@@ -818,7 +818,10 @@ select:focus {
 
 .leader-row,
 .diplomacy-contact {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0.55rem 0.7rem;
+  gap: 0.6rem;
+  min-width: 0;
 }
 
 .leader-row.is-active,
@@ -829,19 +832,25 @@ select:focus {
 }
 
 .leader-row__portrait {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   font-weight: 800;
   color: #10161d;
   overflow: hidden;
+  flex-shrink: 0;
+  font-size: 0.95rem;
 }
 
 .leader-portrait__img {
   width: 100%;
   height: 100%;
+  /* Bias upward so when a splash is being used as a portrait fallback (server
+     profile stage is unavailable) the leader's face is centered in the crop
+     rather than their torso. */
   object-fit: cover;
+  object-position: center 22%;
   display: block;
 }
 
@@ -1138,8 +1147,11 @@ select:focus {
   inset: 0;
   z-index: 200;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Anchor the panel to the bottom-left so the rival's splash dominates the
+     right side and top of the screen — the painterly composition is the
+     headline visual, the chat sits beside it like an aide's notes. */
+  align-items: flex-end;
+  justify-content: flex-start;
   opacity: 0;
   pointer-events: none;
   transition: opacity 220ms ease;
@@ -1163,26 +1175,37 @@ select:focus {
   content: "";
   position: absolute;
   inset: 0;
+  /* The chat panel sits in the lower-left; bias the bright spot of the
+     radial vignette to the right side so the visible portion of the splash
+     gets the natural focal point. Outer edges still darken slightly to
+     anchor the panel. */
   background:
-    radial-gradient(ellipse at center, rgba(8, 12, 18, 0.55) 0%, rgba(8, 12, 18, 0.92) 70%),
-    linear-gradient(180deg, rgba(8, 12, 18, 0.4), rgba(8, 12, 18, 0.85));
+    radial-gradient(ellipse at 68% 40%, rgba(8, 12, 18, 0.05) 0%, rgba(8, 12, 18, 0.66) 85%),
+    linear-gradient(180deg, rgba(8, 12, 18, 0.12), rgba(8, 12, 18, 0.45));
 }
 
 .diplomacy-audience__panel {
   position: relative;
-  width: min(960px, 92vw);
-  max-height: 90vh;
+  /* Narrower panel anchored to the lower-left so the splash dominates the
+     rest of the canvas. */
+  width: min(560px, 90vw);
+  max-height: 82vh;
+  align-self: flex-end;
+  margin: 0 0 3vh 3vw;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   padding: var(--space-lg);
   padding-top: 3.2rem; /* room for the absolute close button */
-  background: rgba(245, 238, 219, 0.95);
+  /* Translucent parchment so the splash art shows through. Stronger
+     backdrop blur keeps the black text readable across light + dark splash
+     regions without needing more opacity. */
+  background: rgba(245, 238, 219, 0.82);
   color: #1a1208;
   border: 1px solid rgba(60, 42, 18, 0.45);
   border-radius: 6px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(12px) saturate(115%);
+  -webkit-backdrop-filter: blur(12px) saturate(115%);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
   overflow-y: auto;
   overflow-x: hidden;
@@ -1331,18 +1354,27 @@ select:focus {
 
 .leader-row__body {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   text-align: left;
+  min-width: 0;
 }
 
 .leader-row__body strong {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.leader-row__body span {
+.leader-row__body > span {
   color: var(--ink-muted);
-  font-size: 0.84rem;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .map-banner {
