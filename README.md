@@ -5,7 +5,7 @@
 
 <div align="center">
 
-**LLM-Driven Strategy Game · Generative Pixel Art · LoRA Style Adaptation**
+**LLM-Driven Strategy Game · Generative Pixel Art · Custom HF Dataset & LoRA**
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue)](backend/)
 [![Next.js](https://img.shields.io/badge/next.js-15-black)](frontend/)
@@ -14,6 +14,19 @@
 [![License](https://img.shields.io/badge/license-Apache_2.0-green)](LICENSE)
 
 </div>
+
+---
+
+### 🤗 HuggingFace Contributions
+
+To bring consistent top-down medieval pixel-art style to StrategAI's generative asset pipeline, we produced two public HuggingFace artifacts:
+
+| Resource | Type | Description |
+|----------|------|-------------|
+| [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) | 📦 Dataset | 100-image curated top-down medieval pixel-art dataset, generated via FLUX.2 [dev] (32B) teacher distillation |
+| [`stixxert/strategai-topdown-medieval-style-lora`](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) | 🎨 LoRA | 6 trained LoRA variants (`<tdp>` trigger token) for FLUX2 Klein 4B Distilled — consumer-GPU-friendly style adaptation |
+
+> See [LoRA Style Adaptation](#-lora-style-adaptation) below for the full knowledge-distillation pipeline, experiment matrix, and training details.
 
 ---
 

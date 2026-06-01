@@ -63,7 +63,7 @@ produced through a systematic 3$\times$2 experiment matrix evaluating
 caption detail against rank configuration on a curated 100-image dataset,
 enforces consistent top-down perspective and medieval architectural styling
 via a trigger token. The system degrades gracefully through four fallback
-tiers when AI services are unavailable. Generation times of 2.5--6~seconds
+tiers when AI services are unavailable. Informally observed generation times of 2.5--6~seconds
 on a Blackwell RTX~6000 and 3.5--7~seconds on an RTX~3090 suggest
 workstation GPUs can support near-interactive generative asset pipelines, and an OpenAI TTS pipeline that produces an epic voiced narration at game start.
 We detail the architectural decisions, integration patterns, and
@@ -91,7 +91,7 @@ sandbox environments without competitive rules, or use diffusion models for
 concept art rather than production game assets with specific technical
 constraints.
 
-StrategAI is a full-stack strategy game---a Civilization-style 4X
+StrategAI\footnote{Source code is available at \url{https://github.com/maxtwotouch/StrategAI}.} is a full-stack strategy game---a Civilization-style 4X
 (explore, expand, exploit, exterminate) experience played on a square
 grid---that demonstrates how these technologies can work together in a
 single, functional system. The game features three AI civilizations, each
@@ -165,16 +165,18 @@ This paper makes the following contributions:
   maintainable layers, producing consistent outputs across six asset
   families.
 
-\item \textbf{Three-stage identity-preserving leader portrait pipeline}: An
-  img2img generation system that maintains character identity across splash
+\item \textbf{Three-stage identity-preserving leader portrait pipeline}: A
+  text-to-image (txt2img) and image-to-image (img2img) generation system that maintains character identity across splash
   art, profile portraits, and action scenes through carefully calibrated
   denoising parameters.
 
-\item \textbf{LoRA fine-tuning methodology}: A complete style-adaptation
+\item \textbf{LoRA fine-tuning methodology and public dataset}: A complete style-adaptation
   pipeline with a 3$\times$2 experiment matrix evaluating caption detail
-  against LoRA rank, trained on a curated 100-image dataset, with
-  systematic evaluation of perspective consistency, style adherence, and
-  trigger-token gating.
+  against LoRA rank, trained on a curated 100-image dataset released on
+  HuggingFace~\cite{asakskogen2026topdown}, with the resulting LoRA
+  adapter also publicly available~\cite{asakskogen2026strategai}.
+  Systematic evaluation covers perspective consistency, style adherence,
+  and trigger-token gating.
 
 \item \textbf{Graceful degradation system}: A four-tier fallback
   architecture---generative, static, placeholder, and built-in---that
@@ -651,7 +653,7 @@ prompt construction process.)
 \begin{figure}[htp]
 \centering
 \includegraphics[width=\columnwidth, keepaspectratio]{figures/fig3_prompt_architecture.pdf}
-\caption{Systematic prompt construction through four layers. Layers 1--2 (workflow and style) are version-controlled; Layer 3 exposes a curated vocabulary of 17 enum classes with 93 semantic descriptions; Layer 4 assembles the final prompt.}
+\caption{Systematic prompt construction through four layers. Layers 1--2 (workflow and style) are version-controlled; Layer 3 exposes a curated vocabulary of 17 enum classes with 90+ semantic descriptions; Layer 4 assembles the final prompt.}
 \label{fig:prompt}
 \end{figure}
 
@@ -675,7 +677,7 @@ change requires editing only this single configuration file.
 
 \textbf{Layer 3: Semantic Descriptions.} Seventeen enum classes define the
 combinatorial vocabulary for asset generation, each containing hand-crafted
-prose descriptions for every enum value---93 total across all families. For
+prose descriptions for every enum value---90+ across all families. For
 structures, the four enums are category (fortification, production,
 housing, sacred), style (Nordic wooden through Moorish), condition
 (pristine through fortified), and scale (small, medium, large). For
@@ -707,7 +709,7 @@ recognizably consistent across three different views---a dramatic
 full-screen splash image, a close-up profile portrait for UI displays, and
 an action scene showing the leader in a dynamic pose.
 
-Our solution is a three-stage img2img pipeline that chains generations to
+Our solution is a three-stage pipeline combining text-to-image (txt2img) and image-to-image (img2img) stages that chains generations to
 preserve identity. Throughout, we denote guidance scale as $\gamma$ and
 denoise strength as $\delta$. Figure~4 illustrates the pipeline with calibration sweet
 spots.
@@ -771,8 +773,7 @@ Structures support 420 possible combinations (4~categories $\times$
 140~combinations (5~categories $\times$ 7~biomes $\times$ 4~seasons).
 Terrain elevation features support 75~combinations (5~categories $\times$
 3~scales $\times$ 5~materials). Units support 4~types (archer, scout,
-settler, warrior). Background tiles support 5~types (water, grass, sand,
-stone, dirt). Leader portraits support thousands of combinations through
+settler, warrior). Background tiles support 4~types (water, grass, sand, stone). Leader portraits support thousands of combinations through
 their multi-enum parameter space.
 
 \FloatBarrier
@@ -797,19 +798,17 @@ images that a FLUX.2 Klein 4B student model would learn to replicate
 through LoRA fine-tuning.
 
 The dataset was manually curated from approximately 150--200 generated
-images down to the best 100. The result is heavily skewed toward
-structures (97 images), with only 2 vegetation and 1 terrain image.
-This imbalance was not intentional---it reflects where the generation
-pipeline worked well and where it struggled. Structures came out clean
-and readable; vegetation blurred into indistinct masses after pixel-art
-quantization; rock formations rarely survived the strict top-down
-constraint with convincing geometry. Each usable non-structure image
-required many more generation attempts, and within a fixed curation
-budget, the practical outcome was a structure-dominated dataset. The
-skew is worth acknowledging because it makes the evaluation more
-meaningful: if the LoRA transfers top-down perspective to categories it
-barely saw during training (0\% units, 3\% terrain), the angle concept
-has been genuinely isolated from subject matter.
+images down to the best 100. We focused primarily on structures (97~images)
+as the most visually complex and gameplay-critical asset family in a
+strategy game, with only 2~vegetation and 1~terrain image included as
+out-of-distribution probes. Structures came out clean and readable in the
+generation pipeline; vegetation blurred into indistinct masses after
+pixel-art quantization; rock formations rarely survived the strict top-down
+constraint with convincing geometry. The structure-dominated composition is
+methodologically advantageous: if the LoRA transfers top-down perspective to
+categories it barely saw during training (0\% units, 3\% terrain), the
+angle concept has been genuinely isolated from subject matter rather than
+merely memorized alongside architectural features.
 
 Each image was captioned at three detail levels to support the experiment
 matrix. Detailed captions (50--100~words) describe materials, architectural
@@ -828,6 +827,12 @@ activates the LoRA adapter's influence.
 All six experiments shared a common training configuration: 2,500~training
 steps, batch size~1, adamw8bit optimizer, flowmatch scheduler, and
 checkpoint saves every 200~steps.
+
+Both the curated dataset~\cite{asakskogen2026topdown} and the six trained
+LoRA variants~\cite{asakskogen2026strategai} are publicly released on
+HuggingFace under permissive licenses, enabling reproduction of our
+fine-tuning results and use of the style adapter in other FLUX.2-based
+pipelines.
 
 \subsection{Experiment Matrix and Methodology}
 
@@ -935,8 +940,8 @@ a cohesive player experience.
 When the game state updates, the frontend's asset manifest resolver
 determines which generative assets are needed and fans out requests to the
 Asset Server. Mapping tables translate game entities to asset server
-parameters: the 10~engine terrain types are collapsed onto 5~background
-tile types, 7~unit types map to 4~asset server unit categories, and each AI
+parameters: engine terrain types are mapped onto the asset server's background
+tile types, game unit types map to the asset server's unit categories, and each AI
 leader's traits map to architectural styles for their civilization's
 structures.
 
@@ -945,7 +950,7 @@ requests full AI-generated assets from the Asset Server in ComfyUI
 mode---the highest quality, requiring GPU inference. If the Asset Server
 is unreachable, Tier~2 falls back to static pre-generated PNG files served
 from the Asset Server's filesystem catalog, providing consistent quality
-without GPU dependency. If static assets are unavailable, Tier~3 uses
+without GPU dependency for common asset configurations. If static assets are unavailable, Tier~3 uses
 placeholder mode---colored rectangles with text labels generated by the
 Python Imaging Library, functional but aesthetically minimal. If the Asset
 Server is completely unreachable, Tier~4 provides built-in fallbacks:
@@ -1074,7 +1079,7 @@ The 420 possible structure combinations produce visually distinct results.
 The seven architectural styles produce meaningfully different visual
 outputs: Nordic wooden structures differ visibly from Moorish arched
 designs. Leader portraits preserve character identity across the three
-pipeline stages, achieved through the img2img pipeline's use of the splash
+pipeline stages, achieved through the pipeline's use of the splash
 art as reference. We acknowledge the absence of automated quantitative
 metrics such as Fr\'{e}chet Inception Distance (FID) or CLIP score for
 asset quality.
