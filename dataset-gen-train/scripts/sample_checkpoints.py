@@ -8,7 +8,7 @@ ComfyUI server nodes with shortest-queue load balancing.
 Usage:
     python scripts/sample_checkpoints.py
     python scripts/sample_checkpoints.py --checkpoints ./my_checkpoints/ --output ./results/
-    python scripts/sample_checkpoints.py --nodes https://g1.stixxert.dev,https://g2.stixxert.dev
+    python scripts/sample_checkpoints.py --nodes http://localhost:8188
 
 Dependencies: httpx, websockets, Pillow (see dataset-gen-train/requirements.txt)
 """
@@ -81,7 +81,7 @@ Examples:
     parser.add_argument(
         "--nodes",
         default=DEFAULT_NODES,
-        help="Comma-separated list of ComfyUI node URLs (default: g1-g4.stixxert.dev)",
+        help="Comma-separated list of ComfyUI node URLs (default: http://localhost:8188)",
     )
     parser.add_argument(
         "--workflow",

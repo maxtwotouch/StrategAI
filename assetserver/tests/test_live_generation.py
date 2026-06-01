@@ -1,17 +1,17 @@
 """
 Live ComfyUI Integration Tests — Phase C
 
-Tests against a running ComfyUI server at https://c6-8.stixxert.dev.
+Tests against a running ComfyUI server at http://localhost:8188.
 
 These tests exercise the full generation pipeline: prompt construction,
 workflow submission, image download, and asset persistence.  They are
 **not** run by default (marked with a custom marker).  To opt in:
 
-    pytest -m live_comfyui --comfyui-url https://c6-8.stixxert.dev
+    pytest -m live_comfyui --comfyui-url http://localhost:8188
 
 Or set the COMFYUI__BASE_URL env var and run:
 
-    COMFYUI__BASE_URL="https://c6-8.stixxert.dev" pytest -m live_comfyui
+    COMFYUI__BASE_URL="http://localhost:8188" pytest -m live_comfyui
 
 WARNING: These tests submit actual GPU generations and may take 30-120s each.
 """
@@ -34,7 +34,7 @@ import io
 #  Configuration
 # ---------------------------------------------------------------------------
 
-COMFYUI_URL = os.environ.get("COMFYUI__BASE_URL", "https://c6-8.stixxert.dev")
+COMFYUI_URL = os.environ.get("COMFYUI__BASE_URL", "http://localhost:8188")
 
 pytestmark = pytest.mark.live_comfyui
 
