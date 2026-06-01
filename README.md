@@ -1,4 +1,5 @@
 [▶ Watch the StrategAI showcase](https://www.youtube.com/watch?v=h5gGrol2Log)
+
 [▶ Watch the StrategAI Longer Playthrough Without Turn Recap](https://youtu.be/nvO3DZogazM)
 
 # StrategAI
