@@ -123,7 +123,7 @@ Purpose: Demonstrates systematic separation of concerns enabling consistent gene
 ## Common Tasks
 
 ### Expanding a Section
-1. Read the current section in `docs/IEEE_REPORT.md`
+1. Read the current section in `docs/REPORT.pdf`
 2. Identify areas lacking technical depth
 3. Research the codebase for implementation details
 4. Add specific examples, algorithms, or design decisions

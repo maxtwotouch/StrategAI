@@ -1,5 +1,7 @@
 # Architecture
 
+> **Last Validated: 2026-06-01** — cross-referenced against backend/app/engine/ source.
+
 AI Civilization-style game with a deterministic Python game engine driven by
 LLM-emitted strategic intents.  This document summarizes the system as it stands
 today (339+ tests, end-to-end playthroughs runnable).
@@ -8,7 +10,7 @@ today (339+ tests, end-to-end playthroughs runnable).
 
 ## 1. High-Level Design
 
-The system is split into three layers:
+The system is split into four layers:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -413,11 +415,32 @@ FastAPI surface for the future frontend:
 | `GET /games/{game_id}`          | Fetch full state                     |
 | `POST /games/{game_id}/turns/end` | End-of-turn tick                   |
 | `POST /games/{game_id}/actions/*` | Apply player actions               |
+| `POST /audio/intro`              | Generate TTS voiceover (OpenAI TTS)  |
 
 Backed by an in-memory `store.py` (single-process, ephemeral) — fine for
 demos and tests, would swap for persistent storage in production.
 
 ---
+
+
+### 12a. Audio / TTS Subsystem
+
+The `POST /audio/intro` endpoint (in `app/api/routers/audio.py`) integrates
+OpenAI's TTS API as a third generative AI modality alongside the LLM and DiT
+pipelines.  It receives a narration text string (up to 1,200 characters) and
+calls `client.audio.speech.create()` with:
+
+- **Model**: `gpt-4o-mini-tts` (configurable via `OPENAI_TTS_MODEL`)
+- **Voice**: `cedar` (configurable via `OPENAI_TTS_VOICE`; 10 voice options)
+- **Instructions**: A 60-word narrator performance prompt specifying deep
+  baritone, British theatrical accent, slow pacing, and dramatic pauses
+- **Output**: MP3 (`audio/mpeg`), no caching (`Cache-Control: no-store`)
+
+On the frontend, `lib/useAudio.ts` provides a `playNarration(src)` function
+that creates a dedicated `HTMLAudioElement`, plays the TTS audio at full
+volume, and ducks the ambient music to 18% during playback.  A three-phase
+state machine (silent → intro → ambient) manages the overall audio
+experience with smooth crossfade transitions.
 
 ## 13. Testing
 
@@ -445,9 +468,10 @@ cd backend
 
 ## 14. Design Decisions Worth Knowing
 
-1. **Three-layer AI** — the LLM emits *intents* (semantic), the operations
-   layer resolves them into *goals* (concrete unit/target pairs), and the
-   executor produces *actions* (primitive moves).  This keeps tool calls
+1. **Four-layer AI** — the LLM emits *intents* (semantic), the operations
+   layer resolves them into *goals* (concrete unit/target pairs), the
+   executor produces *actions* (primitive moves), and the validator+engine
+   enforces legality and applies state mutations.  This keeps tool calls
    compact, hides hex-math grunt work from the model, and gives the validator
    a single sane place to enforce rules.
 2. **Result types over exceptions for LLM-facing code** — the validator must

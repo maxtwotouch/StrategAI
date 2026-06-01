@@ -65,7 +65,7 @@ class ComfyUISettings(BaseModel):
         if self.nodes:
             return self.nodes
 
-        # pydantic-settings YAML source (priority 3) can reset list fields
+        # pydantic-settings YAML source can reset list fields
         # when config.yaml lacks the key.  Check os.environ directly.
         import json as _json, logging, os as _os
         _env_val = _os.environ.get("COMFYUI__NODES")
@@ -205,12 +205,13 @@ class RateLimitSettings(BaseModel):
 class Settings(BaseSettings):
     """Application configuration.
 
-    Load order (later sources win):
-      1. Pydantic defaults (above)
-      2. Environment variables
-      3. ``config.yaml`` — version-controlled, primary source of truth
-      4. ``.env`` file — deployment-specific overrides
-      5. File secrets (highest priority)
+    Source priority (earlier = higher, per pydantic-settings deep_update):
+      1. File secrets (highest)
+      2. Explicit init kwargs
+      3. ``.env`` file — deployment-specific overrides
+      4. ``config.yaml`` — version-controlled, primary source of truth
+      5. System environment variables
+      6. Pydantic field defaults (lowest)
 
     The ``.env`` file is the recommended mechanism for deployment overrides.
     Direct OS environment variables are overridden by ``config.yaml`` and
@@ -277,12 +278,15 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Source priority is determined by position: EARLIER = HIGHER.
+        # pydantic-settings applies sources via deep_update(source_state, state)
+        # where state (accumulated from earlier sources) overrides source_state.
         return (
-            init_settings,
-            env_settings,
-            YamlConfigSettingsSource(settings_cls),
-            dotenv_settings,
-            file_secret_settings,
+            file_secret_settings,                            # 1. HIGHEST — secrets
+            init_settings,                                   # 2. Explicit programmatic kwargs
+            dotenv_settings,                                 # 3. .env file (deployment overrides)
+            YamlConfigSettingsSource(settings_cls),          # 4. config.yaml (primary config)
+            env_settings,                                    # 5. System env vars (fill gaps)
         )
 
 

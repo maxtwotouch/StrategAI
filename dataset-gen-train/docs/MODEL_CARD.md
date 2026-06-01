@@ -32,11 +32,20 @@ widget:
 
 # StrategAI LoRA: TopDown Medieval Style
 
+## At a Glance
+
+- **What it is:** A set of 6 LoRA (Low-Rank Adaptation) adapters for [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) — a 4-billion-parameter Diffusion Transformer (DiT).
+- **What it does:** Enforces a consistent top-down camera perspective and medieval architectural style on generated images, gated by a trigger token.
+- **Trigger phrase:** `<tdp> top-down view.` — both the trigger token and the angle phrase must be present in the prompt.
+- **Training data:** 100 synthetic images from [stixxert/topdown-medieval-pixelart](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) (see [Dataset Card](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart)).
+- **Key stats:** 6 variants across a 3×2 experiment matrix (caption detail × LoRA rank); highlighted variant `detailed-high` is 353 MB.
+- **License:** Non-commercial only — inherits the FLUX.2 [dev] restriction. See [§License](#license).
+
 ## Model Description
 
 Six LoRA (Low-Rank Adaptation) adapters trained on [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) — a 4-billion-parameter Diffusion Transformer (DiT) — for generating **top-down medieval-style game assets**. The adapters enforce consistent overhead perspective and medieval architectural styling when activated by the trigger token `<tdp>` and the angle phrase `top-down view.`
 
-These LoRAs were custom-trained by the StrategAI team specifically for the [StrategAI](https://github.com/maxtwotouch/StrategAI) project — an LLM-driven Civilization-style strategy game where AI civilizations are controlled via OpenAI's tool-use API and game assets are generated on-demand using DiT models. The adapters power the game's generative asset pipeline, providing consistent top-down medieval style across six asset families: structures, units, terrain tiles, nature objects, character sprites, and background tiles.
+These LoRAs were custom-trained for an LLM-driven Civilization-style strategy game where AI civilizations are controlled via large language models and game assets are generated on-demand using DiT models. The adapters power a generative asset pipeline, providing consistent top-down medieval style across six asset families: structures, units, terrain tiles, nature objects, character sprites, and background tiles.
 
 **Training hardware:** Blackwell RTX 6000 GPU (14-16 GB VRAM with FP8 precision)  
 **Training time:** ~2 hours per experiment  
@@ -207,6 +216,8 @@ All variants were trained on [stixxert/topdown-medieval-pixelart](https://huggin
 
 **Important note on pixel-art aesthetics:** While training images underwent pixel-art post-processing (palette quantization via ComfyUI-PixelArt-Detector), the LoRA primarily learned top-down perspective and medieval architectural style rather than pixel-art aesthetics. The resulting models generate medieval-styled assets suitable for various visual styles — the outputs are not strictly pixel art. This is a feature, not a bug: the adapters separate perspective/style from the specific visual filter, making them more versatile for game engines that apply their own post-processing.
 
+> **Why so many structures?** The generation pipeline (FLUX.2 [dev] + Multi-Angles LoRA v2) produced far better results for architectural subjects than for organic ones. Vegetation and terrain each required many more attempts to get a usable image, and within a fixed curation budget, structures dominated. See the [Dataset Card](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) for the full story.
+
 ### Caption Design
 
 Three caption detail levels were derived from each original caption to test how text granularity affects LoRA learning. The hypothesis: less detailed captions force the model to learn abstract concepts (perspective, style) rather than memorizing specific visual patterns, improving generalization at the cost of detail reproduction.
@@ -218,6 +229,9 @@ Three caption detail levels were derived from each original caption to test how 
 | **Ultra-minimal** | 5–10 | `top-down view. Medieval granary, pixel art` |
 
 ### Training Configuration
+
+<details>
+<summary>Per-variant training hyperparameters (click to expand)</summary>
 
 | Parameter | Detailed | Minimal | Ultra-minimal |
 |-----------|:--------:|:-------:|:-------------:|
@@ -231,6 +245,8 @@ Three caption detail levels were derived from each original caption to test how 
 | Checkpoint interval | 200 steps | 200 steps | 200 steps |
 | Resolution | 512, 768, 1024 (multi-scale) | 512, 768, 1024 (multi-scale) | 512, 768, 1024 (multi-scale) |
 | Caption dropout | 5% | 10% | 0% |
+
+</details>
 
 **Learning rate rationale:** Ultra-minimal variants use a lower learning rate (5e-5 vs. 8e-5) because all 100 captions are identical (`"<tdp> top-down view."`). With no text diversity across the dataset, the model converges faster — a lower LR prevents overfitting to the single caption string. Caption dropout is disabled for ultra-minimal (0%) because dropping the only available caption would feed blank conditioning to the model, causing it to learn an unconditional distribution rather than the intended top-down perspective concept. Detailed and minimal variants use the standard 8e-5 rate with 5–10% caption dropout as weak regularization — a small amount of dropout slightly improves generalization without harming concept learning.
 
@@ -271,7 +287,7 @@ No step-2400 checkpoint exists for `detailed-high` — its optimal was reached a
 
 ### Prompt Battery
 
-All 6 LoRA variants plus the base model baseline were evaluated against 8 prompts spanning 3 asset categories (in-distribution structures and terrain, out-of-distribution units) and a style-leakage control. Prompts are sourced from `scripts/sample_prompts.json` and constitute the complete evaluation battery — each prompt exercises distinct aspects of the model's style adaptation and generalization capability.
+All 6 LoRA variants plus the base model baseline were evaluated against 8 prompts spanning 3 asset categories (in-distribution structures and terrain, out-of-distribution units) and a style-leakage control. The complete evaluation battery is shown below — each prompt exercises distinct aspects of the model's style adaptation and generalization capability.
 
 #### Table 1: Evaluation Prompts (Full)
 
@@ -370,13 +386,13 @@ However, subtle art-style leakage was observed in several variants:
 
 ## Figures
 
-Evaluation figures are generated by `scripts/generate_comparison_grid.py` from sampling output in `sample_figures/` and written to `figures/`.
+Evaluation figures compare outputs across all six LoRA variants and the base model baseline.
 
 ### Primary Figures
 
 | Figure | Layout | Content | Purpose |
 |--------|--------|---------|---------|
-| **`figures/report_figure.png`** | 2×4 | 2 prompts (S1, T3) × 4 experiments (base_model, ultra_low, minimal_high, detailed_high) | IEEE report: caption-detail trade-off spectrum across two asset categories |
+| **`figures/report_figure.png`** | 2×4 | 2 prompts (S1, T3) × 4 experiments (base_model, ultra_low, minimal_high, detailed_high) | Caption-detail trade-off spectrum across two asset categories |
 | **`figures/model_card_figure_7x4.png`** | 7×4 | 7 rows (base_model + 6 variants) × 4 prompts (S1, U1, T3, L1) | Model card: comprehensive comparison including style-leakage probe |
 
 ![Caption-detail × rank comparison across S1 and T3](figures/report_figure.png)
@@ -461,7 +477,7 @@ If you use these models in published research, please cite:
 - **Base model:** [black-forest-labs/FLUX.2-klein-base-4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B)
 - **Camera-angle LoRA** (used for dataset generation): [lovis93/Flux-2-Multi-Angles-LoRA-v2](https://huggingface.co/lovis93/Flux-2-Multi-Angles-LoRA-v2)
 - **Training framework:** [ostris/ai-toolkit](https://github.com/ostris/ai-toolkit)
-- **Upstream project:** [StrategAI](https://github.com/maxtwotouch/StrategAI)
+
 
 ## Model Card Author
 

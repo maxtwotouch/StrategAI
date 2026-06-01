@@ -1,11 +1,13 @@
 # Development Guide
 
+> **Last Validated: 2026-05-31**
+
 How to get the game running on your machine, what env vars matter, how to test
 your changes, and where the moving parts live.
 
 For game mechanics see [GAMEPLAY.md](GAMEPLAY.md); for UI structure see
 [frontend/docs/UI_GUIDE.md](frontend/docs/UI_GUIDE.md); for asset service integration see
-[docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md).
+`frontend/lib/assetManifest.ts` and `frontend/lib/assetApi.ts`. For the full asset integration contract, see [`docs/ASSET_INTEGRATION.md`](docs/ASSET_INTEGRATION.md).
 
 > 📖 **Bottom-up documentation**: This is a Layer 2 synthesis document. For authoritative
 > details on specific subsystems, follow links down to:
@@ -28,26 +30,26 @@ The asset service is an **external dependency** — you don't run it locally. It
 lives at the URL in `NEXT_PUBLIC_ASSET_API_URL`. With that variable unset, the
 game is fully playable with built-in colors and glyphs.
 
+> ⚠️ **Port collision note**: The asset server's default port in `assetserver/config.yaml`
+> and `assetserver/src/config.py` is **8000** — the same as the backend. If you run the
+> asset server locally, you **must** override it to **8001** (the documented convention)
+> with `--port 8001` or the `SERVER__PORT` env var to avoid a collision.
+
 ---
 
 ## 2. Repository Layout
 
 ```
-INF-3600/
+StrategAI/
 ├── README.md                  this guide's entry point
 ├── .env                       OPENAI_API_KEY etc. (gitignored)
-├── docs/                      this directory — architecture / game / UI / asset guides
+├── DEVELOPMENT.md             (you are here)
+├── GAMEPLAY.md                game mechanics reference
+├── docs/                      architecture and report materials
 │   ├── ARCHITECTURE.md        backend engine layers + LLM goal source
-│   ├── GAMEPLAY.md
-│   ├── ASSET_INTEGRATION.md
-│   ├── DEVELOPMENT.md         (you are here)
-│   ├── architecture/          architectural deep-dives
-│   ├── report/                IEEE report and presentation materials
-│   └── archive/               historical planning docs and backlog
+│   └── report/                IEEE report and presentation materials
 ├── backend/docs/              backend API reference and config
 ├── frontend/docs/             frontend architecture and UI guide
-├── scripts/
-│   └── asset_api_smoke.py     smoke test for the asset service
 ├── backend/
 │   ├── app/
 │   │   ├── api/               FastAPI app + Pydantic schemas
@@ -87,6 +89,9 @@ INF-3600/
 │   ├── scripts/
 │   │   └── run_playthrough.py       headless game runner
 │   └── tests/                       pytest suite
+├── assetserver/
+│   └── scripts/
+│       └── smoke_test_endpoints.sh  smoke test for the asset service
 └── frontend/
     ├── app/
     │   ├── page.tsx           single client page, owns all state
@@ -118,7 +123,7 @@ INF-3600/
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Run the dev server
@@ -136,7 +141,7 @@ Most of the backend doesn't need env vars. The exception is the LLM-backed
 AI civs:
 
 ```bash
-# in /Users/.../INF-3600/.env  (gitignored)
+# in the repo root .env file (gitignored):
 OPENAI_API_KEY=sk-…
 ```
 
@@ -171,7 +176,7 @@ Create `frontend/.env.local`:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # asset service (optional — leave blank for color/glyph fallback)
-NEXT_PUBLIC_ASSET_API_URL=https://c6-5.stixxert.dev
+NEXT_PUBLIC_ASSET_API_URL=https://localhost:8001
 ```
 
 **Restart `next dev` after editing this file** — Next.js inlines
@@ -234,10 +239,11 @@ There is no Jest/Vitest suite yet. Logic-heavy modules (`assetManifest.ts`,
 ### Asset service smoke test
 
 ```bash
-python3 scripts/asset_api_smoke.py --fast
+bash assetserver/scripts/smoke_test_endpoints.sh
 ```
 
-See [ASSET_INTEGRATION.md §8](ASSET_INTEGRATION.md#8-smoke-testing).
+> **Note**: The smoke test lives in `assetserver/scripts/`, not at the repo root.
+> There is no root-level `scripts/` directory — scripts are per-subproject.
 
 ---
 
@@ -264,10 +270,10 @@ See [ASSET_INTEGRATION.md §8](ASSET_INTEGRATION.md#8-smoke-testing).
 
 ### Adding a new asset-API family
 
-See [ASSET_INTEGRATION.md §11](ASSET_INTEGRATION.md#11-reference). Roughly:
-extend `AssetManifest`, add a `generate*` in `assetApi.ts`, add a `mapLimit`
-batch in `assetManifest.ts`, consume the resolved URL where it surfaces in
-the UI.
+See `frontend/lib/assetManifest.ts` and `frontend/lib/assetApi.ts` for the
+current implementation. Roughly: extend `AssetManifest`, add a `generate*` in
+`assetApi.ts`, add a `mapLimit` batch in `assetManifest.ts`, consume the
+resolved URL where it surfaces in the UI. See [`docs/ASSET_INTEGRATION.md`](docs/ASSET_INTEGRATION.md) for the full asset service contract.
 
 ### Tweaking AI persona
 
@@ -312,8 +318,8 @@ cd ../frontend && npm run typecheck && npm run build
 ### Browser console — env + state inspection
 
 The asset manifest is no longer persisted (see
-[ASSET_INTEGRATION.md §6](ASSET_INTEGRATION.md#6-no-caching)), so cache
-clearing is rarely needed. Useful checks:
+`frontend/lib/assetManifest.ts` — manifests are resolved per-game and not
+cached in localStorage), so cache clearing is rarely needed. Useful checks:
 
 ```js
 // see what env was inlined

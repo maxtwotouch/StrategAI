@@ -19,7 +19,7 @@ Complete every item before exposing the service to the internet.
 
 ### Infrastructure
 
-- [ ] **ComfyUI server provisioned** — see [comfyui-setup-guide.md](comfyui-setup-guide.md) for step-by-step instructions. Flux2 Klein 4B Distilled models must be loaded.
+- [ ] **ComfyUI server provisioned** — see [comfyui-setup-guide.md](docs/architecture/comfyui-setup-guide.md) for step-by-step instructions. Flux2 Klein 4B Distilled models must be loaded.
 - [ ] **GPU VRAM sufficient** — Flux2 Klein 4B Distilled requires ~8 GB VRAM at FP8. Ensure the ComfyUI host has adequate GPU memory.
 - [ ] **Disk space** — generated PNGs accumulate in `generated_assets/`. Monitor disk usage and set up a cleanup cron job if needed.
 - [ ] **Network connectivity** — the FastAPI server must be able to reach the ComfyUI server on its HTTP port (default 8188).
@@ -431,7 +431,7 @@ curl -s http://127.0.0.1:8000/health | jq .comfyui_nodes
 ## ComfyUI Setup Prerequisite
 
 The service **requires** a running ComfyUI server with Flux2 Klein 4B Distilled models. See
-[docs/comfyui-setup-guide.md](comfyui-setup-guide.md) for full provisioning
+[docs/comfyui-setup-guide.md](docs/architecture/comfyui-setup-guide.md) for full provisioning
 instructions.
 
 Quick checklist:
@@ -561,7 +561,7 @@ systemctl enable --now medieval-pixel-art
 ## See Also
 
 - [README.md](../README.md) — Project overview and quickstart
-- [architecture.md](architecture.md) — Full system architecture
+- [architecture.md](docs/architecture/architecture.md) — Full system architecture
 - [SECURITY.md](SECURITY.md) — Security model and considerations
-- [comfyui-setup-guide.md](comfyui-setup-guide.md) — ComfyUI provisioning
-- [next_steps.md](next_steps.md) — Future roadmap
+- [comfyui-setup-guide.md](docs/architecture/comfyui-setup-guide.md) — ComfyUI provisioning
+- [next_steps.md](docs/project/next_steps.md) — Future roadmap

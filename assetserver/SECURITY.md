@@ -199,7 +199,7 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 SQLite serializes all writes. Under high concurrent write load, expect
 `SQLITE_BUSY` errors (mitigated by busy timeout + retry logic). For
 high-throughput deployments, consider migrating to PostgreSQL. See
-[next_steps.md](next_steps.md) for the distributed scaling roadmap.
+[next_steps.md](docs/project/next_steps.md) for the distributed scaling roadmap.
 
 ---
 
@@ -216,5 +216,5 @@ If you discover a security vulnerability in this service, please:
 ## See Also
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Production deployment guide
-- [architecture.md](architecture.md) — Full system architecture
+- [architecture.md](docs/architecture/architecture.md) — Full system architecture
 - [README.md](../README.md) — Project overview

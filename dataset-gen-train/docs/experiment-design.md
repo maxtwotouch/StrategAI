@@ -64,14 +64,11 @@ than learning the shared angle.  Our countermeasures:
 
 | Family | Count | Description |
 |--------|------:|-------------|
-| structure | ~90 | Buildings, towers, mills, workshops, outposts (the dominant category, reflecting the target use case) |
-| object | ~7 | Trees, boulders, stumps, props — non-walkable world scenery |
-| terrain | ~3 | Hills and plateaus with wide flat tops for unit placement |
+| structure | 97 | Buildings, towers, mills, workshops, outposts (the dominant category, reflecting the target use case) |
+| vegetation | 2 | Bramble masses, reed clusters — non-walkable world scenery |
+| terrain | 1 | Jagged boulder |
 
-The heavy skew toward structures is deliberate — game-development asset pipelines
-primarily need consistent building sprites. The angle concept should transfer
-across categories because the perspective geometry is identical regardless of
-what occupies the ground plane.
+The heavy skew toward structures reflects where the generation pipeline excelled and where it struggled — not a deliberate choice (see [Dataset Card](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart) for details). The skew actually strengthens the experiment: if the angle concept transfers to categories nearly absent from training, it has been genuinely isolated from subject matter.
 
 
 ## 4. Caption Design

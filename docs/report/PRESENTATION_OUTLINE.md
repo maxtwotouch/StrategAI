@@ -74,7 +74,13 @@ Our solution demonstrates that these challenges can be overcome. By selecting ap
 
 The asset server is a separate FastAPI service that generates pixel-art assets on-demand using ComfyUI and FLUX.2 Klein 4B Distilled - a 4-billion parameter Diffusion Transformer. Finally, our training pipeline uses the Ostris AI Toolkit to fine-tune LoRA adapters that adapt the base model to our specific visual style.
 
-The key architectural insight is that these components communicate through well-defined APIs, enabling independent scaling and deployment. The backend handles game logic, the asset server handles generation, and they can be scaled separately based on demand."
+The key architectural insight is that these components communicate through well-defined APIs, enabling independent scaling and deployment. The backend handles game logic, the asset server handles generation, and they can be scaled separately based on demand.
+
+A third AI modality---OpenAI TTS---generates an epic voiced narration at
+game start. When the player clicks "Begin Campaign," the frontend constructs
+a personalized campaign script, the backend calls OpenAI's TTS API with
+theatrical narrator instructions, and the generated voiceover plays over
+ducked ambient music."
 
 **Transition**: "Now let's dive into the first major AI innovation - how we use LLMs to control AI civilizations."
 
@@ -221,6 +227,7 @@ At inference time, we activate the LoRA using the trigger token 'tdp' followed b
   - Consistent style across families
   - Proper top-down perspective
   - Identity preservation in leaders
+- **TTS Demo** (15s): Show narration generation --- highlight narrator instructions as prompt engineering
 
 **Speaker Notes** (45 seconds):
 "Our evaluation covers three dimensions: performance, test coverage, and AI behavior quality.

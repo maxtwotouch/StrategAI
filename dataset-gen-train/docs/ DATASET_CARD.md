@@ -32,6 +32,16 @@ language_creators:
 
 # Dataset Card for Top-Down Medieval Pixel Art
 
+## Quick Facts
+
+| | |
+|---|---|
+| **Images** | 100 |
+| **Resolution** | 1024 × 1024 px |
+| **Format** | PNG, white background |
+| **Asset families** | structure 97 / vegetation 2 / terrain 1 |
+| **License** | Non-commercial, with Open RAIL-M usage restrictions (see [§License](#license)) |
+
 ## Dataset Description
 
 **Top-Down Medieval Pixel Art** is a synthetic dataset of 100 top-down
@@ -45,7 +55,7 @@ Each image is a 1024×1024 PNG with a white background, rendered in a crisp
 (buildings, towers, workshops, outposts), vegetation (brambles, reed
 clusters), and terrain (boulders, rock formations).
 
-> You may notice that the dataset primarily contains buildings/structures - for my use case (LoRa training), this did not impact the quality of misc. image generation of other types of contents.
+> You may notice that the dataset is dominated by structures. This was not by design — the generation pipeline simply produced better results for buildings than for vegetation or terrain (see [Curation Rationale](#curation-rationale)). Despite the skew, the LoRA trained on this dataset successfully transfers top-down perspective to categories it barely saw during training, including character sprites and terrain features.
 
 - **Curated by:** [stixxert](https://github.com/stixxert)
 - **Language(s):** English (captions)
@@ -53,7 +63,6 @@ clusters), and terrain (boulders, rock formations).
 
 ### Dataset Sources
 
-- **Repository:** [TopDownMedievalPixelArt-Flux2-Klein-LoRa](https://github.com/stixxert/TopDownMedievalPixelArt-Flux2-Klein-LoRa)
 - **Base model:** [black-forest-labs/FLUX.2-dev](https://huggingface.co/black-forest-labs/FLUX.2-dev)
 - **Camera-angle LoRA:** [lovis93/Flux-2-Multi-Angles-LoRA-v2](https://huggingface.co/lovis93/Flux-2-Multi-Angles-LoRA-v2)
 - **Pixel-art post-processing:** [dimtoneff/ComfyUI-PixelArt-Detector](https://github.com/dimtoneff/ComfyUI-PixelArt-Detector) (MIT)
@@ -77,6 +86,8 @@ This dataset is intended for:
 The dataset is specifically designed to pair with
 [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B)
 using the [Ostris AI Toolkit](https://github.com/ostris/ai-toolkit).
+
+This dataset was used to train the [StrategAI LoRA adapters](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) — six LoRA variants for FLUX.2 Klein 4B that enforce top-down medieval style in generated game assets. See the [companion Model Card](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) for training details and evaluation results.
 
 ### Out-of-Scope Use
 
@@ -213,13 +224,11 @@ Key design decisions:
 | 16×16 pixel-art style | Crisp, readable assets; distinct from photorealistic training data |
 | White background isolation | Removes confounding background context |
 | Natural-language captions | Compatible with FLUX.2 text encoder; avoids structured tag formats |
-| No trigger token in published data | Let users choose their own trigger token at training time |
+| No trigger token in published data | Let users choose their own trigger token at training time. Dataset users are free to choose their own trigger token at training time — the companion [StrategAI LoRA](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) uses `<tdp>`, but this is a training-time choice, not a property of the dataset. |
 
-The heavy skew toward `structure` (97 of 100) is deliberate —
-game-development asset pipelines primarily need consistent building
-sprites. The angle concept should transfer across categories because
-perspective geometry is identical regardless of what occupies the
-ground plane.
+The heavy skew toward `structure` (97 of 100) was not intentional — it reflects where the generation pipeline worked well and where it struggled. The teacher pipeline (FLUX.2 [dev] + Multi-Angles LoRA v2, pixel-art quantization, background removal) reliably produced clean, readable structures. But the same pipeline faltered on non-structure categories: vegetation blurred into indistinct masses after quantization; rock formations rarely survived the strict top-down constraint with convincing geometry. Each usable vegetation or terrain image required many more generation attempts than a structure image. Within a curation budget of roughly 150–200 raw generations, the practical outcome was a structure-dominated dataset.
+
+The skew has a silver lining: it provides a stronger test of concept isolation. If a LoRA trained on 97% structures successfully transfers top-down perspective to unseen categories (0% character sprites, 3% terrain), the angle concept has been genuinely isolated from subject matter.
 
 ### Source Data
 
@@ -244,8 +253,7 @@ top-down — there is no variation in perspective.
 
 **Processing steps:**
 
-1. **Prompt generation** — `src/generation/prompt_generator.py` produces
-   diverse medieval fantasy captions from structured templates
+1. **Prompt generation** — diverse medieval fantasy captions are produced from structured templates
 2. **Image generation** — ComfyUI runs FLUX.2 [dev] + Multi-Angles LoRA
    with each prompt via HTTP API
 3. **Pixel-art quantization** — ComfyUI-PixelArt-Detector reduces the
@@ -255,9 +263,8 @@ top-down — there is no variation in perspective.
 5. **Manual curation** — a human reviewer deletes images with artifacts,
    perspective errors, or poor composition; ~150–200 raw images were
    generated and culled to the best 100
-6. **Dataset packaging** — `src/generation/prepare_dataset.py` strips
-   embedded metadata, renumbers files, and produces the final
-   `metadata.jsonl`
+6. **Dataset packaging** — embedded metadata is stripped, files are renumbered, and the final
+   `metadata.jsonl` is produced
 
 #### Who are the source data producers?
 
@@ -273,8 +280,7 @@ image creation process. No web-scraped or crowd-sourced data was used.
 
 #### Annotation Process
 
-Captions were **machine-generated** via structured prompt templates
-(`config/prompt_templates.json`) that combine:
+Captions were **machine-generated** via structured prompt templates that combine:
 
 - Asset type (granary, watchtower, sawmill, barracks, etc.)
 - Setting/context (steampunk industrial, feudal military, mystical
@@ -301,14 +307,12 @@ training experiments:
 | **Minimal** | `top-down view. A medieval vegetation.` | Category-only; reduces style binding to specific asset features |
 | **Ultra-minimal** | `top-down view.` | Angle phrase only; isolates the angle concept completely |
 
-These variants live in `dataset/derived/` (not published in this card's
-dataset) and are used to test the hypothesis that less text detail leads
-to purer angle-concept learning.
+These caption variants are used to test the hypothesis that less text detail leads
+to purer angle-concept learning. They are not included in this published dataset.
 
 #### Who are the annotators?
 
-Captions were generated by the prompt generation script
-(`src/generation/prompt_generator.py`) using structured templates.
+Captions were generated using structured templates.
 The template design and caption review were performed by the dataset
 curator. No crowd-sourced or third-party annotators were involved.
 
@@ -333,9 +337,7 @@ This dataset contains **no personal or sensitive information**:
 - **Pixel-art style bias** — all images use a 16×16 pixel-art aesthetic.
   The LoRA may inadvertently learn pixel-art style alongside camera
   angle, despite efforts to isolate the angle concept.
-- **Structure-heavy distribution** — 97% of images are structures. The
-  camera-angle concept may not transfer as reliably to vegetation,
-  terrain, or organic subjects.
+- **Structure-heavy distribution** — 97% of images are structures. This reflects generation pipeline constraints (see [Curation Rationale](#curation-rationale)) rather than a design choice. The camera-angle concept may not transfer as reliably to vegetation, terrain, or organic subjects.
 - **Single perspective** — all images are strictly top-down. The LoRA
   will not learn isometric, side-view, or ¾-angle perspectives.
 

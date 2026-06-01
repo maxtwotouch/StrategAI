@@ -1,6 +1,12 @@
 # StrategAI Deployment Guide
 
-This guide covers deploying StrategAI in production environments. The system uses a **separation of concerns** architecture where different components run on different infrastructure based on their resource requirements.
+> **Last Validated: 2026-06-01**
+
+This guide covers running StrategAI's components. The system uses a **separation of concerns** architecture where different components run on different infrastructure based on their resource requirements (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §1 for the rationale).
+
+> **Why no Docker / containers?** Our deployment environment does not have root access and Docker is not available. The system is designed to run as plain OS processes managed by systemd or a process supervisor. Each subproject is self-contained with its own dependency management — there is intentionally no top-level `requirements.txt` or `Dockerfile`.
+
+> **Why no top-level `requirements.txt`?** Each subproject manages its own dependencies: the backend uses `pyproject.toml` (`pip install -e .`), the asset server uses `requirements.txt`, and the frontend uses `package.json`. A single top-level requirements file would conflate unrelated dependency trees and Python version constraints (3.10+ for assetserver vs 3.11+ for backend).
 
 ## Architecture Overview
 
@@ -12,7 +18,7 @@ StrategAI consists of three main deployment tiers:
 
 **Critical:** The Asset Server is **never deployed on the same machine** as the Game Server. It is **colocated** with ComfyUI GPU workers to minimize latency on generation requests.
 
-See [docs/architecture/SEPARATION_OF_CONCERNS.md](docs/architecture/SEPARATION_OF_CONCERNS.md) for the architectural rationale.
+All components run as plain processes — start them with `uvicorn` (Python) and `npm start` (Node). See the step-by-step sections below.
 
 ## Deployment Tiers
 
@@ -68,106 +74,9 @@ See [docs/architecture/SEPARATION_OF_CONCERNS.md](docs/architecture/SEPARATION_O
 - Inbound: HTTP/WebSocket from Asset Server
 - No public internet access required
 
-## Deployment Options
-
-### Option A: Single-Region Deployment (Simple)
-
-All components in one datacenter/region:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ Datacenter / Region                                      │
-│                                                          │
-│  ┌──────────────┐         ┌──────────────────────────┐ │
-│  │ Game Server  │────────▶│ Asset Server             │ │
-│  │ (Backend +   │         │ (Orchestrator)           │ │
-│  │  Frontend)   │         └──────────┬───────────────┘ │
-│  └──────────────┘                    │                  │
-│                                      │ Low-latency      │
-│                                      ▼                  │
-│                           ┌──────────────────────────┐ │
-│                           │ ComfyUI Worker 1 (GPU)   │ │
-│                           │ ComfyUI Worker 2 (GPU)   │ │
-│                           │ ComfyUI Worker N (GPU)   │ │
-│                           └──────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Pros:**
-- Simple networking (all internal)
-- Low latency between all components
-- Easy to manage
-
-**Cons:**
-- Limited scalability (single region)
-- Higher cost if GPU instances are expensive in your region
-
-### Option B: Multi-Region Deployment (Production)
-
-Game Server in one region, Asset Server + ComfyUI in another:
-
-```
-┌─────────────────────┐         ┌─────────────────────────────────┐
-│ Region A            │         │ Region B (GPU-optimized)        │
-│                     │         │                                 │
-│ ┌──────────────┐   │         │  ┌──────────────────────────┐  │
-│ │ Game Server  │───┼─────────┼─▶│ Asset Server             │  │
-│ │ (Backend +   │   │  HTTPS  │  │ (Orchestrator)           │  │
-│ │  Frontend)   │   │         │  └──────────┬───────────────┘  │
-│ └──────────────┘   │         │             │                  │
-│                     │         │             │ Low-latency      │
-│                     │         │             ▼                  │
-│                     │         │  ┌──────────────────────────┐  │
-│                     │         │  │ ComfyUI Worker 1 (GPU)   │  │
-│                     │         │  │ ComfyUI Worker 2 (GPU)   │  │
-│                     │         │  │ ComfyUI Worker N (GPU)   │  │
-│                     │         │  └──────────────────────────┘  │
-└─────────────────────┘         └─────────────────────────────────┘
-```
-
-**Pros:**
-- Can use GPU-optimized regions (e.g., AWS us-east-1 with G5 instances)
-- Game Server can be in user-proximate region
-- Better cost optimization
-
-**Cons:**
-- Higher latency between Game Server and Asset Server (mitigated by caching)
-- More complex networking (cross-region communication)
-
-### Option C: Hybrid Cloud (Advanced)
-
-Game Server in cloud, Asset Server + ComfyUI on-premises:
-
-```
-┌─────────────────────┐         ┌─────────────────────────────────┐
-│ Cloud Provider      │         │ On-Premises GPU Cluster         │
-│                     │         │                                 │
-│ ┌──────────────┐   │         │  ┌──────────────────────────┐  │
-│ │ Game Server  │───┼─────────┼─▶│ Asset Server             │  │
-│ │ (Backend +   │   │  HTTPS  │  │ (Orchestrator)           │  │
-│ │  Frontend)   │   │         │  └──────────┬───────────────┘  │
-│ └──────────────┘   │         │             │                  │
-│                     │         │             │ Low-latency      │
-│                     │         │             ▼                  │
-│                     │         │  ┌──────────────────────────┐  │
-│                     │         │  │ ComfyUI Worker 1 (GPU)   │  │
-│                     │         │  │ ComfyUI Worker 2 (GPU)   │  │
-│                     │         │  │ ComfyUI Worker N (GPU)   │  │
-│                     │         │  └──────────────────────────┘  │
-└─────────────────────┘         └─────────────────────────────────┘
-```
-
-**Pros:**
-- Use existing GPU hardware
-- Cloud for scalable Game Server
-- Cost-effective for high-volume generation
-
-**Cons:**
-- Complex networking (VPN/tunneling required)
-- Security considerations (cross-network communication)
-- Maintenance overhead
-
 ## Step-by-Step Deployment
+
+> **Deployment model:** The simplest and recommended setup runs all components on machines within the same network — the Game Server on one machine, the Asset Server + ComfyUI Workers on another (or the same GPU machine). The tiers above describe the logical separation; physically, the only hard requirement is that the Asset Server has low-latency connectivity to ComfyUI.
 
 ### 1. Deploy ComfyUI Workers
 
@@ -185,8 +94,9 @@ pip install -r requirements.txt
 # Download LoRA adapters from HuggingFace
 # https://huggingface.co/stixxert/topdown-medieval-pixelart
 
-# Copy workflows from assetserver
-cp -r /path/to/assetserver/workflows ./custom_nodes/
+# Note: Workflows are JSON API payloads (not ComfyUI custom nodes).
+# They stay in the asset server and are read by Python code at runtime.
+# See assetserver/workflows/ for the JSON prompt templates.
 
 # Start ComfyUI
 python main.py --listen 0.0.0.0 --port 8188
@@ -215,26 +125,38 @@ cp .env.example .env
 nano .env
 ```
 
+> **Port note:** This guide uses port 8001 as the deployment convention, but the
+> code default in `config.yaml` and `src/config.py` is **8000**. To use 8001,
+> explicitly set `SERVER__PORT=8001` in `.env` or pass `--port 8001` to uvicorn.
+
 **Required environment variables:**
 
 ```bash
-# ComfyUI worker URLs (comma-separated for load balancing)
-COMFYUI_URLS=http://gpu-worker-1:8188,http://gpu-worker-2:8188
+# ComfyUI — single node:
+COMFYUI__BASE_URL=http://gpu-worker-1:8188
 
-# Database
-DATABASE_URL=sqlite:///./assetserver.db
+# ComfyUI — multi-node (JSON array, overrides BASE_URL):
+# COMFYUI__NODES=["http://gpu1:8188","http://gpu2:8188"]
 
-# Storage
-GENERATED_ASSETS_DIR=./generated_assets
-STATIC_ASSETS_DIR=./static_assets
+# Database (default: sqlite:///tilemap.db)
+DATABASE_URL=sqlite:///tilemap.db
 
-# Server
-HOST=0.0.0.0
-PORT=8001
+# Storage paths (all relative to project root)
+PATHS__OUTPUT_DIR=generated_assets
+PATHS__STATIC_TILES_DIR=static_tiles
+
+# Server bind
+SERVER__HOST=0.0.0.0
+SERVER__PORT=8001
 
 # Optional: API key for authentication
-API_KEY=your-secret-key-here
+SERVER__API_KEY=your-secret-key-here
 ```
+
+> **Naming convention:** The asset server uses `__` (double underscore) as the
+> nested delimiter for environment variables.
+> Example: `SERVER__PORT` → `settings.server.port`.
+> See `assetserver/.env.example` for the full reference.
 
 **Start server:**
 ```bash
@@ -258,7 +180,7 @@ cd StrategAI/backend
 
 # Create virtual environment
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 
 # Configure environment
 cp .env.example .env
@@ -270,13 +192,12 @@ nano .env
 ```bash
 # OpenAI API (required for AI civilizations)
 OPENAI_API_KEY=sk-...
-
-# Optional: Model selection
-OPENAI_MODEL=gpt-5.4-mini
-
-# Optional: Temperature
-OPENAI_TEMPERATURE=0.7
 ```
+
+> **Note:** The LLM model (`gpt-5.4-mini`) and temperature (`0.7`) are
+> **hardcoded** in `backend/app/engine/openai_goals.py` (lines 471–473).
+> They cannot be overridden via environment variables. Only `OPENAI_API_KEY`
+> is configurable. See `backend/.env.example` for all available options.
 
 **Start backend:**
 ```bash
@@ -320,7 +241,7 @@ npm start
 | Source | Destination | Port | Protocol | Purpose |
 |--------|-------------|------|----------|---------|
 | Internet | Game Server | 80/443 | HTTP/HTTPS | User access |
-| Game Server | Asset Server | 8001 | HTTP | Asset requests |
+| Game Server | Asset Server | 8001 | HTTP | Asset requests (8000 by code default; 8001 recommended) |
 | Asset Server | ComfyUI Workers | 8188 | HTTP/WS | Generation requests |
 | Game Server | OpenAI API | 443 | HTTPS | LLM calls |
 
@@ -328,6 +249,8 @@ npm start
 
 Backend (`backend/app/main.py`):
 ```python
+# NOTE: The default CORS setting is allow_origins=["*"] (wide open).
+# For production, restrict to your frontend domain:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://game-server:3000"],  # Frontend URL
@@ -337,11 +260,13 @@ app.add_middleware(
 )
 ```
 
-Asset Server (`assetserver/src/main.py`):
+Asset Server (`assetserver/src/main.py` — configured via `config.yaml` or `.env`):
 ```python
+# Default: cors_origins=["http://localhost:3000"] (see config.yaml line 43)
+# Override via SERVER__CORS_ORIGINS in .env for production domains.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://game-server:3000"],  # Frontend URL
+    allow_origins=settings.server.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -398,29 +323,7 @@ server {
 
 ## Scaling
 
-### Horizontal Scaling
-
-**Game Server:**
-- Run multiple backend instances behind load balancer
-- Run multiple frontend instances (stateless)
-- Use sticky sessions if needed (game state in memory)
-
-**Asset Server:**
-- Run multiple instances behind load balancer
-- Share SQLite database (use WAL mode) or migrate to PostgreSQL
-- Share `generated_assets/` directory (NFS/S3)
-
-**ComfyUI Workers:**
-- Add more GPU nodes
-- Asset Server load balancer distributes requests
-- Monitor queue depth per worker
-
-### Vertical Scaling
-
-**ComfyUI Workers:**
-- Upgrade GPU (more VRAM = larger batch sizes)
-- Add more RAM (for model loading)
-- Use faster storage (NVMe SSD for model loading)
+The Asset Server's built-in load balancer distributes generation requests across multiple ComfyUI workers using shortest-queue selection. To scale up, add more GPU nodes to the `COMFYUI__NODES` list.
 
 ### Caching Strategy
 
@@ -443,7 +346,6 @@ Asset Server caches generated images to reduce GPU load:
 **Game Server:**
 ```bash
 curl http://game-server:8000/health
-curl http://game-server:3000/api/health
 ```
 
 **Asset Server:**
@@ -457,50 +359,7 @@ curl http://asset-server:8001/modes
 curl http://gpu-worker:8188/system_stats
 ```
 
-### Metrics to Monitor
-
-**Game Server:**
-- Request latency (p50, p95, p99)
-- Error rate (4xx, 5xx)
-- OpenAI API usage (tokens, cost)
-- Active games count
-
-**Asset Server:**
-- Generation request rate
-- Cache hit rate
-- Generation latency (p50, p95, p99)
-- Storage usage (GB)
-- Database size
-
-**ComfyUI Workers:**
-- GPU utilization (%)
-- VRAM usage (GB)
-- Queue depth (pending requests)
-- Generation throughput (images/minute)
-- Model loading time
-
-### Logging
-
-**Structured logging recommended:**
-
-Backend:
-```python
-import structlog
-logger = structlog.get_logger()
-logger.info("game_created", game_id=123, player_name="Athens")
-```
-
-Asset Server:
-```python
-import structlog
-logger = structlog.get_logger()
-logger.info("generation_started", asset_type="structure", prompt_hash="abc123")
-```
-
-**Log aggregation:**
-- Use ELK stack (Elasticsearch, Logstash, Kibana)
-- Or Loki + Grafana
-- Or cloud provider logging (CloudWatch, Stackdriver)
+Key metrics to watch: backend error rate, asset generation latency, ComfyUI GPU queue depth.
 
 ## Security
 
@@ -624,26 +483,6 @@ async def generate_structure(request: Request, ...):
 - Add more GPU workers
 - Check for memory leaks (restart ComfyUI periodically)
 
-## Cost Optimization
-
-### GPU Costs
-
-- Use spot/preemptible instances for ComfyUI workers (50-70% savings)
-- Auto-scale workers based on queue depth
-- Use smaller GPU instances during off-peak hours
-
-### OpenAI API Costs
-
-- The default model `gpt-5.4-mini` is already cost-optimized for strategic reasoning
-- Cache LLM responses for similar game states
-- Limit AI decision frequency (e.g., every 2 turns instead of every turn)
-
-### Storage Costs
-
-- Use S3-compatible storage for generated assets (cheaper than EBS)
-- Enable CDN for asset delivery (CloudFront, Cloudflare)
-- Delete old/unused assets periodically
-
 ## Deployment Checklist
 
 - [ ] ComfyUI workers deployed and healthy
@@ -672,8 +511,8 @@ For issues not covered in this guide:
 
 ## References
 
-- [Separation of Concerns](architecture/SEPARATION_OF_CONCERNS.md) — Architectural rationale
-- [Asset Server Deployment](../assetserver/DEPLOYMENT.md) — Detailed asset server guide
-- [ComfyUI Setup](../assetserver/docs/architecture/comfyui-setup-guide.md) — ComfyUI installation
-- [Load Balancer](../assetserver/docs/architecture/load-balancer.md) — Multi-worker configuration
-- [Security](../assetserver/SECURITY.md) — Security considerations
+- [Architecture Overview](docs/ARCHITECTURE.md) — System architecture and separation-of-concerns rationale
+- [Asset Server Deployment](assetserver/DEPLOYMENT.md) — Detailed asset server guide
+- [ComfyUI Setup](assetserver/docs/architecture/comfyui-setup-guide.md) — ComfyUI installation
+- [Load Balancer](assetserver/docs/architecture/load-balancer.md) — Multi-worker configuration
+- [Security](assetserver/SECURITY.md) — Security considerations

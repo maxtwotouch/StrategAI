@@ -1,5 +1,7 @@
 # StrategAI — Gameplay Reference
 
+> **Last Validated: 2026-05-31** — cross-referenced against `backend/app/engine/` source.
+
 Everything a player or designer needs to know about how the game works. Numbers
 come directly from the engine (`backend/app/engine/`) and stay in sync with
 the rules the code enforces.
@@ -18,7 +20,7 @@ field is optional.
 | **Archetype** | One of 8 leader vocabularies: Warrior King/Queen, Philosopher King, Merchant Prince, Spiritual Leader, Diplomat, Tyrant, Visionary. Drives the leader's splash art prompt. | `Philosopher King` |
 | **Culture** | One of 12 cultural prompts: Medieval European, Classical Greek, Ancient Egyptian, East Asian Imperial, Nordic Viking, etc. Drives splash/profile art and city-building style. | `Medieval European` |
 | **Leader Appearance** | Free-text physical description (50–800 chars to take effect). Becomes the literal prompt the asset service generates from. Blank → a neutral default. | _empty_ |
-| **Map Radius** | Half-width of the square map (`r=20` → 41×41 tiles). | `20` |
+| **Map Radius** | Half-width of the square map (`r=20` → 41×41 tiles). **Backend default is 8** (`game_factory.py:new_game(radius=8)`); the frontend initializer overrides this to 20. | `20` (frontend), `8` (backend) |
 
 The seed is randomized each "Begin Campaign" so two consecutive games on the
 same settings produce different maps and leader art.
@@ -27,11 +29,19 @@ After clicking **Begin Campaign**:
 
 1. The game backend builds the map and places four civs (you + three AI).
 2. The frontend's asset resolver fans out to the asset service (terrain, unit,
-   structure, leader splash + profile, elevation overlays). See
-   [docs/ASSET_INTEGRATION.md](docs/ASSET_INTEGRATION.md).
+   structure, leader splash + profile, elevation overlays). Fallback logic:
+   `frontend/lib/hex.ts` (built-in colors/glyphs) and
+   `frontend/lib/assetManifest.ts` (null resolution when the asset server is
+   unreachable).
 3. The intro screen plays — full-bleed splash, civ name, leader name, an epic
    line, "Begin the Age" CTA.
 4. The war room reveals the map.
+
+> **Note on asset integration**: The frontend's asset resolver maps game entities
+> to generative pixel-art assets. Fallback logic lives in
+> `frontend/lib/hex.ts` (built-in colors/glyphs for missing terrain assets) and
+> `frontend/lib/assetManifest.ts` (null resolution when the asset server is
+> unreachable). See [`docs/ASSET_INTEGRATION.md`](docs/ASSET_INTEGRATION.md) for the full asset service contract.
 
 ---
 
@@ -57,7 +67,7 @@ persona prompt that feeds the LLM goal source — see
 | Concept | Detail |
 |---|---|
 | Coordinate system | Square grid using `(q, r)` integer axes (legacy hex naming). |
-| Terrain types | 13: `ocean`, `coast`, `grassland`, `plains`, `forest`, `hills`, `mountain`, `desert`, `tundra`, `snow`, `lake`, `savanna`, `taiga`. |
+| Terrain types | 10: `ocean`, `coast`, `plains`, `grassland`, `forest`, `hills`, `mountain`, `desert`, `tundra`, `snow`. |
 | Features | `forest`, `jungle`, `marsh`, `oasis` (overlay glyphs on the base tile). |
 | Resources | `wheat`, `cattle`, `fish`, `iron`, `horses`, `coal`, `gems`, `silk`, `spices` (tile bonuses). |
 | Rivers | Boolean on a tile — boosts defense for any unit standing on it. |
@@ -65,8 +75,8 @@ persona prompt that feeds the LLM goal source — see
 
 ### Passable vs impassable
 
-- Land units cannot enter ocean / lake / coast tiles.
-- Mountains are impassable to everything except scouts at a movement penalty.
+- **Impassable**: ocean, mountain, snow (`IMPASSABLE_TERRAIN`). No unit type can cross these — including scouts (no unit-type override exists).
+- **Passable**: coast, plains, grassland, forest, hills, desert, tundra. Land units CAN enter coast tiles.
 - See `backend/app/engine/terrain.py:is_passable` for the canonical rules.
 
 ---
@@ -106,7 +116,7 @@ and there is no bankruptcy disbanding.
 
 - On a tile your civ owns: **+4 HP**.
 - On unowned / neutral land: **+2 HP**.
-- On hostile-controlled tile: **0 HP**.
+- On hostile-controlled tile: **+1 HP** (`HEAL_ENEMY_TERRITORY = 1`).
 
 ---
 
@@ -241,8 +251,9 @@ The Worker is occupied for the duration. Status shown in the unit chip
 
 ## 9. Tech Tree
 
-21 techs across 4 tiers (`backend/app/engine/research.py`). Science is pooled
-across the civilization; **2 science/city/turn baseline**, plus Library bonus.
+20 techs across 4 tiers (5 Tier 1, 6 Tier 2, 5 Tier 3, 4 Tier 4;
+`backend/app/engine/research.py`). Science is pooled across the civilization;
+**2 science/city/turn baseline**, plus Library bonus.
 
 ```
 Tier 1 (no prerequisites)
@@ -284,19 +295,23 @@ prerequisites are met).
 
 ### Attack resolution (`backend/app/engine/combat.py`)
 
-Both sides roll damage based on `attack` vs `effective_defense`. The defender
-benefits from terrain.
+Combat is **purely deterministic** — no RNG anywhere.
+- **Damage to defender**: `max(1, 2 × attacker_attack − effective_defense)`
+- **Damage to attacker**: `max(0, defender_attack − attacker_defense)`
+
+The defender benefits from terrain (see below).
 
 ### Terrain defense multiplier
 
 Each qualifying condition multiplies the defender's defense by 1.25:
 
-- Standing on **hills** or **mountain**.
+- Standing on **hills** (mountains are impassable — no unit can stand on a mountain tile).
 - Standing on **forest**, **jungle**, **marsh**, or in a **forest** feature.
 - Tile has a **river** (forces attackers to cross).
 
-The multiplier caps at **1.6×**. So a Swordsman (defense 5) on hills+river+forest
-gets `5 × 1.6 = 8` effective defense, not `5 × 1.25³ ≈ 9.77`.
+The multiplier caps at **1.6×** (`MAX_TERRAIN_DEFENSE_MULT`). So a Swordsman
+(defense 5) on hills+river+forest gets `5 × 1.6 = 8` effective defense, not
+`5 × 1.25³ ≈ 9.77`.
 
 ### Stance enforcement
 
@@ -329,7 +344,7 @@ Labels:
 | ≥ 60 | Devoted | green |
 
 Relationships shift via `DiplomaticEvent`s — see `backend/app/engine/diplomacy.py`
-and the deltas applied by message kinds (e.g. `threat: -10`, `declare_war: -30`).
+and the deltas applied by message kinds (e.g. `threat: -10`, `declare_war: -50`).
 
 ### Message kinds (`MessageKind`)
 
@@ -351,8 +366,8 @@ composer's tone dropdown.
 Clicking a leader avatar in the **Diplomatic Ribbon** on the right edge of
 the map opens a full-screen Diplomatic Audience overlay backed by the
 rival's splash art. See
-[../frontend/docs/UI_GUIDE.md §4.1](../frontend/docs/UI_GUIDE.md#41-diplomatic-ribbon-met-leader-portraits-on-the-map)
-and [../frontend/docs/UI_GUIDE.md §5 Diplomatic Audience](../frontend/docs/UI_GUIDE.md#diplomatic-audience-full-screen-overlay).
+[frontend/docs/UI_GUIDE.md §4.1](frontend/docs/UI_GUIDE.md#41-diplomatic-ribbon-met-leader-portraits-on-the-map)
+and [frontend/docs/UI_GUIDE.md §5 Diplomatic Audience](frontend/docs/UI_GUIDE.md#diplomatic-audience-full-screen-overlay).
 
 ---
 
@@ -379,13 +394,14 @@ also enforces turn ownership on the API boundary.
 
 ## 13. Victory
 
-Score-based. Default threshold is **200** (`state.score_threshold`).
-`civ.score` is calculated by `backend/app/engine/victory.py:civ_score` —
-roughly: `population × 3 + technologies × 6 + cities × 5 + cultural standing`.
+Score-based. Default threshold is **200** (`SCORE_THRESHOLD`).
+`civ.score` is calculated by `backend/app/engine/victory.py:civ_score`:
+`10 × cities + 2 × population + 3 × known_techs`.
+(No "cultural standing" term exists in the engine.)
 
 First civ to cross the threshold wins; the UI shows a "you reached the goal"
-banner. (Defeat conditions and proper end-game screens are on the backlog —
-see `docs/archive/GAME_BACKLOG.md`.)
+banner. (Defeat conditions and proper end-game screens are planned but not yet
+implemented.)
 
 ---
 
@@ -418,5 +434,5 @@ This document describes game mechanics. For implementation details and related s
 - **[Backend Config](backend/docs/BACKEND_CONFIG.md)** — LLM model selection, game parameters, environment setup
 - **[Architecture Overview](docs/ARCHITECTURE.md)** — How the three-layer engine (Strategic → Tactical → Validator) processes these mechanics
 - **[UI Guide](frontend/docs/UI_GUIDE.md)** — How these mechanics surface in the frontend (panels, drawers, map interactions)
-- **[Asset Integration](docs/ASSET_INTEGRATION.md)** — How game entities (units, cities, terrain) map to generative pixel-art assets
+- **[Asset Integration](docs/ASSET_INTEGRATION.md)** — How game entities (units, cities, terrain) map to generative pixel-art assets. See also `frontend/lib/hex.ts` and `frontend/lib/assetManifest.ts` for fallback logic
 - **[Report Traceability](docs/report/TRACEABILITY.md)** — Claims about game mechanics mapped to verifiable sources

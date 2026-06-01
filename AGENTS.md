@@ -7,7 +7,7 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 **StrategAI** is a full-stack strategy game where:
 - **AI civilizations** are controlled by LLMs via OpenAI's tool-use API (strategic decision-making, diplomacy)
 - **Game assets** are generated on-demand using Diffusion Transformers (FLUX2 Klein 4B Distilled via ComfyUI), styled with a custom LoRA: [`stixxert/strategai-topdown-medieval-style-lora`](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora)
-- **Style adaptation** is achieved through LoRA fine-tuning via knowledge distillation — a FLUX.2 [dev] (12B) teacher model + Multi-Angles LoRA v2 generates the training dataset [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart), which trains the FLUX.2 Klein 4B student LoRA
+- **Style adaptation** is achieved through LoRA fine-tuning via knowledge distillation — a FLUX.2 [dev] (32B) teacher model + Multi-Angles LoRA v2 generates the training dataset [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart), which trains the FLUX.2 Klein 4B student LoRA
 
 ## Architecture
 
@@ -27,8 +27,9 @@ This repository contains a multi-agent system for an INF-3600 Generative AI stud
 |-----------|-----------|----------|
 | **LLM-driven AI civs** | OpenAI tool-use API | `backend/app/engine/openai_goals.py` — 9 intent tools, per-leader personas, rolling memory |
 | **Diplomacy chat** | LLM with persistent conversation | `backend/app/engine/diplomacy.py` — free-form chat with AI leaders |
+| **TTS voiceover** | OpenAI TTS API (gpt-4o-mini-tts, cedar voice) | `backend/app/api/routers/audio.py` — narrator performance instructions shape vocal delivery; `frontend/lib/useAudio.ts` — intro narration with music ducking |
 | **Generative pixel art** | ComfyUI + FLUX2 Klein 4B Distilled (DiT) | `assetserver/src/` — 6 asset families, 3 generation modes |
-| **Style adaptation** | LoRA fine-tuning via knowledge distillation (FLUX.2 [dev] 12B teacher → FLUX.2 Klein 4B student) | `dataset-gen-train/` — Ostris AI Toolkit, 6-experiment matrix; dataset: [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart); LoRA: [`stixxert/strategai-topdown-medieval-style-lora`](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) |
+| **Style adaptation** | LoRA fine-tuning via knowledge distillation (FLUX.2 [dev] 32B teacher → FLUX.2 Klein 4B student) | `dataset-gen-train/` — Ostris AI Toolkit, 6-experiment matrix; dataset: [`stixxert/topdown-medieval-pixelart`](https://huggingface.co/datasets/stixxert/topdown-medieval-pixelart); LoRA: [`stixxert/strategai-topdown-medieval-style-lora`](https://huggingface.co/stixxert/strategai-topdown-medieval-style-lora) |
 
 ### Inter-Service Contracts
 
