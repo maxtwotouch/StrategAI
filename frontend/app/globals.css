@@ -506,6 +506,23 @@ select:focus {
     linear-gradient(180deg, rgba(50, 30, 30, 0.94), rgba(21, 18, 22, 0.98));
 }
 
+/* The cinematic toggle keeps aria-pressed="true" while ON (recaps enabled), so
+   it must not take the red "engaged" treatment above — only the .is-off
+   (recaps disabled) state goes muted/red, matching the slashed glyph. */
+.audio-toggle.cinematic-toggle[aria-pressed="true"] {
+  border-color: rgba(203, 166, 88, 0.28);
+  color: oklch(0.79 0.05 84);
+  background:
+    linear-gradient(180deg, rgba(33, 41, 50, 0.88), rgba(12, 17, 24, 0.94));
+}
+
+.audio-toggle.is-off {
+  border-color: rgba(203, 88, 88, 0.5);
+  color: oklch(0.78 0.09 32);
+  background:
+    linear-gradient(180deg, rgba(50, 30, 30, 0.94), rgba(21, 18, 22, 0.98));
+}
+
 .audio-toggle__icon {
   width: 22px;
   height: 22px;
@@ -623,7 +640,10 @@ select:focus {
 .turn-resolution {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* Above the in-game HUD: the leader ribbon (60) and the city/diplomacy
+     drawers (80) must not show through during resolution. Stays below the
+     full-screen diplomacy audience (200). */
+  z-index: 100;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -663,13 +683,19 @@ select:focus {
   text-align: center;
 }
 
+/* The stage matches the generated art's native 16:9 ratio so the full
+   cinematic composition is shown without cropping the leader or action. Width
+   is capped so the derived height never exceeds the viewport. */
 .turn-resolution__scene-stage {
-  min-height: min(58vh, 560px);
+  position: relative;
+  width: min(100%, calc(min(62vh, 600px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
 }
 
 .turn-resolution__scene {
-  position: relative;
-  min-height: min(58vh, 560px);
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   border: 1px solid rgba(215, 180, 102, 0.22);
   background: rgba(7, 11, 16, 0.72);
@@ -678,21 +704,77 @@ select:focus {
 .turn-resolution__scene img {
   width: 100%;
   height: 100%;
-  min-height: min(58vh, 560px);
   object-fit: cover;
   display: block;
   filter: saturate(0.92) contrast(1.04);
+  /* Single animation (one property timeline avoids transform conflicts): a
+     quick fade-in over the matching backdrop, then a slow Ken Burns zoom. The
+     keyed remount on each scene change replays it as a smooth crossfade. */
+  animation: turn-scene-reveal 9000ms ease-out both;
+}
+
+@keyframes turn-scene-reveal {
+  0% {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .turn-resolution__scene::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 34%, rgba(5, 8, 12, 0.88));
+  background: linear-gradient(180deg, transparent 38%, rgba(5, 8, 12, 0.9));
+}
+
+.turn-resolution__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  margin: 0;
+  padding: clamp(16px, 2.4vw, 28px);
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 2vw, 1.6rem);
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--ink, #f4ead2);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+  animation: turn-caption-rise 900ms ease both;
+}
+
+@keyframes turn-caption-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.turn-resolution__actions {
+  display: flex;
+  justify-content: center;
+}
+
+.turn-resolution__actions .button-primary {
+  min-width: 220px;
 }
 
 .turn-resolution__empty {
-  min-height: min(58vh, 560px);
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   gap: var(--space-sm);

@@ -20,7 +20,11 @@ import {
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
 import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, STRUCTURE_CATEGORIES } from "@/lib/assetMapping";
-import { buildCustomLeaderParams, leaderParamsFor } from "@/lib/leaderMapping";
+import {
+  buildCustomLeaderParams,
+  leaderParamsFor,
+  sceneCinematicsFor,
+} from "@/lib/leaderMapping";
 import { useAudio } from "@/lib/useAudio";
 
 type PendingAction = { kind: "found"; unit: UnitDTO } | null;
@@ -29,6 +33,24 @@ type TurnScene = {
   turn: number;
   text: string;
   url: string;
+};
+
+// localStorage key for the player's cinematic-recap preference.
+const CINEMATIC_PREF_KEY = "inf3600:cinematic";
+
+// Each turn resolution shows a single scene. When several events happen in one
+// turn we pick the most cinematic one by this priority (lower = preferred).
+const TURN_EVENT_PRIORITY: Record<TurnEvent["kind"], number> = {
+  stance_changed: 0,
+  civ_met: 1,
+  city_founded: 2,
+  tech_completed: 3,
+  unit_lost: 4,
+  structure_built: 5,
+  city_grew: 6,
+  unit_created: 7,
+  message_received: 8,
+  turn_summary: 9,
 };
 type Setup = {
   radius: number;
@@ -59,6 +81,24 @@ function AudioGlyph({ muted }: { muted: boolean }) {
         </>
       )}
       {muted && <path className="audio-toggle__slash" d="M16.2 8.1l4.1 7.8M20.3 8.1l-4.1 7.8" />}
+    </svg>
+  );
+}
+
+// Toggles the cinematic turn-recap images. Picture-frame glyph with a sun and
+// hills; slashed when recaps are turned off.
+function SceneGlyph({ enabled }: { enabled: boolean }) {
+  return (
+    <svg
+      className="audio-toggle__icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect className="audio-toggle__wave" x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <circle className="audio-toggle__speaker" cx="8.5" cy="10" r="1.5" />
+      <path className="audio-toggle__wave" d="M4.5 17.5l4-4 2.5 2.5 3.5-4 5 5.5" />
+      {!enabled && <path className="audio-toggle__slash" d="M5 5l14 14" />}
     </svg>
   );
 }
@@ -213,9 +253,24 @@ export default function HomePage() {
   const [loadingSplashIndex, setLoadingSplashIndex] = useState(0);
   const [sovereignSplashIndex, setSovereignSplashIndex] = useState(0);
   const [turnScenes, setTurnScenes] = useState<TurnScene[]>([]);
-  const [resolvingScenes, setResolvingScenes] = useState<TurnScene[]>([]);
-  const [resolvingBackdropScene, setResolvingBackdropScene] =
-    useState<TurnScene | null>(null);
+  // Player preference: show the cinematic turn-recap images, or resolve turns
+  // instantly like the classic flow. Persisted across sessions; the novelty of
+  // the images wears off, so it's opt-out.
+  const [cinematicEnabled, setCinematicEnabled] = useState(true);
+  // Base "dawn rising" scene generated once at game start. Acts as the fallback
+  // image whenever a per-turn scene can't be generated.
+  const [baseScene, setBaseScene] = useState<TurnScene | null>(null);
+  // Prefetched scene shown on the NEXT turn resolution so End Turn paints
+  // instantly. Seeded with the dawn scene at game start, then regenerated in the
+  // background after each resolution from that turn's events (one-turn lag).
+  const [nextScene, setNextScene] = useState<TurnScene | null>(null);
+  const preparingNextSceneRef = useRef(false);
+  // The single scene shown during the current turn resolution (null = still
+  // generating → spinner).
+  const [resolvingScene, setResolvingScene] = useState<TurnScene | null>(null);
+  // True once the turn's work + scene generation finish, so the overlay can
+  // show the image and a Continue button. The user dismisses it manually.
+  const [turnResolved, setTurnResolved] = useState(false);
   const [pendingTurnSceneIds, setPendingTurnSceneIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -250,8 +305,11 @@ export default function HomePage() {
     setLoadingSplashIndex(0);
     setSovereignSplashIndex(0);
     setTurnScenes([]);
-    setResolvingScenes([]);
-    setResolvingBackdropScene(null);
+    setBaseScene(null);
+    setNextScene(null);
+    preparingNextSceneRef.current = false;
+    setResolvingScene(null);
+    setTurnResolved(false);
     setPendingTurnSceneIds(new Set());
     setResolvingTurn(false);
     setIntroDismissed(false);
@@ -324,6 +382,11 @@ export default function HomePage() {
       setAssets(manifest);
       setState(next);
       prevStateRef.current = next;
+      // Generate the "dawn rising" base scene in the background (only if recaps
+      // are enabled). It becomes the fallback/first image for turn resolutions.
+      if (cinematicEnabled) {
+        void generateBaseDawnScene(manifest, next, humanCustomParams);
+      }
     } catch (e: unknown) {
       setError(formatError(e));
       setHasStarted(false);
@@ -347,6 +410,29 @@ export default function HomePage() {
     const t = setTimeout(() => setError(null), 5000);
     return () => clearTimeout(t);
   }, [error]);
+
+  // Restore the cinematic-recap preference once on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(CINEMATIC_PREF_KEY);
+      if (stored !== null) setCinematicEnabled(stored === "1");
+    } catch {
+      // localStorage unavailable — keep the default (on).
+    }
+  }, []);
+
+  const toggleCinematic = (): void => {
+    setCinematicEnabled((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(CINEMATIC_PREF_KEY, next ? "1" : "0");
+      } catch {
+        // Persisting is best-effort.
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -709,9 +795,6 @@ export default function HomePage() {
       img.src = url;
     });
 
-  const wait = (ms: number): Promise<void> =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-
   const queueTurnSummaryScenes = async (
     events: TurnEvent[],
     next: GameStateDTO,
@@ -843,7 +926,7 @@ export default function HomePage() {
         next.civ_roster.find((civ) => civ.id === primaryCivId) ??
         next.civs.find((civ) => civ.id === primaryCivId);
       if (!primaryCiv) return null;
-      const primaryParams =
+      const baseParams =
         primaryCiv.is_human
           ? buildCustomLeaderParams({
               leaderName: setup.leaderName || primaryCiv.leader_name,
@@ -852,6 +935,14 @@ export default function HomePage() {
               description: setup.leaderDescription,
             })
           : leaderParamsFor(primaryCiv.leader_name);
+      // Vary lighting and mood per scene by event category and turn so repeated
+      // scenes for the same leader don't all look identical (see
+      // sceneCinematicsFor). Identity fields (archetype/culture/description)
+      // stay fixed for visual consistency.
+      const primaryParams: typeof baseParams = {
+        ...baseParams,
+        ...sceneCinematicsFor(event.actionCategory, event.turn),
+      };
 
       const result =
         leaderIds.length > 1
@@ -891,6 +982,107 @@ export default function HomePage() {
     }
   };
 
+  // Generate the one-time "dawn rising" base scene for the human civilization.
+  // Best-effort: a failure just means turn resolutions fall back to no image.
+  const generateBaseDawnScene = async (
+    manifest: AssetManifest | null,
+    next: GameStateDTO,
+    humanParams: ReturnType<typeof buildCustomLeaderParams>,
+  ): Promise<void> => {
+    if (!manifest) return;
+    const human = next.civ_roster.find((civ) => civ.is_human) ?? null;
+    const leaderId = human ? manifest.leaders[human.id]?.leaderId : undefined;
+    if (!human || !leaderId) return;
+    try {
+      const params = { ...humanParams, timeOfDay: "dawn", mood: "hopeful" };
+      const description =
+        `${params.leaderName} stands upon a rise at first light, surveying their ` +
+        `newborn civilization awakening below — smoke curling from the first ` +
+        `hearths, banners catching the morning wind, citizens stirring to begin ` +
+        `the day's labor, and the wide unwritten land stretching toward the ` +
+        `horizon. No rival ruler is present; this scene focuses only on the ` +
+        `player's leader and their own people.`;
+      const result = await generateLeaderAction(
+        params,
+        leaderId,
+        "exploration",
+        description,
+      );
+      await preloadImage(result.url);
+      const dawn: TurnScene = {
+        eventId: "base-dawn",
+        turn: next.turn,
+        text: "A new dawn rises over your people",
+        url: result.url,
+      };
+      setBaseScene(dawn);
+      // Seed the prefetch buffer so the very first End Turn paints instantly.
+      setNextScene((current) => current ?? dawn);
+    } catch {
+      // Decorative — no base scene just means no fallback image.
+    }
+  };
+
+  // Choose the single most cinematic event to depict for a turn resolution,
+  // restricted to events whose leaders actually have generated portraits.
+  const selectPrimaryTurnEvent = (events: TurnEvent[]): TurnEvent | null => {
+    if (!assets) return null;
+    const generatable = events.filter((event) =>
+      event.civIds.some((civId) => Boolean(assets.leaders[civId]?.leaderId)),
+    );
+    if (generatable.length === 0) return null;
+    return [...generatable].sort(
+      (a, b) =>
+        (TURN_EVENT_PRIORITY[a.kind] ?? 99) - (TURN_EVENT_PRIORITY[b.kind] ?? 99),
+    )[0];
+  };
+
+  // Apply fog-of-war filtering, fall back to a synthesized summary event, then
+  // pick the single event to depict. Shared by live resolution and prefetch.
+  const pickResolutionEvent = (
+    events: TurnEvent[],
+    next: GameStateDTO,
+  ): TurnEvent | null => {
+    const human = next.civ_roster.find((civ) => civ.is_human) ?? null;
+    const hasMetRival =
+      human === null || next.known_civ_ids.some((civId) => civId !== human.id);
+    const visible = hasMetRival
+      ? events
+      : events.filter(
+          (event) =>
+            human !== null &&
+            event.civIds.length === 1 &&
+            event.civIds[0] === human.id,
+        );
+    const sceneEvents =
+      visible.length > 0 ? visible : [buildFallbackTurnSummaryEvent(next)];
+    return selectPrimaryTurnEvent(sceneEvents) ?? sceneEvents[0] ?? null;
+  };
+
+  // Background prefetch: generate the scene to show on the NEXT End Turn from
+  // the turn that just resolved, so it's preloaded and instant when needed.
+  const prepareNextScene = async (
+    events: TurnEvent[],
+    next: GameStateDTO,
+  ): Promise<void> => {
+    if (!assets || preparingNextSceneRef.current) return;
+    preparingNextSceneRef.current = true;
+    try {
+      const event = pickResolutionEvent(events, next);
+      const scene = event ? await generateTurnSummaryScene(event, next) : null;
+      if (scene) setNextScene(scene);
+    } finally {
+      preparingNextSceneRef.current = false;
+    }
+  };
+
+  // User-driven dismissal of the turn-resolution overlay (no auto-timeout).
+  const dismissResolution = (): void => {
+    setResolvingTurn(false);
+    setTurnResolved(false);
+    setResolvingScene(null);
+  };
+
   const run = async (fn: () => Promise<GameStateDTO>) => {
     setBusy(true);
     setError(null);
@@ -917,29 +1109,22 @@ export default function HomePage() {
 
   const endTurn = async () => {
     if (!state) return;
-    const previousScene = turnScenes[0] ?? null;
-    setResolvingBackdropScene(previousScene);
-    setResolvingScenes(turnScenes.slice(0, 3));
+    // Classic flow when the player has turned recaps off (or there's no asset
+    // server): resolve instantly with no cinematic overlay.
+    if (!assets || !cinematicEnabled) {
+      await run(() => api.resolveTurn(state.id));
+      return;
+    }
+    // Paint the prefetched scene immediately so the overlay feels instant; only
+    // fall back to a spinner if nothing has been prepared yet.
+    setResolvingScene(nextScene ?? baseScene);
+    setTurnResolved(false);
     setBusy(true);
     setResolvingTurn(true);
     setError(null);
     try {
       const next = await api.resolveTurn(state.id);
       const events = ingestEvents(next);
-      const nextHumanCiv = next.civ_roster.find((civ) => civ.is_human) ?? null;
-      const hasMetRival =
-        nextHumanCiv === null ||
-        next.known_civ_ids.some((civId) => civId !== nextHumanCiv.id);
-      const visibleEvents = hasMetRival
-        ? events
-        : events.filter(
-            (event) =>
-              nextHumanCiv !== null &&
-              event.civIds.length === 1 &&
-              event.civIds[0] === nextHumanCiv.id,
-          );
-      const sceneEvents =
-        visibleEvents.length > 0 ? visibleEvents : [buildFallbackTurnSummaryEvent(next)];
       setState(next);
       if (selectedUnit) {
         const updated = next.units.find((u) => u.id === selectedUnit.id) ?? null;
@@ -950,19 +1135,14 @@ export default function HomePage() {
           next.tiles.find((t) => t.q === hoveredTile.q && t.r === hoveredTile.r) ?? null;
         setHoveredTile(updatedTile);
       }
-      const scenes = await queueTurnSummaryScenes(sceneEvents, next);
-      if (scenes.length > 0) {
-        setResolvingBackdropScene(scenes[0]);
-        setResolvingScenes((current) => [...scenes, ...current].slice(0, 3));
-        await wait(2400);
-      } else if (previousScene) {
-        await wait(900);
-      }
+      // Prefetch the scene for the NEXT resolution from this turn's events so
+      // the following End Turn is instant too.
+      void prepareNextScene(events, next);
     } catch (e: unknown) {
       setError(formatError(e));
     } finally {
-      setResolvingTurn(false);
-      setResolvingScenes([]);
+      // Backend work is done — enable Continue; the user dismisses when ready.
+      setTurnResolved(true);
       setBusy(false);
     }
   };
@@ -1411,6 +1591,24 @@ export default function HomePage() {
         <div className="war-room__turnbox">
           <button
             type="button"
+            className={`audio-toggle cinematic-toggle${cinematicEnabled ? "" : " is-off"}`}
+            onClick={toggleCinematic}
+            title={
+              cinematicEnabled
+                ? "Turn recap images: on (click to disable)"
+                : "Turn recap images: off (click to enable)"
+            }
+            aria-label={
+              cinematicEnabled
+                ? "Disable turn recap images"
+                : "Enable turn recap images"
+            }
+            aria-pressed={cinematicEnabled}
+          >
+            <SceneGlyph enabled={cinematicEnabled} />
+          </button>
+          <button
+            type="button"
             className="audio-toggle"
             onClick={toggleMute}
             title={muted ? "Unmute music" : "Mute music"}
@@ -1437,12 +1635,12 @@ export default function HomePage() {
       {resolvingTurn && (
         <div className="turn-resolution" aria-live="polite">
           {(() => {
-            const latestScene = resolvingBackdropScene?.url ?? turnScenes[0]?.url;
-            const previousLeader =
-              loadingSplashUrls.length > 0
+            const backdrop =
+              resolvingScene?.url ??
+              baseScene?.url ??
+              (loadingSplashUrls.length > 0
                 ? loadingSplashUrls[loadingSplashIndex % loadingSplashUrls.length]
-                : null;
-            const backdrop = latestScene ?? previousLeader;
+                : null);
             return backdrop ? (
               <div
                 key={backdrop}
@@ -1453,24 +1651,38 @@ export default function HomePage() {
           })()}
           <div className="turn-resolution__veil" />
           <section className="turn-resolution__panel">
-            <h2>Resolving Turn</h2>
+            <h2>{turnResolved ? `Turn ${state.turn} Begins` : "Resolving Turn"}</h2>
             <div className="turn-resolution__scene-stage">
-              {resolvingScenes[0] ? (
+              {resolvingScene ? (
                 <article
-                  key={resolvingScenes[0].eventId}
+                  key={resolvingScene.eventId}
                   className="turn-resolution__scene turn-resolution__scene--featured"
                 >
                   <img
-                    src={resolvingScenes[0].url}
-                    alt={`Generated scene: ${resolvingScenes[0].text}`}
+                    src={resolvingScene.url}
+                    alt={`Generated scene: ${resolvingScene.text}`}
                   />
+                  <p className="turn-resolution__caption">{resolvingScene.text}</p>
                 </article>
-              ) : (
+              ) : !turnResolved ? (
                 <div className="turn-resolution__empty">
                   <div className="spinner" />
-                  <span>Preparing the next chronicle scene...</span>
+                  <span>Resolving the turn...</span>
+                </div>
+              ) : (
+                <div className="turn-resolution__empty">
+                  <span>The turn is resolved. Your people press on.</span>
                 </div>
               )}
+            </div>
+            <div className="turn-resolution__actions">
+              <button
+                className="button-primary"
+                onClick={dismissResolution}
+                disabled={!turnResolved}
+              >
+                {turnResolved ? "Continue" : "Resolving..."}
+              </button>
             </div>
           </section>
         </div>
@@ -2455,14 +2667,18 @@ function formatNetDelta(net: number): string {
   return "0 / t";
 }
 
+// Composition/staging variety only — lighting and time of day are owned by the
+// structured time_of_day enum (sceneCinematicsFor), so these must not name a
+// time of day or weather or they contradict it. Focus on props, crowd, and
+// camera framing so each fallback scene still feels distinct.
 function turnSceneAccent(turn: number): string {
   const accents = [
-    "Use dawn light, low mist, and fresh construction dust so the scene feels like a new moment.",
-    "Use torchlight, smoke, and moving workers so the scene feels urgent rather than ceremonial.",
-    "Use rain, muddy ground, and wind-torn banners so the scene feels distinct from a council chamber.",
-    "Use warm workshop firelight, tools, stone chips, timber, and crowded activity in the foreground.",
-    "Use hilltop frontier light, distant campfires, scouts, and maps spread over rough wooden crates.",
-    "Use a crowded city square with carts, citizens, standards, and visible civic motion around the leader.",
+    "Fill the foreground with fresh construction dust, scattered tools, and workers mid-task for a lived-in feel.",
+    "Stage urgent movement — figures hurrying, banners shifting — so the scene feels active rather than ceremonial.",
+    "Add wind-stirred banners and a churned, busy ground so it reads as a working site, not a still council chamber.",
+    "Crowd the foreground with timber, stone chips, and laboring figures layered in front of the leader.",
+    "Spread maps over rough wooden crates with scouts gesturing toward the distance for a frontier feel.",
+    "Surround the leader with carts, citizens, standards, and visible civic motion in a busy public space.",
   ];
   return accents[turn % accents.length];
 }

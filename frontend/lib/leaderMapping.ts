@@ -6,7 +6,7 @@
 // backend/app/api/game_factory.py. Unknown names fall back to a neutral
 // medieval ruler so newly-added leaders still render something sensible.
 
-import { LeaderParams } from "@/lib/assetApi";
+import { LeaderParams, LeaderActionCategory } from "@/lib/assetApi";
 
 interface LeaderDef {
   archetype: string; // Archetype enum
@@ -61,6 +61,63 @@ export function leaderParamsFor(leaderName: string): LeaderParams {
     culture: def.culture,
     timeOfDay: def.timeOfDay,
     mood: def.mood,
+  };
+}
+
+// Per-scene cinematic variation. The leader's identity (archetype, culture,
+// physical description) stays fixed, but an action scene's lighting and mood
+// should track *what is happening* and shift turn to turn — otherwise every
+// scene for a given leader is lit the same way and looks repetitive. Each
+// category lists candidate TimeOfDay / Mood enum values; we rotate through them
+// by turn (with an offset so time and mood don't move in lockstep) to maximise
+// variety while staying tonally appropriate to the event.
+const SCENE_CINEMATICS: Record<
+  LeaderActionCategory,
+  { timeOfDay: string[]; mood: string[] }
+> = {
+  military: {
+    timeOfDay: ["twilight", "storm", "night", "golden_hour"],
+    mood: ["grim_determined", "menacing", "triumphant"],
+  },
+  diplomatic: {
+    timeOfDay: ["golden_hour", "midday", "dawn"],
+    mood: ["contemplative", "wise_serene", "hopeful", "menacing"],
+  },
+  construction: {
+    timeOfDay: ["dawn", "golden_hour", "midday"],
+    mood: ["hopeful", "triumphant", "contemplative"],
+  },
+  scientific: {
+    timeOfDay: ["night", "twilight", "dawn"],
+    mood: ["contemplative", "wise_serene", "mystical"],
+  },
+  cultural: {
+    timeOfDay: ["golden_hour", "twilight", "midday"],
+    mood: ["triumphant", "hopeful", "mystical"],
+  },
+  exploration: {
+    timeOfDay: ["dawn", "golden_hour", "midday", "storm"],
+    mood: ["hopeful", "contemplative", "wise_serene"],
+  },
+  crisis: {
+    timeOfDay: ["storm", "night", "twilight"],
+    mood: ["grim_determined", "menacing", "melancholic"],
+  },
+};
+
+// Returns the TimeOfDay / Mood overrides for a given scene, rotated by turn so
+// successive scenes of the same category still differ. Merge onto a leader's
+// base LeaderParams before generating an action image.
+export function sceneCinematicsFor(
+  category: LeaderActionCategory,
+  turn: number,
+): Pick<LeaderParams, "timeOfDay" | "mood"> {
+  const profile = SCENE_CINEMATICS[category] ?? SCENE_CINEMATICS.cultural;
+  const safeTurn = Number.isFinite(turn) ? Math.abs(Math.trunc(turn)) : 0;
+  return {
+    timeOfDay: profile.timeOfDay[safeTurn % profile.timeOfDay.length],
+    // Offset the mood index so lighting and mood cycle out of phase.
+    mood: profile.mood[(safeTurn + 1) % profile.mood.length],
   };
 }
 

@@ -213,14 +213,19 @@ function truncate(value: string, max: number): string {
   return value.length <= max ? value : value.slice(0, max - 1) + "…";
 }
 
+// Composition/staging variety only. Lighting, time of day, and weather are
+// owned by the structured time_of_day enum (set per scene by category in
+// sceneCinematicsFor) — accents must NOT specify those or they fight the enum
+// and produce muddy, contradictory prompts. Keep these to camera framing and
+// incidental props/crowd detail.
 function sceneAccent(turn: number): string {
   const accents = [
-    "Compose it outdoors at dawn with mist, half-built palisades, and long shadows.",
-    "Compose it at night by torchlight with sparks, smoke, and urgent movement.",
-    "Compose it in a rain-soaked courtyard with muddy ground and wind-torn banners.",
-    "Compose it inside a busy workshop with tools, timber, stone dust, and warm firelight.",
-    "Compose it on a hilltop overlooking the frontier with maps, scouts, and distant campfires.",
-    "Compose it in a crowded city square with citizens, carts, livestock, and raised standards.",
+    "Frame it as a wide establishing shot with deep foreground detail and figures at varied distances.",
+    "Frame it from a tense low angle that emphasizes scale and the movement around the leader.",
+    "Frame it with a crowded, layered foreground of working figures, tools, and raised banners.",
+    "Frame it from a slightly elevated three-quarter angle that reveals the surrounding activity.",
+    "Frame it as an intimate mid shot centered on the leader with bustling activity behind them.",
+    "Frame it with strong depth, the leader sharp in front and the wider scene softening behind.",
   ];
   return accents[turn % accents.length];
 }
