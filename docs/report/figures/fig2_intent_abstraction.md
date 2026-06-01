@@ -10,10 +10,10 @@ graph TD
     classDef val fill:#fecaca,color:#1c1917,stroke:#dc2626
 
     L1["Strategic LLM Layer\nPersona + Memory + Fog-filtered View"]:::llm
-    L2["9 Intent Types\nExpand \u00b7 Scout \u00b7 Engage\nReinforce \u00b7 Speak \u00b7 AdjustStance\nBuild \u00b7 Research \u00b7 Improve"]:::intent
-    L3["Operations Layer\nresolve_intents() \u2192 Goals + Directives"]:::ops
+    L2["9 Intent Types\nExpand | Scout | Engage\nReinforce | Speak | AdjustStance\nBuild | Research | Improve"]:::intent
+    L3["Operations Layer\nresolve_intents() -> Goals + Directives"]:::ops
     L4["Tactical Engine\nA* Pathfinding + Combat + City Founding"]:::tac
-    L5["Validator + Engine\nRule Enforcement \u2192 Immutable GameState"]:::val
+    L5["Validator + Engine\nRule Enforcement -> Immutable GameState"]:::val
 
     L1 -->|"structured intents"| L2
     L2 -->|"intents"| L3
