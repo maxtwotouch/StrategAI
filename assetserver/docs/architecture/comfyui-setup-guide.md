@@ -477,7 +477,7 @@ load balancer configuration.
   pipelines for top-down camera angle) will be documented here once its
   filename and source are confirmed.
 - **Multi-instance spawning**: See [§7 Multi-Instance Spawning](#7-multi-instance-spawning)
-  above and [DEPLOYMENT.md](../DEPLOYMENT.md#multi-instance-comfyui-on-a-single-gpu).
+  above and [DEPLOYMENT.md](../../DEPLOYMENT.md#multi-instance-comfyui-on-a-single-gpu).
 - **Multi-node**: See [architecture.md](architecture.md) §4 (ComfyUI Client)
   for load-balanced multi-GPU setup.
 - **Production**: See [architecture.md](architecture.md) §7 for known issues and

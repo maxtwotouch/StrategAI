@@ -91,9 +91,11 @@ class TestConfigOverrides:
         assert s.server.port == 9999
 
     def test_env_var_override(self, tmp_project_root, monkeypatch):
-        """COMFYUI__BASE_URL env var wins over yaml."""
+        """COMFYUI__BASE_URL env var fills gaps not set by config.yaml."""
         monkeypatch.setattr("src.config.BASE_DIR", tmp_project_root)
+        # Chdir so Settings reads config.yaml from tmp_project_root
+        monkeypatch.chdir(tmp_project_root)
         monkeypatch.setenv("COMFYUI__BASE_URL", "http://10.0.0.5:8188")
 
-        s = Settings()
+        s = Settings(_env_file="")
         assert s.comfyui.base_url == "http://10.0.0.5:8188"

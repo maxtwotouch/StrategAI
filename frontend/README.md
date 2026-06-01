@@ -44,6 +44,13 @@ npm run build       # production build verification
 - **Asset fallback** — Every missing generative asset degrades gracefully to built-in colors, glyphs, or initials.
 - **Single stylesheet** — `app/globals.css` (~1250 lines) with design tokens and all UI surfaces.
 
+## Audio Attribution
+
+Background music is sourced from [OpenGameArt.org](https://opengameart.org/).
+See [`public/audio/ATTRIBUTION.md`](public/audio/ATTRIBUTION.md) for full
+credits, licenses, and required attribution text.
+
+
 ## Architecture
 
 ```

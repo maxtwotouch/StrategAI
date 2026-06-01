@@ -457,7 +457,7 @@ curl -s -X POST "$BASE/background_tile" -H 'Content-Type: application/json' \
 
 ## See Also
 
-- [README.md](../README.md) — Project overview and quick-start guide
+- [README.md](../../README.md) — Project overview and quick-start guide
 - [docs/architecture/architecture.md](../architecture/architecture.md) — Full system architecture and endpoint table
-- [scripts/validate_api.py](../scripts/validate_api.py) — Automated API validation script
-- [scripts/smoke_test_endpoints.sh](../scripts/smoke_test_endpoints.sh) — Bash smoke-test script
+- [scripts/validate_api.py](../../scripts/validate_api.py) — Automated API validation script
+- [scripts/smoke_test_endpoints.sh](../../scripts/smoke_test_endpoints.sh) — Bash smoke-test script
