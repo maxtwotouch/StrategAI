@@ -64,8 +64,10 @@ export const TERRAIN_TO_TILE_TYPE: Record<string, BackgroundTileType> = {
 };
 
 export interface LeaderAssets {
+  leaderId?: string;
   splashUrl?: string;
   profileUrl?: string;
+  actionUrls?: string[];
 }
 
 export interface AssetManifest {
@@ -277,6 +279,7 @@ export async function resolveManifest(
       const assets: LeaderAssets = {};
       try {
         const splash = await generateLeaderSplash(params, options.signal);
+        assets.leaderId = splash.leaderId;
         assets.splashUrl = splash.url;
         try {
           assets.profileUrl = await generateLeaderProfile(
@@ -292,11 +295,17 @@ export async function resolveManifest(
         // matching entry from the existing leader catalog so the slot still
         // shows real art rather than an initial.
         const fallback = pickFromPool(params.archetype, params.culture, civId);
+        if (fallback?.leader_id) {
+          assets.leaderId = fallback.leader_id;
+        }
         if (fallback?.splash_url) {
           assets.splashUrl = absoluteAssetUrl(fallback.splash_url);
         }
         if (fallback?.profile_url) {
           assets.profileUrl = absoluteAssetUrl(fallback.profile_url);
+        }
+        if (fallback?.action_urls?.length) {
+          assets.actionUrls = fallback.action_urls.map(absoluteAssetUrl);
         }
       }
       if (assets.splashUrl || assets.profileUrl) {

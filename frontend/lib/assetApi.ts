@@ -87,6 +87,8 @@ export interface LeaderResponse {
   asset_type: string;
   leader_name: string;
   leader_id: string;
+  leader_ids?: string[];
+  leader_names?: string[];
   seed: number;
   generation_mode: string;
   status?: string;
@@ -107,6 +109,15 @@ function leaderBody(params: LeaderParams): Record<string, unknown> {
     time_of_day: params.timeOfDay,
     mood: params.mood,
   };
+}
+
+function randomAssetSeed(): number {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0];
+  }
+  return Math.floor(Math.random() * 2 ** 32);
 }
 
 // Stage 1: cinematic 16:9 splash. Returns leader_id for chaining the profile.
@@ -132,6 +143,7 @@ export interface ExistingLeader {
   culture: string;
   splash_url: string | null;
   profile_url: string | null;
+  action_urls?: string[];
 }
 
 export async function listLeaders(
@@ -160,6 +172,76 @@ export async function generateLeaderProfile(
     signal,
   );
   return absoluteAssetUrl(res.url);
+}
+
+export type LeaderActionCategory =
+  | "military"
+  | "diplomatic"
+  | "construction"
+  | "scientific"
+  | "cultural"
+  | "exploration"
+  | "crisis";
+
+export interface LeaderActionResult {
+  url: string;
+  leaderId: string;
+  leaderIds: string[];
+  seed: number;
+}
+
+export async function generateLeaderAction(
+  params: LeaderParams,
+  leaderId: string,
+  actionCategory: LeaderActionCategory,
+  actionDescription: string,
+  signal?: AbortSignal,
+): Promise<LeaderActionResult> {
+  const res = await postJson<LeaderResponse>(
+    "/leader",
+    {
+      asset_type: "action",
+      leader_id: leaderId,
+      action_category: actionCategory,
+      action_description: actionDescription,
+      seed: randomAssetSeed(),
+      ...leaderBody(params),
+    },
+    signal,
+  );
+  return {
+    url: absoluteAssetUrl(res.url),
+    leaderId: res.leader_id,
+    leaderIds: res.leader_ids ?? [res.leader_id],
+    seed: res.seed,
+  };
+}
+
+export async function generateLeaderMultiAction(
+  params: LeaderParams,
+  leaderIds: string[],
+  actionCategory: LeaderActionCategory,
+  actionDescription: string,
+  signal?: AbortSignal,
+): Promise<LeaderActionResult> {
+  const res = await postJson<LeaderResponse>(
+    "/leader",
+    {
+      asset_type: "action",
+      leader_ids: leaderIds,
+      action_category: actionCategory,
+      action_description: actionDescription,
+      seed: randomAssetSeed(),
+      ...leaderBody(params),
+    },
+    signal,
+  );
+  return {
+    url: absoluteAssetUrl(res.url),
+    leaderId: res.leader_id,
+    leaderIds: res.leader_ids ?? leaderIds,
+    seed: res.seed,
+  };
 }
 
 // --- Structure (buildings) ---

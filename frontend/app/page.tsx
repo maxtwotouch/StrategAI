@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SquareMap } from "@/components/SquareMap";
-import { absoluteAssetUrl, listLeaders } from "@/lib/assetApi";
+import {
+  absoluteAssetUrl,
+  generateLeaderAction,
+  generateLeaderMultiAction,
+  listLeaders,
+} from "@/lib/assetApi";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
 import {
   CIV_COLORS,
@@ -15,10 +20,16 @@ import {
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
 import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, STRUCTURE_CATEGORIES } from "@/lib/assetMapping";
-import { buildCustomLeaderParams } from "@/lib/leaderMapping";
+import { buildCustomLeaderParams, leaderParamsFor } from "@/lib/leaderMapping";
 import { useAudio } from "@/lib/useAudio";
 
 type PendingAction = { kind: "found"; unit: UnitDTO } | null;
+type TurnScene = {
+  eventId: string;
+  turn: number;
+  text: string;
+  url: string;
+};
 type Setup = {
   radius: number;
   seed: number;
@@ -200,6 +211,15 @@ export default function HomePage() {
   const [assetProgress, setAssetProgress] = useState<{ done: number; total: number } | null>(null);
   const [loadingSplashUrls, setLoadingSplashUrls] = useState<string[]>([]);
   const [loadingSplashIndex, setLoadingSplashIndex] = useState(0);
+  const [sovereignSplashIndex, setSovereignSplashIndex] = useState(0);
+  const [turnScenes, setTurnScenes] = useState<TurnScene[]>([]);
+  const [resolvingScenes, setResolvingScenes] = useState<TurnScene[]>([]);
+  const [resolvingBackdropScene, setResolvingBackdropScene] =
+    useState<TurnScene | null>(null);
+  const [pendingTurnSceneIds, setPendingTurnSceneIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [resolvingTurn, setResolvingTurn] = useState(false);
   const [introDismissed, setIntroDismissed] = useState(false);
   const [showSovereign, setShowSovereign] = useState(false);
   const { muted, toggleMute, startIntro, playNarration, startAmbient } = useAudio();
@@ -227,8 +247,13 @@ export default function HomePage() {
     setAssets(null);
     setPlacedStructureAssets({});
     setAssetProgress(null);
-    setLoadingSplashUrls([]);
     setLoadingSplashIndex(0);
+    setSovereignSplashIndex(0);
+    setTurnScenes([]);
+    setResolvingScenes([]);
+    setResolvingBackdropScene(null);
+    setPendingTurnSceneIds(new Set());
+    setResolvingTurn(false);
     setIntroDismissed(false);
     introNarratedRef.current = false;
     setIntroNarrationStatus("idle");
@@ -324,12 +349,49 @@ export default function HomePage() {
   }, [error]);
 
   useEffect(() => {
-    if (!hasStarted || state || loadingSplashUrls.length <= 1) return;
+    let cancelled = false;
+    void listLeaders()
+      .then((leaders) => {
+        if (cancelled) return;
+        const urls = shuffled(
+          leaders
+            .map((leader) => leader.splash_url)
+            .filter((url): url is string => Boolean(url))
+            .map(absoluteAssetUrl),
+        );
+        setLoadingSplashUrls(urls);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingSplashUrls([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state || loadingSplashUrls.length <= 1) return;
     const timer = setInterval(() => {
       setLoadingSplashIndex((index) => (index + 1) % loadingSplashUrls.length);
-    }, 2600);
+    }, 6500);
     return () => clearInterval(timer);
-  }, [hasStarted, loadingSplashUrls.length, state]);
+  }, [loadingSplashUrls.length, state]);
+
+  useEffect(() => {
+    if (!resolvingTurn || loadingSplashUrls.length <= 1) return;
+    const timer = setInterval(() => {
+      setLoadingSplashIndex((index) => (index + 1) % loadingSplashUrls.length);
+    }, 6500);
+    return () => clearInterval(timer);
+  }, [loadingSplashUrls.length, resolvingTurn]);
+
+  useEffect(() => {
+    if (!showSovereign || loadingSplashUrls.length <= 1) return;
+    const timer = setInterval(() => {
+      setSovereignSplashIndex((index) => (index + 1) % loadingSplashUrls.length);
+    }, 7000);
+    return () => clearInterval(timer);
+  }, [loadingSplashUrls.length, showSovereign]);
 
   useEffect(() => {
     return () => {
@@ -551,6 +613,11 @@ export default function HomePage() {
     [assets, activeConversationCivId],
   );
 
+  const generatedTurnSceneByEventId = useMemo(
+    () => new Map(turnScenes.map((scene) => [scene.eventId, scene])),
+    [turnScenes],
+  );
+
   const activeStance = useMemo(
     () =>
       activeConversationCivId === null
@@ -610,15 +677,15 @@ export default function HomePage() {
     return state.cities.find((c) => c.q === hoveredTile.q && c.r === hoveredTile.r) ?? null;
   }, [state, hoveredTile]);
 
-  const ingestEvents = (next: GameStateDTO) => {
+  const ingestEvents = (next: GameStateDTO): TurnEvent[] => {
     const prev = prevStateRef.current;
     if (!prev || prev.id !== next.id) {
       prevStateRef.current = next;
-      return;
+      return [];
     }
     if (prev.turn === next.turn) {
       prevStateRef.current = next;
-      return;
+      return [];
     }
     const events = diffTurnEvents({
       prev,
@@ -626,11 +693,202 @@ export default function HomePage() {
       humanCivId: humanCiv?.id ?? null,
     });
     prevStateRef.current = next;
-    if (events.length === 0) return;
+    if (events.length === 0) return [];
     setEventLog((current) => [...events, ...current].slice(0, 80));
     setBannerEvents(events);
     if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
     bannerTimerRef.current = setTimeout(() => setBannerEvents(null), 4500);
+    return events;
+  };
+
+  const preloadImage = (url: string): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+      img.src = url;
+    });
+
+  const wait = (ms: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+  const queueTurnSummaryScenes = async (
+    events: TurnEvent[],
+    next: GameStateDTO,
+  ): Promise<TurnScene[]> => {
+    if (!assets) return [];
+    const existingIds = new Set(turnScenes.map((scene) => scene.eventId));
+    const selected = events
+      .filter((event) => !existingIds.has(event.id) && !pendingTurnSceneIds.has(event.id))
+      .filter((event) =>
+        event.civIds.some((civId) => Boolean(assets.leaders[civId]?.leaderId)),
+      )
+      .slice(0, 2);
+    if (selected.length === 0) return [];
+
+    setPendingTurnSceneIds((current) => {
+      const nextSet = new Set(current);
+      for (const event of selected) nextSet.add(event.id);
+      return nextSet;
+    });
+
+    const scenes = (
+      await Promise.all(selected.map((event) => generateTurnSummaryScene(event, next)))
+    ).filter((scene): scene is TurnScene => Boolean(scene));
+    return scenes;
+  };
+
+  const buildFallbackTurnSummaryEvent = (next: GameStateDTO): TurnEvent => {
+    const nextHumanCiv = next.civ_roster.find((civ) => civ.is_human) ?? null;
+    const nextOtherCivs = next.civ_roster.filter((civ) => !civ.is_human);
+    const preContact =
+      nextOtherCivs.length === 0 ||
+      !next.known_civ_ids.some((id) => id !== nextHumanCiv?.id);
+    const sceneVariants: Array<{
+      actionCategory: TurnEvent["actionCategory"];
+      text: string;
+      description: (leaderName: string, civName: string) => string;
+    }> = [
+      {
+        actionCategory: "military",
+        text: "Army mustering",
+        description: (leaderName, civName) =>
+          `${leaderName} of ${civName} inspects newly mustered troops in a torchlit courtyard, with soldiers tightening armor straps, smiths handing over fresh weapons, horses stamping nearby, and campaign banners rising behind them. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
+      },
+      {
+        actionCategory: "construction",
+        text: "City works",
+        description: (leaderName, civName) =>
+          `${leaderName} of ${civName} stands before a growing construction site, pointing across scaffolding, cranes, stone blocks, timber frames, and workers raising a new district under urgent civic orders. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
+      },
+      {
+        actionCategory: "exploration",
+        text: "Frontier plans",
+        description: (leaderName, civName) =>
+          `${leaderName} of ${civName} studies a large frontier map with scouts, compass tools, muddy boots, and travel packs scattered nearby, preparing expeditions toward unknown lands. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
+      },
+      {
+        actionCategory: "scientific",
+        text: "Research council",
+        description: (leaderName, civName) =>
+          `${leaderName} of ${civName} listens as scholars demonstrate a new discovery with brass instruments, scrolls, diagrams, and candlelit calculations spread across a busy observatory chamber. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
+      },
+      {
+        actionCategory: "cultural",
+        text: "Civic ceremony",
+        description: (leaderName, civName) =>
+          `${leaderName} of ${civName} presides over a civic ceremony with musicians, artisans, embroidered banners, ceremonial gifts, and citizens gathered around a monument under warm festival light. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
+      },
+      {
+        actionCategory: "crisis",
+        text: "Emergency council",
+        description: (leaderName, civName) =>
+          `${leaderName} of ${civName} reacts to urgent messengers in a tense command chamber, with scattered reports, overturned maps, anxious officers, storm light at the windows, and immediate decisions being made. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
+      },
+    ];
+    const variant = sceneVariants[(next.turn + next.id) % sceneVariants.length];
+    const civIds: number[] = [];
+    const primary =
+      nextHumanCiv ??
+      next.civ_roster.find((civ) => Boolean(assets?.leaders[civ.id]?.leaderId)) ??
+      next.civ_roster[0];
+    if (primary) civIds.push(primary.id);
+    const visibleRival =
+      nextOtherCivs.find((civ) => Boolean(assets?.leaders[civ.id]?.leaderId)) ??
+      next.civ_roster.find(
+        (civ) => !civ.is_human && Boolean(assets?.leaders[civ.id]?.leaderId),
+      );
+    if (
+      !preContact &&
+      variant.actionCategory === "diplomatic" &&
+      visibleRival &&
+      !civIds.includes(visibleRival.id)
+    ) {
+      civIds.push(visibleRival.id);
+    }
+    if (civIds.length === 0 && next.civ_roster[0]) {
+      civIds.push(next.civ_roster[0].id);
+    }
+    const primaryName = primary?.name ?? setup.humanName;
+    const leaderName =
+      primary?.is_human
+        ? setup.leaderName.trim() || primary.leader_name
+        : primary?.leader_name ?? "the ruler";
+    return {
+      id: `summary-${next.id}-${next.turn}`,
+      turn: next.turn,
+      kind: "turn_summary",
+      text: variant.text,
+      civIds,
+      actionCategory: variant.actionCategory,
+      actionDescription: `${variant.description(leaderName, primaryName)} ${turnSceneAccent(next.turn)}`,
+    };
+  };
+
+  const generateTurnSummaryScene = async (
+    event: TurnEvent,
+    next: GameStateDTO,
+  ): Promise<TurnScene | null> => {
+    try {
+      if (!assets) return null;
+      const uniqueCivIds = [...new Set(event.civIds)];
+      const leaderIds = uniqueCivIds
+        .map((civId) => assets.leaders[civId]?.leaderId)
+        .filter((id): id is string => Boolean(id));
+      if (leaderIds.length === 0) return null;
+
+      const primaryCivId =
+        uniqueCivIds.find((civId) => assets.leaders[civId]?.leaderId) ?? uniqueCivIds[0];
+      const primaryCiv =
+        next.civ_roster.find((civ) => civ.id === primaryCivId) ??
+        next.civs.find((civ) => civ.id === primaryCivId);
+      if (!primaryCiv) return null;
+      const primaryParams =
+        primaryCiv.is_human
+          ? buildCustomLeaderParams({
+              leaderName: setup.leaderName || primaryCiv.leader_name,
+              archetype: setup.archetype,
+              culture: setup.culture,
+              description: setup.leaderDescription,
+            })
+          : leaderParamsFor(primaryCiv.leader_name);
+
+      const result =
+        leaderIds.length > 1
+          ? await generateLeaderMultiAction(
+              primaryParams,
+              leaderIds.slice(0, 2),
+              event.actionCategory,
+              event.actionDescription,
+            )
+          : await generateLeaderAction(
+              primaryParams,
+              leaderIds[0],
+              event.actionCategory,
+              event.actionDescription,
+            );
+      await preloadImage(result.url);
+      const scene: TurnScene = {
+        eventId: event.id,
+        turn: event.turn,
+        text: event.text,
+        url: result.url,
+      };
+      setTurnScenes((current) => {
+        if (current.some((scene) => scene.eventId === event.id)) return current;
+        return [scene, ...current].slice(0, 12);
+      });
+      return scene;
+    } catch {
+      // Action-scene generation is decorative; the text chronicle remains authoritative.
+      return null;
+    } finally {
+      setPendingTurnSceneIds((current) => {
+        const nextSet = new Set(current);
+        nextSet.delete(event.id);
+        return nextSet;
+      });
+    }
   };
 
   const run = async (fn: () => Promise<GameStateDTO>) => {
@@ -638,8 +896,9 @@ export default function HomePage() {
     setError(null);
     try {
       const next = await fn();
-      ingestEvents(next);
+      const events = ingestEvents(next);
       setState(next);
+      void queueTurnSummaryScenes(events, next);
       if (selectedUnit) {
         const updated = next.units.find((u) => u.id === selectedUnit.id) ?? null;
         setSelectedUnit(updated);
@@ -656,7 +915,57 @@ export default function HomePage() {
     }
   };
 
-  const endTurn = () => state && run(() => api.resolveTurn(state.id));
+  const endTurn = async () => {
+    if (!state) return;
+    const previousScene = turnScenes[0] ?? null;
+    setResolvingBackdropScene(previousScene);
+    setResolvingScenes(turnScenes.slice(0, 3));
+    setBusy(true);
+    setResolvingTurn(true);
+    setError(null);
+    try {
+      const next = await api.resolveTurn(state.id);
+      const events = ingestEvents(next);
+      const nextHumanCiv = next.civ_roster.find((civ) => civ.is_human) ?? null;
+      const hasMetRival =
+        nextHumanCiv === null ||
+        next.known_civ_ids.some((civId) => civId !== nextHumanCiv.id);
+      const visibleEvents = hasMetRival
+        ? events
+        : events.filter(
+            (event) =>
+              nextHumanCiv !== null &&
+              event.civIds.length === 1 &&
+              event.civIds[0] === nextHumanCiv.id,
+          );
+      const sceneEvents =
+        visibleEvents.length > 0 ? visibleEvents : [buildFallbackTurnSummaryEvent(next)];
+      setState(next);
+      if (selectedUnit) {
+        const updated = next.units.find((u) => u.id === selectedUnit.id) ?? null;
+        setSelectedUnit(updated);
+      }
+      if (hoveredTile) {
+        const updatedTile =
+          next.tiles.find((t) => t.q === hoveredTile.q && t.r === hoveredTile.r) ?? null;
+        setHoveredTile(updatedTile);
+      }
+      const scenes = await queueTurnSummaryScenes(sceneEvents, next);
+      if (scenes.length > 0) {
+        setResolvingBackdropScene(scenes[0]);
+        setResolvingScenes((current) => [...scenes, ...current].slice(0, 3));
+        await wait(2400);
+      } else if (previousScene) {
+        await wait(900);
+      }
+    } catch (e: unknown) {
+      setError(formatError(e));
+    } finally {
+      setResolvingTurn(false);
+      setResolvingScenes([]);
+      setBusy(false);
+    }
+  };
 
   const submitFoundCity = () => {
     if (!state || !pending || !cityName.trim() || !isHumanTurn) return;
@@ -815,8 +1124,19 @@ export default function HomePage() {
     : 0;
 
   if (!hasStarted) {
+    const startSplashUrl =
+      loadingSplashUrls.length > 0
+        ? loadingSplashUrls[loadingSplashIndex % loadingSplashUrls.length]
+        : null;
     return (
       <main className="start-screen">
+        {startSplashUrl && (
+          <div
+            key={startSplashUrl}
+            className="loading-slideshow"
+            style={{ backgroundImage: `url(${startSplashUrl})` }}
+          />
+        )}
         <div className="start-screen__veil" />
         <section className="start-screen__panel">
           <div className="plate-label">Strategic World Builder</div>
@@ -952,11 +1272,6 @@ export default function HomePage() {
         )}
         <div className="start-screen__veil" />
         <section className="start-screen__panel start-screen__panel--loading">
-          {loadingSplashUrls.length > 0 && (
-            <div className="loading-slideshow__caption">
-              Sovereigns from prior campaigns
-            </div>
-          )}
           <div className="spinner" />
           <p className="start-screen__copy">
             Surveying the land, placing the first capitals, and opening the campaign map.
@@ -1118,6 +1433,48 @@ export default function HomePage() {
           </button>
         </div>
       </header>
+
+      {resolvingTurn && (
+        <div className="turn-resolution" aria-live="polite">
+          {(() => {
+            const latestScene = resolvingBackdropScene?.url ?? turnScenes[0]?.url;
+            const previousLeader =
+              loadingSplashUrls.length > 0
+                ? loadingSplashUrls[loadingSplashIndex % loadingSplashUrls.length]
+                : null;
+            const backdrop = latestScene ?? previousLeader;
+            return backdrop ? (
+              <div
+                key={backdrop}
+                className="turn-resolution__backdrop loading-slideshow"
+                style={{ backgroundImage: `url(${backdrop})` }}
+              />
+            ) : null;
+          })()}
+          <div className="turn-resolution__veil" />
+          <section className="turn-resolution__panel">
+            <h2>Resolving Turn</h2>
+            <div className="turn-resolution__scene-stage">
+              {resolvingScenes[0] ? (
+                <article
+                  key={resolvingScenes[0].eventId}
+                  className="turn-resolution__scene turn-resolution__scene--featured"
+                >
+                  <img
+                    src={resolvingScenes[0].url}
+                    alt={`Generated scene: ${resolvingScenes[0].text}`}
+                  />
+                </article>
+              ) : (
+                <div className="turn-resolution__empty">
+                  <div className="spinner" />
+                  <span>Preparing the next chronicle scene...</span>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       <section className="war-room__layout">
         <aside className="war-room__rail war-room__rail--left">
@@ -1460,8 +1817,18 @@ export default function HomePage() {
             ) : (
               eventLog.slice(0, 9).map((event) => (
                 <div key={event.id} className="log-row">
+                  {generatedTurnSceneByEventId.has(event.id) && (
+                    <img
+                      className="log-row__scene"
+                      src={generatedTurnSceneByEventId.get(event.id)?.url}
+                      alt={`Generated scene for ${event.text}`}
+                    />
+                  )}
                   <span className={`log-kind log-kind--${event.kind}`}>{event.kind}</span>
                   <p>{event.text}</p>
+                  {pendingTurnSceneIds.has(event.id) && (
+                    <span className="log-row__scene-pending">scene forming</span>
+                  )}
                   <span className="log-turn">T-{event.turn}</span>
                 </div>
               ))
@@ -1861,6 +2228,15 @@ export default function HomePage() {
           className="intro-screen sovereign-overlay"
           onClick={() => setShowSovereign(false)}
         >
+          {loadingSplashUrls.length > 0 && (
+            <div
+              key={loadingSplashUrls[sovereignSplashIndex % loadingSplashUrls.length]}
+              className="loading-slideshow sovereign-overlay__slideshow"
+              style={{
+                backgroundImage: `url(${loadingSplashUrls[sovereignSplashIndex % loadingSplashUrls.length]})`,
+              }}
+            />
+          )}
           <div
             className="intro-screen__bg"
             style={
@@ -2077,6 +2453,18 @@ function formatNetDelta(net: number): string {
   if (net > 0) return `+${net} / t`;
   if (net < 0) return `${net} / t`;
   return "0 / t";
+}
+
+function turnSceneAccent(turn: number): string {
+  const accents = [
+    "Use dawn light, low mist, and fresh construction dust so the scene feels like a new moment.",
+    "Use torchlight, smoke, and moving workers so the scene feels urgent rather than ceremonial.",
+    "Use rain, muddy ground, and wind-torn banners so the scene feels distinct from a council chamber.",
+    "Use warm workshop firelight, tools, stone chips, timber, and crowded activity in the foreground.",
+    "Use hilltop frontier light, distant campfires, scouts, and maps spread over rough wooden crates.",
+    "Use a crowded city square with carts, citizens, standards, and visible civic motion around the leader.",
+  ];
+  return accents[turn % accents.length];
 }
 
 // Mirrors UNIT_STATS.max_health from the backend. Keep in sync with
