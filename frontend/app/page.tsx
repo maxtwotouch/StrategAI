@@ -10,13 +10,16 @@ import {
   listLeaders,
 } from "@/lib/assetApi";
 import { CityDTO, GameStateDTO, TileDTO, UnitDTO, api } from "@/lib/api";
+import { CIV_COLORS, hexDistance, tileKey } from "@/lib/hex";
 import {
-  CIV_COLORS,
-  FEATURE_LABEL,
-  RESOURCE_LABEL,
-  hexDistance,
-  tileKey,
-} from "@/lib/hex";
+  LOCALES,
+  LOCALE_LABELS,
+  Locale,
+  TFunction,
+  TranslateParams,
+  TranslationKey,
+  useI18n,
+} from "@/lib/i18n";
 import { TurnEvent, diffTurnEvents } from "@/lib/turnEvents";
 import { AssetManifest, CivInput, resolveManifest } from "@/lib/assetManifest";
 import { ARCHETYPE_OPTIONS, CULTURE_OPTIONS, STRUCTURE_CATEGORIES } from "@/lib/assetMapping";
@@ -31,7 +34,9 @@ type PendingAction = { kind: "found"; unit: UnitDTO } | null;
 type TurnScene = {
   eventId: string;
   turn: number;
-  text: string;
+  /** Translation key + params for the scene caption. */
+  textKey: TranslationKey;
+  textParams?: TranslateParams;
   url: string;
 };
 
@@ -105,7 +110,6 @@ function SceneGlyph({ enabled }: { enabled: boolean }) {
 
 type TechDef = {
   id: string;
-  name: string;
   cost: number;
   prerequisites: string[];
 };
@@ -127,27 +131,28 @@ function shuffled<T>(items: T[]): T[] {
   return next;
 }
 
+// Names are resolved from `locales/*.json` via `tech.<id>` (see tEnum).
 const TECHS: TechDef[] = [
-  { id: "agriculture", name: "Agriculture", cost: 20, prerequisites: [] },
-  { id: "pottery", name: "Pottery", cost: 20, prerequisites: [] },
-  { id: "mining", name: "Mining", cost: 25, prerequisites: [] },
-  { id: "fishing", name: "Fishing", cost: 20, prerequisites: [] },
-  { id: "archery", name: "Archery", cost: 25, prerequisites: [] },
-  { id: "animal_husbandry", name: "Animal Husbandry", cost: 35, prerequisites: ["agriculture"] },
-  { id: "trapping", name: "Trapping", cost: 35, prerequisites: ["pottery"] },
-  { id: "bronze_working", name: "Bronze Working", cost: 55, prerequisites: ["mining"] },
-  { id: "sailing", name: "Sailing", cost: 45, prerequisites: ["fishing"] },
-  { id: "wheel", name: "The Wheel", cost: 55, prerequisites: ["animal_husbandry"] },
-  { id: "masonry", name: "Masonry", cost: 55, prerequisites: ["mining"] },
-  { id: "writing", name: "Writing", cost: 75, prerequisites: ["pottery"] },
-  { id: "horseback_riding", name: "Horseback Riding", cost: 70, prerequisites: ["animal_husbandry"] },
-  { id: "currency", name: "Currency", cost: 80, prerequisites: ["bronze_working"] },
-  { id: "calendar", name: "Calendar", cost: 70, prerequisites: ["pottery", "agriculture"] },
-  { id: "iron_working", name: "Iron Working", cost: 120, prerequisites: ["bronze_working"] },
-  { id: "mathematics", name: "Mathematics", cost: 110, prerequisites: ["currency"] },
-  { id: "construction", name: "Construction", cost: 100, prerequisites: ["masonry"] },
-  { id: "philosophy", name: "Philosophy", cost: 120, prerequisites: ["writing"] },
-  { id: "astronomy", name: "Astronomy", cost: 130, prerequisites: ["mathematics", "sailing"] },
+  { id: "agriculture", cost: 20, prerequisites: [] },
+  { id: "pottery", cost: 20, prerequisites: [] },
+  { id: "mining", cost: 25, prerequisites: [] },
+  { id: "fishing", cost: 20, prerequisites: [] },
+  { id: "archery", cost: 25, prerequisites: [] },
+  { id: "animal_husbandry", cost: 35, prerequisites: ["agriculture"] },
+  { id: "trapping", cost: 35, prerequisites: ["pottery"] },
+  { id: "bronze_working", cost: 55, prerequisites: ["mining"] },
+  { id: "sailing", cost: 45, prerequisites: ["fishing"] },
+  { id: "wheel", cost: 55, prerequisites: ["animal_husbandry"] },
+  { id: "masonry", cost: 55, prerequisites: ["mining"] },
+  { id: "writing", cost: 75, prerequisites: ["pottery"] },
+  { id: "horseback_riding", cost: 70, prerequisites: ["animal_husbandry"] },
+  { id: "currency", cost: 80, prerequisites: ["bronze_working"] },
+  { id: "calendar", cost: 70, prerequisites: ["pottery", "agriculture"] },
+  { id: "iron_working", cost: 120, prerequisites: ["bronze_working"] },
+  { id: "mathematics", cost: 110, prerequisites: ["currency"] },
+  { id: "construction", cost: 100, prerequisites: ["masonry"] },
+  { id: "philosophy", cost: 120, prerequisites: ["writing"] },
+  { id: "astronomy", cost: 130, prerequisites: ["mathematics", "sailing"] },
 ];
 
 const TECH_EMOJIS: Record<string, string> = {
@@ -175,41 +180,48 @@ const TECH_EMOJIS: Record<string, string> = {
 
 type BuildableUnit = {
   id: string;
-  label: string;
   cost: number;
   requires: string | null;
 };
 
+// Labels are resolved from `locales/*.json` via `unit.<id>` (see tEnum).
 const BUILDABLE_UNITS: BuildableUnit[] = [
-  { id: "warrior", label: "Warrior", cost: 10, requires: null },
-  { id: "scout", label: "Scout", cost: 8, requires: null },
-  { id: "settler", label: "Settler", cost: 15, requires: null },
-  { id: "worker", label: "Worker", cost: 10, requires: null },
-  { id: "archer", label: "Archer", cost: 15, requires: "archery" },
-  { id: "horseman", label: "Horseman", cost: 22, requires: "horseback_riding" },
-  { id: "swordsman", label: "Swordsman", cost: 30, requires: "iron_working" },
+  { id: "warrior", cost: 10, requires: null },
+  { id: "scout", cost: 8, requires: null },
+  { id: "settler", cost: 15, requires: null },
+  { id: "worker", cost: 10, requires: null },
+  { id: "archer", cost: 15, requires: "archery" },
+  { id: "horseman", cost: 22, requires: "horseback_riding" },
+  { id: "swordsman", cost: 30, requires: "iron_working" },
 ];
 
 const STRUCTURE_GOLD_COST = 15;
 const STRUCTURE_PRODUCTION_BONUS = 2;
 
-const IMPROVEMENT_OPTIONS = [
-  { id: "farm", label: "Farm", desc: "+1 food on plains / grassland" },
-  { id: "mine", label: "Mine", desc: "+1 production on hills" },
-  { id: "road", label: "Road", desc: "Connect tiles" },
+const IMPROVEMENT_OPTIONS: ReadonlyArray<{
+  id: string;
+  labelKey: TranslationKey;
+  hintKey: TranslationKey;
+}> = [
+  { id: "farm", labelKey: "improvement.farm", hintKey: "improvement.farm.hint" },
+  { id: "mine", labelKey: "improvement.mine", hintKey: "improvement.mine.hint" },
+  { id: "road", labelKey: "improvement.road", hintKey: "improvement.road.hint" },
 ];
 
-const MESSAGE_KINDS = [
-  { id: "chat", label: "Chat" },
-  { id: "threat", label: "Threat" },
-  { id: "offer_peace", label: "Offer Peace" },
-  { id: "accept_peace", label: "Accept Peace" },
-  { id: "declare_war", label: "Declare War" },
-  { id: "propose_alliance", label: "Propose Alliance" },
-  { id: "accept_alliance", label: "Accept Alliance" },
-  { id: "reject", label: "Reject" },
+const MESSAGE_KINDS: ReadonlyArray<{ id: string; labelKey: TranslationKey }> = [
+  { id: "chat", labelKey: "messageKind.chat" },
+  { id: "threat", labelKey: "messageKind.threat" },
+  { id: "offer_peace", labelKey: "messageKind.offer_peace" },
+  { id: "accept_peace", labelKey: "messageKind.accept_peace" },
+  { id: "declare_war", labelKey: "messageKind.declare_war" },
+  { id: "propose_alliance", labelKey: "messageKind.propose_alliance" },
+  { id: "accept_alliance", labelKey: "messageKind.accept_alliance" },
+  { id: "reject", labelKey: "messageKind.reject" },
 ];
 
+// Spoken intro. Deliberately English-only: the backend renders it with a fixed
+// English narrator voice (see backend/app/api/routers/audio.py), so localizing
+// the script would change how the narrator sounds rather than only what it says.
 function buildIntroNarration(civName: string, leaderName: string): string {
   return [
     `In the long silence before empire, the people of ${civName} gathered beneath strange stars and dreamed of dominion.`,
@@ -221,10 +233,11 @@ function buildIntroNarration(civName: string, leaderName: string): string {
 }
 
 export default function HomePage() {
+  const { locale, setLocale, t, tEnum, tPlural } = useI18n();
   const [state, setState] = useState<GameStateDTO | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<UnitDTO | null>(null);
   const [hoveredTile, setHoveredTile] = useState<TileDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction>(null);
   const [cityName, setCityName] = useState("");
@@ -388,7 +401,7 @@ export default function HomePage() {
         void generateBaseDawnScene(manifest, next, humanCustomParams);
       }
     } catch (e: unknown) {
-      setError(formatError(e));
+      setError(toAppError(e));
       setHasStarted(false);
       setLoadingSplashUrls([]);
     } finally {
@@ -407,8 +420,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!error) return;
-    const t = setTimeout(() => setError(null), 5000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
   }, [error]);
 
   // Restore the cinematic-recap preference once on mount.
@@ -488,7 +501,12 @@ export default function HomePage() {
   useEffect(() => {
     if (!state || introDismissed) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+      const isActivationKey = e.key === "Enter" || e.key === " ";
+      // Enter/Space belong to the focused control — the language switch, the
+      // replay button, or the CTA all handle their own activation, so the
+      // shortcut must not steal them. Esc always closes the intro.
+      if (isActivationKey && isInteractiveTarget(e.target)) return;
+      if (e.key === "Escape" || isActivationKey) {
         e.preventDefault();
         dismissIntro();
       }
@@ -829,42 +847,42 @@ export default function HomePage() {
       !next.known_civ_ids.some((id) => id !== nextHumanCiv?.id);
     const sceneVariants: Array<{
       actionCategory: TurnEvent["actionCategory"];
-      text: string;
+      textKey: TranslationKey;
       description: (leaderName: string, civName: string) => string;
     }> = [
       {
         actionCategory: "military",
-        text: "Army mustering",
+        textKey: "event.summary.military",
         description: (leaderName, civName) =>
           `${leaderName} of ${civName} inspects newly mustered troops in a torchlit courtyard, with soldiers tightening armor straps, smiths handing over fresh weapons, horses stamping nearby, and campaign banners rising behind them. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
       },
       {
         actionCategory: "construction",
-        text: "City works",
+        textKey: "event.summary.construction",
         description: (leaderName, civName) =>
           `${leaderName} of ${civName} stands before a growing construction site, pointing across scaffolding, cranes, stone blocks, timber frames, and workers raising a new district under urgent civic orders. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
       },
       {
         actionCategory: "exploration",
-        text: "Frontier plans",
+        textKey: "event.summary.exploration",
         description: (leaderName, civName) =>
           `${leaderName} of ${civName} studies a large frontier map with scouts, compass tools, muddy boots, and travel packs scattered nearby, preparing expeditions toward unknown lands. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
       },
       {
         actionCategory: "scientific",
-        text: "Research council",
+        textKey: "event.summary.scientific",
         description: (leaderName, civName) =>
           `${leaderName} of ${civName} listens as scholars demonstrate a new discovery with brass instruments, scrolls, diagrams, and candlelit calculations spread across a busy observatory chamber. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
       },
       {
         actionCategory: "cultural",
-        text: "Civic ceremony",
+        textKey: "event.summary.cultural",
         description: (leaderName, civName) =>
           `${leaderName} of ${civName} presides over a civic ceremony with musicians, artisans, embroidered banners, ceremonial gifts, and citizens gathered around a monument under warm festival light. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
       },
       {
         actionCategory: "crisis",
-        text: "Emergency council",
+        textKey: "event.summary.crisis",
         description: (leaderName, civName) =>
           `${leaderName} of ${civName} reacts to urgent messengers in a tense command chamber, with scattered reports, overturned maps, anxious officers, storm light at the windows, and immediate decisions being made. No rival ruler is present; this scene focuses only on the player's leader and their own civilization.`,
       },
@@ -901,7 +919,7 @@ export default function HomePage() {
       id: `summary-${next.id}-${next.turn}`,
       turn: next.turn,
       kind: "turn_summary",
-      text: variant.text,
+      textKey: variant.textKey,
       civIds,
       actionCategory: variant.actionCategory,
       actionDescription: `${variant.description(leaderName, primaryName)} ${turnSceneAccent(next.turn)}`,
@@ -962,7 +980,8 @@ export default function HomePage() {
       const scene: TurnScene = {
         eventId: event.id,
         turn: event.turn,
-        text: event.text,
+        textKey: event.textKey,
+        textParams: event.textParams,
         url: result.url,
       };
       setTurnScenes((current) => {
@@ -1012,7 +1031,7 @@ export default function HomePage() {
       const dawn: TurnScene = {
         eventId: "base-dawn",
         turn: next.turn,
-        text: "A new dawn rises over your people",
+        textKey: "resolution.dawnScene",
         url: result.url,
       };
       setBaseScene(dawn);
@@ -1101,7 +1120,7 @@ export default function HomePage() {
         setHoveredTile(updatedTile);
       }
     } catch (e: unknown) {
-      setError(formatError(e));
+      setError(toAppError(e));
     } finally {
       setBusy(false);
     }
@@ -1139,7 +1158,7 @@ export default function HomePage() {
       // the following End Turn is instant too.
       void prepareNextScene(events, next);
     } catch (e: unknown) {
-      setError(formatError(e));
+      setError(toAppError(e));
     } finally {
       // Backend work is done — enable Continue; the user dismisses when ready.
       setTurnResolved(true);
@@ -1159,7 +1178,7 @@ export default function HomePage() {
   const openFoundCity = () => {
     if (!selectedUnit || selectedUnit.type !== "settler") return;
     setPending({ kind: "found", unit: selectedUnit });
-    setCityName(`City ${(state?.cities.length ?? 0) + 1}`);
+    setCityName(t("city.defaultName", { number: (state?.cities.length ?? 0) + 1 }));
   };
 
   const chooseResearch = async (techId: string) => {
@@ -1201,7 +1220,7 @@ export default function HomePage() {
         setPlacedStructureAssets((current) => ({ ...current, [key]: preloadedUrl }));
       }
     } catch (e: unknown) {
-      setError(formatError(e));
+      setError(toAppError(e));
     } finally {
       setBusy(false);
     }
@@ -1218,9 +1237,7 @@ export default function HomePage() {
       activeStance?.truce_active &&
       (messageKind === "declare_war" || messageKind === "threat")
     ) {
-      setError(
-        `Truce in force until turn ${activeStance.truce_until}. Hostile messages are blocked.`,
-      );
+      setError({ key: "error.truceHostile", params: { turn: activeStance.truce_until ?? "?" } });
       return;
     }
     const text = messageText.trim();
@@ -1240,7 +1257,7 @@ export default function HomePage() {
         const occupant = state.units.find((u) => u.q === q && u.r === r);
         if (occupant && occupant.owner !== selectedUnit.owner) {
           if (!canAttackOwner(state, selectedUnit.owner, occupant.owner)) {
-            setError("You must declare war before attacking this civilization.");
+            setError({ key: "error.declareWar" });
             return;
           }
           run(() => api.attack(state.id, selectedUnit.id, occupant.id));
@@ -1270,7 +1287,7 @@ export default function HomePage() {
       const here = { q: selectedUnit.q, r: selectedUnit.r };
       if (hexDistance(here, { q: u.q, r: u.r }) === 1) {
         if (!canAttackOwner(state, selectedUnit.owner, u.owner)) {
-          setError("You must declare war before attacking this civilization.");
+          setError({ key: "error.declareWar" });
           return;
         }
         run(() => api.attack(state.id, selectedUnit.id, u.id));
@@ -1289,19 +1306,24 @@ export default function HomePage() {
     humanCities.length > 0 && selectedProductionCity?.production_queue.length === 0;
   const needsSelection = humanUnits.length > 0 && !selectedUnit && isHumanTurn;
   const nextObjective = !humanCities.length
-    ? "Settle your first city on secure terrain."
+    ? t("objective.foundCity")
     : needsResearch
-      ? "Select the next technology before the next turn."
+      ? t("objective.research")
       : needsProduction
-        ? `Queue production in ${selectedProductionCity?.name ?? "your city"}.`
+        ? t("objective.production", {
+            city: selectedProductionCity?.name ?? t("objective.productionFallback"),
+          })
         : totalInbox > 0
-          ? "Review diplomatic replies from rival leaders."
+          ? t("objective.inbox")
           : needsSelection
-            ? "Select a unit and issue a field order."
-            : "Expand your borders and pressure rival factions.";
+            ? t("objective.selection")
+            : t("objective.expand");
   const researchProgress = currentResearch
     ? Math.min(humanCiv?.science ?? 0, currentResearch.cost)
     : 0;
+  const resolvingSceneCaption = resolvingScene
+    ? t(resolvingScene.textKey, resolvingScene.textParams)
+    : null;
 
   if (!hasStarted) {
     const startSplashUrl =
@@ -1319,16 +1341,13 @@ export default function HomePage() {
         )}
         <div className="start-screen__veil" />
         <section className="start-screen__panel">
-          <div className="plate-label">Strategic World Builder</div>
-          <h1>Forge a Civilization.</h1>
-          <p className="start-screen__copy">
-            Command a modern 4X campaign with a map-first interface built for fast tactical
-            reading, deliberate expansion, and tense turn-to-turn decisions.
-          </p>
+          <div className="plate-label">{t("start.plate")}</div>
+          <h1>{t("start.title")}</h1>
+          <p className="start-screen__copy">{t("start.copy")}</p>
 
           <div className="start-screen__grid">
             <label className="field">
-              <span className="field-label">Civilization Name</span>
+              <span className="field-label">{t("start.civilizationName")}</span>
               <input
                 type="text"
                 maxLength={40}
@@ -1339,11 +1358,11 @@ export default function HomePage() {
                     humanName: e.target.value,
                   }))
                 }
-                placeholder="Athens"
+                placeholder={t("start.civilizationPlaceholder")}
               />
             </label>
             <label className="field">
-              <span className="field-label">Leader Name</span>
+              <span className="field-label">{t("start.leaderName")}</span>
               <input
                 type="text"
                 maxLength={100}
@@ -1351,11 +1370,11 @@ export default function HomePage() {
                 onChange={(e) =>
                   setSetup((prev) => ({ ...prev, leaderName: e.target.value }))
                 }
-                placeholder="e.g. Aurelius the Wise"
+                placeholder={t("start.leaderPlaceholder")}
               />
             </label>
             <label className="field">
-              <span className="field-label">Archetype</span>
+              <span className="field-label">{t("start.archetype")}</span>
               <select
                 value={setup.archetype}
                 onChange={(e) =>
@@ -1364,13 +1383,13 @@ export default function HomePage() {
               >
                 {ARCHETYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {tEnum("archetype", opt.value)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="field">
-              <span className="field-label">Culture</span>
+              <span className="field-label">{t("start.culture")}</span>
               <select
                 value={setup.culture}
                 onChange={(e) =>
@@ -1379,13 +1398,13 @@ export default function HomePage() {
               >
                 {CULTURE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {tEnum("culture", opt.value)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="field">
-              <span className="field-label">Map Radius</span>
+              <span className="field-label">{t("start.mapRadius")}</span>
               <input
                 type="number"
                 min={2}
@@ -1403,9 +1422,11 @@ export default function HomePage() {
 
           <label className="field field--full">
             <span className="field-label">
-              Leader Appearance{" "}
+              {t("start.leaderAppearance")}{" "}
               <small style={{ color: "var(--ink-muted)" }}>
-                ({setup.leaderDescription.length} / 800 · 50 min for custom)
+                {t("start.leaderAppearanceCount", {
+                  count: setup.leaderDescription.length,
+                })}
               </small>
             </span>
             <textarea
@@ -1415,23 +1436,24 @@ export default function HomePage() {
               onChange={(e) =>
                 setSetup((prev) => ({ ...prev, leaderDescription: e.target.value }))
               }
-              placeholder="Age, build, skin tone, hair, distinctive features, clothing, weapon. Leave blank for a neutral default."
+              placeholder={t("start.leaderAppearancePlaceholder")}
             />
           </label>
 
           <div className="start-screen__meta">
-            <span>Settle your first capital</span>
-            <span>Scout the unknown frontier</span>
-            <span>Negotiate with rival leaders</span>
+            <span>{t("start.metaCapital")}</span>
+            <span>{t("start.metaFrontier")}</span>
+            <span>{t("start.metaDiplomacy")}</span>
           </div>
 
           <div className="start-screen__actions">
             <button className="button-primary" onClick={beginGame} disabled={busy}>
-              {busy ? "Generating World..." : "Begin Campaign"}
+              {busy ? t("start.generating") : t("start.begin")}
             </button>
+            <LocaleSwitch locale={locale} onChange={setLocale} label={t("start.language")} />
           </div>
         </section>
-        {error && <div className="toast">{error}</div>}
+        {error && <div className="toast">{t(error.key, error.params)}</div>}
       </main>
     );
   }
@@ -1453,16 +1475,17 @@ export default function HomePage() {
         <div className="start-screen__veil" />
         <section className="start-screen__panel start-screen__panel--loading">
           <div className="spinner" />
-          <p className="start-screen__copy">
-            Surveying the land, placing the first capitals, and opening the campaign map.
-          </p>
+          <p className="start-screen__copy">{t("loading.copy")}</p>
           {assetProgress && assetProgress.total > 0 && (
             <p className="start-screen__copy">
-              Conjuring world art… {assetProgress.done}/{assetProgress.total}
+              {t("loading.art", {
+                done: assetProgress.done,
+                total: assetProgress.total,
+              })}
             </p>
           )}
         </section>
-        {error && <div className="toast">{error}</div>}
+        {error && <div className="toast">{t(error.key, error.params)}</div>}
       </main>
     );
   }
@@ -1473,7 +1496,7 @@ export default function HomePage() {
     const leaderName =
       setup.leaderName.trim() || humanCiv?.leader_name || civName;
     return (
-      <main className="intro-screen" aria-label={`${civName} campaign introduction`}>
+      <main className="intro-screen" aria-label={t("intro.aria", { civ: civName })}>
         <div
           className="intro-screen__bg"
           style={
@@ -1482,14 +1505,15 @@ export default function HomePage() {
           onClick={dismissIntro}
         />
         <section className="intro-screen__panel">
-          <div className="plate-label intro-screen__chapter">Chapter I</div>
+          <div className="plate-label intro-screen__chapter">{t("intro.chapter")}</div>
           <h1 className="intro-screen__civ">{civName}</h1>
-          <div className="intro-screen__leader">Under the reign of {leaderName}</div>
+          <div className="intro-screen__leader">
+            {t("intro.reign", { leader: leaderName })}
+          </div>
           <p className="intro-screen__epitaph">
-            The age stands quiet, waiting for an empire bold enough to carve its
-            name across the world.
+            {t("intro.epitaph1")}
             <br />
-            History will remember what is forged here.
+            {t("intro.epitaph2")}
           </p>
           <div className="intro-screen__actions">
             <button
@@ -1500,7 +1524,7 @@ export default function HomePage() {
                 dismissIntro();
               }}
             >
-              Begin the Age
+              {t("intro.begin")}
             </button>
             <button
               type="button"
@@ -1510,21 +1534,23 @@ export default function HomePage() {
                 void playIntroNarration(civName, leaderName);
               }}
             >
-              Replay Proclamation
+              {t("intro.replay")}
             </button>
           </div>
           <div className="intro-screen__narration">
-            {muted && "AI narration muted"}
-            {!muted && introNarrationStatus === "idle" && "AI narration ready"}
-            {!muted && introNarrationStatus === "generating" && "Generating AI voice..."}
+            {muted && t("intro.narrationMuted")}
+            {!muted && introNarrationStatus === "idle" && t("intro.narrationReady")}
+            {!muted && introNarrationStatus === "generating" &&
+              t("intro.narrationGenerating")}
             {!muted && introNarrationStatus === "playing" &&
-              "AI-generated voice playing over campaign music"}
+              t("intro.narrationPlaying")}
             {!muted && introNarrationStatus === "unavailable" &&
-              "AI voice unavailable; check backend OPENAI_API_KEY"}
+              t("intro.narrationUnavailable")}
           </div>
-          <div className="intro-screen__hint">click backdrop · esc · enter · space</div>
+          <div className="intro-screen__hint">{t("intro.hint")}</div>
+          <LocaleSwitch locale={locale} onChange={setLocale} label={t("start.language")} />
         </section>
-        {error && <div className="toast">{error}</div>}
+        {error && <div className="toast">{t(error.key, error.params)}</div>}
       </main>
     );
   }
@@ -1536,7 +1562,7 @@ export default function HomePage() {
           type="button"
           className="empire-badge empire-badge--button"
           onClick={() => setShowSovereign(true)}
-          title="View sovereign portrait"
+          title={t("topbar.sovereignPortrait")}
         >
           <div className="empire-badge__seal" style={{ background: humanColor }}>
             {(() => {
@@ -1560,9 +1586,11 @@ export default function HomePage() {
             })()}
           </div>
           <div className="empire-badge__copy">
-            <div className="empire-badge__name">{humanCiv?.name ?? "Civilization"}</div>
+            <div className="empire-badge__name">
+              {humanCiv?.name ?? t("topbar.civilizationFallback")}
+            </div>
             <div className="empire-badge__sub">
-              {setup.leaderName.trim() || humanCiv?.leader_name || "Unknown Leader"}
+              {setup.leaderName.trim() || humanCiv?.leader_name || t("topbar.leaderFallback")}
             </div>
             <div className="empire-badge__sub empire-badge__objective">
               {nextObjective}
@@ -1571,37 +1599,40 @@ export default function HomePage() {
         </button>
 
         <div className="war-room__metrics">
-          <TopMetric label="Science" value={humanCiv?.science ?? 0} />
+          <TopMetric label={t("metric.science")} value={humanCiv?.science ?? 0} />
           <TopMetric
-            label="Gold"
+            label={t("metric.gold")}
             value={humanCiv?.gold ?? 0}
             delta={formatNetDelta(
               (humanCiv?.gold_income ?? 0) - (humanCiv?.gold_upkeep ?? 0),
+              t,
             )}
           />
-          <TopMetric label="Culture" value={humanCiv?.culture ?? 0} />
+          <TopMetric label={t("metric.culture")} value={humanCiv?.culture ?? 0} />
           <TopMetric
-            label="Score"
+            label={t("metric.score")}
             value={humanCiv?.score ?? 0}
             delta={`/ ${state.score_threshold}`}
           />
-          <TopMetric label="Cities" value={humanCities.length} />
+          <TopMetric label={t("metric.cities")} value={humanCities.length} />
         </div>
 
         <div className="war-room__turnbox">
+          <LocaleSwitch
+            locale={locale}
+            onChange={setLocale}
+            label={t("start.language")}
+            compact
+          />
           <button
             type="button"
             className={`audio-toggle cinematic-toggle${cinematicEnabled ? "" : " is-off"}`}
             onClick={toggleCinematic}
             title={
-              cinematicEnabled
-                ? "Turn recap images: on (click to disable)"
-                : "Turn recap images: off (click to enable)"
+              cinematicEnabled ? t("topbar.cinematicOn") : t("topbar.cinematicOff")
             }
             aria-label={
-              cinematicEnabled
-                ? "Disable turn recap images"
-                : "Enable turn recap images"
+              cinematicEnabled ? t("topbar.cinematicDisable") : t("topbar.cinematicEnable")
             }
             aria-pressed={cinematicEnabled}
           >
@@ -1611,23 +1642,27 @@ export default function HomePage() {
             type="button"
             className="audio-toggle"
             onClick={toggleMute}
-            title={muted ? "Unmute music" : "Mute music"}
-            aria-label={muted ? "Unmute music" : "Mute music"}
+            title={muted ? t("topbar.unmute") : t("topbar.mute")}
+            aria-label={muted ? t("topbar.unmute") : t("topbar.mute")}
             aria-pressed={muted}
           >
             <AudioGlyph muted={muted} />
           </button>
           <div className="turn-box__meta">
-            <span className="plate-label">Turn</span>
+            <span className="plate-label">{t("topbar.turn")}</span>
             <strong>{state.turn}</strong>
             <span className={`turn-state${isHumanTurn ? " is-live" : ""}`}>
               {isHumanTurn
-                ? "Your Move"
-                : `${state.civs.find((c) => c.id === state.current_civ_id)?.name ?? "AI"} Acting`}
+                ? t("topbar.yourMove")
+                : t("topbar.acting", {
+                    civ:
+                      state.civs.find((c) => c.id === state.current_civ_id)?.name ??
+                      t("topbar.actingFallback"),
+                  })}
             </span>
           </div>
           <button className="button-primary end-turn" onClick={endTurn} disabled={busy || !isHumanTurn}>
-            {busy ? "Resolving..." : "End Turn"}
+            {busy ? t("topbar.resolving") : t("topbar.endTurn")}
           </button>
         </div>
       </header>
@@ -1651,7 +1686,11 @@ export default function HomePage() {
           })()}
           <div className="turn-resolution__veil" />
           <section className="turn-resolution__panel">
-            <h2>{turnResolved ? `Turn ${state.turn} Begins` : "Resolving Turn"}</h2>
+            <h2>
+              {turnResolved
+                ? t("resolution.turnBegins", { turn: state.turn })
+                : t("resolution.resolvingTitle")}
+            </h2>
             <div className="turn-resolution__scene-stage">
               {resolvingScene ? (
                 <article
@@ -1660,18 +1699,18 @@ export default function HomePage() {
                 >
                   <img
                     src={resolvingScene.url}
-                    alt={`Generated scene: ${resolvingScene.text}`}
+                    alt={t("resolution.sceneAlt", { text: resolvingSceneCaption ?? "" })}
                   />
-                  <p className="turn-resolution__caption">{resolvingScene.text}</p>
+                  <p className="turn-resolution__caption">{resolvingSceneCaption}</p>
                 </article>
               ) : !turnResolved ? (
                 <div className="turn-resolution__empty">
                   <div className="spinner" />
-                  <span>Resolving the turn...</span>
+                  <span>{t("resolution.resolving")}</span>
                 </div>
               ) : (
                 <div className="turn-resolution__empty">
-                  <span>The turn is resolved. Your people press on.</span>
+                  <span>{t("resolution.done")}</span>
                 </div>
               )}
             </div>
@@ -1681,7 +1720,7 @@ export default function HomePage() {
                 onClick={dismissResolution}
                 disabled={!turnResolved}
               >
-                {turnResolved ? "Continue" : "Resolving..."}
+                {turnResolved ? t("resolution.continue") : t("resolution.resolvingAction")}
               </button>
             </div>
           </section>
@@ -1690,13 +1729,24 @@ export default function HomePage() {
 
       <section className="war-room__layout">
         <aside className="war-room__rail war-room__rail--left">
-          <Panel label="Minimap" title={`Turn ${state.turn}`}>
+          <Panel label={t("panel.minimap")} title={t("panel.turnTitle", { turn: state.turn })}>
             <MiniMap tiles={state.tiles} visibleTiles={activeVisibleTiles} focusHex={mapFocusHex} />
           </Panel>
 
           <Panel
-            label={selectedUnit ? `Selected · ${capitalize(selectedUnit.type)}` : "Selection"}
-            title={selectedUnit ? `${capitalize(selectedUnit.type)} #${selectedUnit.id}` : "No Unit Selected"}
+            label={
+              selectedUnit
+                ? t("panel.selected", { unit: tEnum("unit", selectedUnit.type) })
+                : t("panel.selection")
+            }
+            title={
+              selectedUnit
+                ? t("panel.unitTitle", {
+                    unit: tEnum("unit", selectedUnit.type),
+                    id: selectedUnit.id,
+                  })
+                : t("panel.noUnit")
+            }
           >
             {selectedUnit ? (
               <div className="selection-stack">
@@ -1709,43 +1759,52 @@ export default function HomePage() {
                   </div>
                   <div>
                     <div className="selection-hero__tile">
-                      Tile {selectedUnit.q}, {selectedUnit.r}
+                      {t("selection.tile", { q: selectedUnit.q, r: selectedUnit.r })}
                     </div>
                     <div className="selection-hero__sub">
-                      {selectedCity ? `Garrisoned in ${selectedCity.name}` : "Field formation"}
+                      {selectedCity
+                        ? t("selection.garrisoned", { city: selectedCity.name })
+                        : t("selection.field")}
                     </div>
                   </div>
                 </div>
 
                 <div className="stat-grid">
                   <MetricStat
-                    label="Health"
+                    label={t("stat.health")}
                     value={`${selectedUnit.health}/${maxHealthFor(selectedUnit.type)}`}
                   />
-                  <MetricStat label="Moves" value={selectedUnit.moves_remaining} />
-                  <MetricStat label="Owner" value={state.civs[selectedUnit.owner]?.name ?? "Unknown"} />
+                  <MetricStat label={t("stat.moves")} value={selectedUnit.moves_remaining} />
+                  <MetricStat
+                    label={t("stat.owner")}
+                    value={state.civs[selectedUnit.owner]?.name ?? t("common.unknown")}
+                  />
                 </div>
 
                 <div className="selection-actions">
-                  <button onClick={() => setSelectedUnit(null)}>Clear</button>
+                  <button onClick={() => setSelectedUnit(null)}>{t("common.clear")}</button>
                   {selectedUnit.type === "settler" && (
                     <button
                       className="button-primary"
                       onClick={openFoundCity}
                       disabled={busy || !isHumanTurn}
                     >
-                      Found City
+                      {t("city.found")}
                     </button>
                   )}
                 </div>
 
                 {selectedUnit.type === "worker" && (
                   <>
-                    <div className="plate-label">Build Improvement</div>
+                    <div className="plate-label">{t("selection.buildImprovement")}</div>
                     {selectedUnit.work_order ? (
                       <EmptyCopy>
-                        Building {selectedUnit.work_order.improvement} —{" "}
-                        {selectedUnit.work_order.turns_remaining} turn(s) left.
+                        {tPlural("selection.workOrder", selectedUnit.work_order.turns_remaining, {
+                          improvement: {
+                            ns: "improvement",
+                            value: selectedUnit.work_order.improvement,
+                          },
+                        })}
                       </EmptyCopy>
                     ) : (
                       <div className="list-stack">
@@ -1755,10 +1814,10 @@ export default function HomePage() {
                             className="list-row"
                             onClick={() => startImprovement(selectedUnit.id, opt.id)}
                             disabled={busy || !isHumanTurn}
-                            title={opt.desc}
+                            title={t(opt.hintKey)}
                           >
-                            <span>{opt.label}</span>
-                            <span>{opt.desc}</span>
+                            <span>{t(opt.labelKey)}</span>
+                            <span>{t(opt.hintKey)}</span>
                           </button>
                         ))}
                       </div>
@@ -1767,9 +1826,7 @@ export default function HomePage() {
                 )}
               </div>
             ) : (
-              <EmptyCopy>
-                Select a unit on the map to reveal field orders, movement options, and city actions.
-              </EmptyCopy>
+              <EmptyCopy>{t("selection.empty")}</EmptyCopy>
             )}
           </Panel>
         </aside>
@@ -1786,6 +1843,7 @@ export default function HomePage() {
               visibleTiles={activeVisibleTiles}
               assets={assets}
               placedStructureAssets={placedStructureAssets}
+              t={t}
               onTileClick={onTileClick}
               onTileHover={(q, r) =>
                 setHoveredTile(state.tiles.find((t) => t.q === q && t.r === r) ?? null)
@@ -1798,7 +1856,7 @@ export default function HomePage() {
               <div
                 className="leader-ribbon"
                 role="toolbar"
-                aria-label="Diplomatic ribbon"
+                aria-label={t("map.diplomaticRibbon")}
               >
                 {otherCivs.map((civ) => {
                   const stanceEntry = state.stances.find(
@@ -1824,12 +1882,21 @@ export default function HomePage() {
                         background: factionColor,
                         borderColor: ringColor,
                       }}
-                      title={`${civ.name} · ${civ.leader_name}\n${capitalize(stance)} · ${relationship >= 0 ? "+" : ""}${relationship} ${relationshipLabel(relationship)}${truceActive ? " · Truce" : ""}${inboxCount > 0 ? ` · ${inboxCount} new` : ""}`}
+                      title={[
+                        `${civ.name} · ${civ.leader_name}`,
+                        [
+                          `${tEnum("stance", stance)} · ${formatRelationship(relationship, t)}`,
+                          truceActive ? t("map.truce") : null,
+                          inboxCount > 0 ? t("map.inboxTag", { count: inboxCount }) : null,
+                        ]
+                          .filter((part): part is string => Boolean(part))
+                          .join(" · "),
+                      ].join("\n")}
                     >
                       {portrait ? (
                         <img
                           src={portrait}
-                          alt={`${civ.name} portrait`}
+                          alt={t("map.portraitAlt", { civ: civ.name })}
                         />
                       ) : (
                         <span className="leader-ribbon__initial">
@@ -1844,7 +1911,7 @@ export default function HomePage() {
                       {inboxCount > 0 && (
                         <span
                           className="leader-ribbon__inbox"
-                          aria-label={`${inboxCount} unread message${inboxCount === 1 ? "" : "s"}`}
+                          aria-label={tPlural("map.unread", inboxCount)}
                         >
                           {inboxCount}
                         </span>
@@ -1857,12 +1924,14 @@ export default function HomePage() {
 
             {bannerEvents && bannerEvents.length > 0 && (
               <div className="map-banner">
-                <div className="plate-label">Turn Chronicle</div>
+                <div className="plate-label">{t("map.turnChronicle")}</div>
                 <ul>
                   {bannerEvents.slice(0, 4).map((event) => (
                     <li key={event.id}>
-                      <span className={`log-kind log-kind--${event.kind}`}>{event.kind}</span>
-                      <span>{event.text}</span>
+                      <span className={`log-kind log-kind--${event.kind}`}>
+                        {tEnum("eventKind", event.kind)}
+                      </span>
+                      <span>{t(event.textKey, event.textParams)}</span>
                     </li>
                   ))}
                 </ul>
@@ -1872,26 +1941,36 @@ export default function HomePage() {
             {hoveredTile && (
               <div className="terrain-readout">
                 <div className="terrain-readout__title">
-                  {capitalize(hoveredTile.terrain)}
+                  {tEnum("terrain", hoveredTile.terrain)}
                   {hoveredTile.feature && (
-                    <span> · {FEATURE_LABEL[hoveredTile.feature] ?? hoveredTile.feature}</span>
+                    <span> · {tEnum("feature", hoveredTile.feature)}</span>
                   )}
                 </div>
                 <div className="terrain-readout__yields">
-                  <YieldLine label="Food" value={hoveredTile.food} />
-                  <YieldLine label="Prod" value={hoveredTile.production} />
-                  <YieldLine label="Gold" value={hoveredTile.gold} />
+                  <YieldLine label={t("yield.food")} value={hoveredTile.food} />
+                  <YieldLine label={t("yield.production")} value={hoveredTile.production} />
+                  <YieldLine label={t("yield.gold")} value={hoveredTile.gold} />
                 </div>
                 {hoveredTile.resource && (
                   <div className="terrain-readout__sub">
-                    Resource · {RESOURCE_LABEL[hoveredTile.resource] ?? hoveredTile.resource}
+                    {t("map.resource", {
+                      resource: tEnum("resource", hoveredTile.resource),
+                    })}
                   </div>
                 )}
                 {(hoveredUnit || hoveredCity) && (
                   <div className="terrain-readout__sub">
                     {hoveredUnit
-                      ? `${capitalize(hoveredUnit.type)} · ${state.civs[hoveredUnit.owner]?.name ?? "Unknown"} · HP ${hoveredUnit.health}`
-                      : `${hoveredCity?.name ?? "City"} · pop ${hoveredCity?.population ?? 0}`}
+                      ? t("map.unitReadout", {
+                          unit: tEnum("unit", hoveredUnit.type),
+                          civ:
+                            state.civs[hoveredUnit.owner]?.name ?? t("common.unknown"),
+                          health: hoveredUnit.health,
+                        })
+                      : t("map.cityReadout", {
+                          city: hoveredCity?.name ?? t("map.cityFallback"),
+                          population: hoveredCity?.population ?? 0,
+                        })}
                   </div>
                 )}
               </div>
@@ -1901,8 +1980,16 @@ export default function HomePage() {
 
         <aside className="war-room__rail war-room__rail--right">
           <Panel
-            label={`Research · ${currentResearch ? currentResearch.name : "Awaiting Order"}`}
-            title={currentResearch ? `${researchProgress} / ${currentResearch.cost}` : "Choose Technology"}
+            label={`${t("panel.research")} · ${
+              currentResearch
+                ? tEnum("tech", currentResearch.id)
+                : t("panel.researchAwaiting")
+            }`}
+            title={
+              currentResearch
+                ? `${researchProgress} / ${currentResearch.cost}`
+                : t("panel.chooseTechnology")
+            }
           >
             {currentResearch && (
               <div className="progress-shell">
@@ -1916,7 +2003,7 @@ export default function HomePage() {
             )}
             <div className="tech-choice-grid">
               {availableTechs.length === 0 ? (
-                <EmptyCopy>No available technologies. Expand prerequisites or finish the current research.</EmptyCopy>
+                <EmptyCopy>{t("research.empty")}</EmptyCopy>
               ) : (
                 availableTechs.map((tech) => (
                   <button
@@ -1928,8 +2015,10 @@ export default function HomePage() {
                     <span className="tech-choice__icon" aria-hidden="true">
                       {TECH_EMOJIS[tech.id] ?? "✦"}
                     </span>
-                    <span className="tech-choice__name">{tech.name}</span>
-                    <span className="tech-choice__cost">{tech.cost}</span>
+                    <span className="tech-choice__name">{tEnum("tech", tech.id)}</span>
+                    <span className="tech-choice__cost">
+                      {tech.cost} {t("research.costUnit")}
+                    </span>
                   </button>
                 ))
               )}
@@ -1937,11 +2026,11 @@ export default function HomePage() {
           </Panel>
 
           <Panel
-            label="Cities"
-            title={`${humanCities.length} settlement${humanCities.length === 1 ? "" : "s"}`}
+            label={t("panel.cities")}
+            title={tPlural("city.count", humanCities.length)}
           >
             {humanCities.length === 0 ? (
-              <EmptyCopy>Your first settlement unlocks production orders and population growth.</EmptyCopy>
+              <EmptyCopy>{t("city.empty")}</EmptyCopy>
             ) : (
               <div className="list-stack">
                 {humanCities.map((city) => (
@@ -1959,7 +2048,12 @@ export default function HomePage() {
                         )}
                       </strong>
                       <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem" }}>
-                        pop {city.population} · {city.production_queue[0] ?? "idle"}
+                        {t("city.rowMeta", {
+                          population: city.population,
+                          queue: city.production_queue[0]
+                            ? tEnum("unit", city.production_queue[0])
+                            : t("common.idle"),
+                        })}
                       </div>
                     </span>
                     <span style={{ color: "var(--ink-muted)" }}>›</span>
@@ -1969,7 +2063,10 @@ export default function HomePage() {
             )}
           </Panel>
 
-          <Panel label="Standings" title={`Goal · ${state.score_threshold}`}>
+          <Panel
+            label={t("panel.standings")}
+            title={t("standings.goal", { goal: state.score_threshold })}
+          >
             <div className="list-stack">
               {state.standings.map((entry) => {
                 const isMe = humanCiv?.id === entry.civ_id;
@@ -1981,7 +2078,7 @@ export default function HomePage() {
                   >
                     <span>
                       {entry.name}
-                      {isMe ? " (you)" : ""}
+                      {isMe ? ` ${t("common.you")}` : ""}
                     </span>
                     <span>
                       {entry.score} / {state.score_threshold}
@@ -1998,7 +2095,7 @@ export default function HomePage() {
         className={`war-room__chronicle${chronicleCollapsed ? " is-collapsed" : ""}`}
       >
         <div className="chronicle-tabs">
-          <div className="chronicle-tab is-active">Events</div>
+          <div className="chronicle-tab is-active">{t("chronicle.events")}</div>
           {totalInbox > 0 && (
             <button
               type="button"
@@ -2006,44 +2103,57 @@ export default function HomePage() {
               onClick={() => {
                 if (otherCivs[0]) setActiveConversationCivId(otherCivs[0].id);
               }}
-              title="Open diplomacy drawer"
+              title={t("chronicle.openDiplomacy")}
             >
-              Inbox ({totalInbox})
+              {t("chronicle.inbox", { count: totalInbox })}
             </button>
           )}
           <button
             type="button"
             className="chronicle-collapse"
             onClick={() => setChronicleCollapsed((c) => !c)}
-            aria-label={chronicleCollapsed ? "Expand chronicle" : "Collapse chronicle"}
-            title={chronicleCollapsed ? "Expand" : "Collapse"}
+            aria-label={
+              chronicleCollapsed ? t("chronicle.expand") : t("chronicle.collapse")
+            }
+            title={
+              chronicleCollapsed ? t("chronicle.expandShort") : t("chronicle.collapseShort")
+            }
           >
-            {chronicleCollapsed ? "▴ Show" : "▾ Hide"}
+            {chronicleCollapsed ? t("chronicle.show") : t("chronicle.hide")}
           </button>
         </div>
 
         {!chronicleCollapsed && (
           <div className="chronicle-grid">
             {eventLog.length === 0 ? (
-              <EmptyCopy>No events recorded yet. Resolve a turn to populate the chronicle.</EmptyCopy>
+              <EmptyCopy>{t("chronicle.empty")}</EmptyCopy>
             ) : (
-              eventLog.slice(0, 9).map((event) => (
-                <div key={event.id} className="log-row">
-                  {generatedTurnSceneByEventId.has(event.id) && (
-                    <img
-                      className="log-row__scene"
-                      src={generatedTurnSceneByEventId.get(event.id)?.url}
-                      alt={`Generated scene for ${event.text}`}
-                    />
-                  )}
-                  <span className={`log-kind log-kind--${event.kind}`}>{event.kind}</span>
-                  <p>{event.text}</p>
-                  {pendingTurnSceneIds.has(event.id) && (
-                    <span className="log-row__scene-pending">scene forming</span>
-                  )}
-                  <span className="log-turn">T-{event.turn}</span>
-                </div>
-              ))
+              eventLog.slice(0, 9).map((event) => {
+                const eventText = t(event.textKey, event.textParams);
+                return (
+                  <div key={event.id} className="log-row">
+                    {generatedTurnSceneByEventId.has(event.id) && (
+                      <img
+                        className="log-row__scene"
+                        src={generatedTurnSceneByEventId.get(event.id)?.url}
+                        alt={t("chronicle.sceneAlt", { text: eventText })}
+                      />
+                    )}
+                    <span className={`log-kind log-kind--${event.kind}`}>
+                      {tEnum("eventKind", event.kind)}
+                    </span>
+                    <p>{eventText}</p>
+                    {pendingTurnSceneIds.has(event.id) && (
+                      <span className="log-row__scene-pending">
+                        {t("chronicle.sceneForming")}
+                      </span>
+                    )}
+                    <span className="log-turn">
+                      {t("chronicle.turnTag", { turn: event.turn })}
+                    </span>
+                  </div>
+                );
+              })
             )}
           </div>
         )}
@@ -2058,8 +2168,8 @@ export default function HomePage() {
           }}
         >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="plate-label">New Settlement</div>
-            <h2>Name Your City</h2>
+            <div className="plate-label">{t("city.nameModalPlate")}</div>
+            <h2>{t("city.nameModalTitle")}</h2>
             <input
               type="text"
               value={cityName}
@@ -2071,7 +2181,7 @@ export default function HomePage() {
                   setCityName("");
                 }
               }}
-              placeholder="e.g. Athens"
+              placeholder={t("start.civilizationPlaceholder")}
               autoFocus
             />
             <div className="modal-actions">
@@ -2081,10 +2191,10 @@ export default function HomePage() {
                   setCityName("");
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button className="button-primary" onClick={submitFoundCity} disabled={!cityName.trim()}>
-                Found City
+                {t("city.found")}
               </button>
             </div>
           </div>
@@ -2116,9 +2226,9 @@ export default function HomePage() {
                 type="button"
                 className="diplomacy-audience__close"
                 onClick={() => setActiveConversationCivId(null)}
-                aria-label="Close diplomacy"
+                aria-label={t("diplomacy.close")}
               >
-                × Return
+                {t("common.return")}
               </button>
 
               <header className="diplomacy-audience__hero">
@@ -2132,7 +2242,7 @@ export default function HomePage() {
                   }
                 />
                 <div className="diplomacy-audience__heading">
-                  <div className="plate-label">Diplomatic Audience</div>
+                  <div className="plate-label">{t("diplomacy.audience")}</div>
                   <h2>{activeConversationCiv.name}</h2>
                   <div className="diplomacy-audience__leader">
                     {activeConversationCiv.leader_name}
@@ -2140,21 +2250,28 @@ export default function HomePage() {
                   {activeStance && (
                     <div className="thread-pills">
                       <span className="thread-pill">
-                        <span className="thread-pill__label">Status</span>
-                        {capitalize(activeStance.stance)}
+                        <span className="thread-pill__label">
+                          {t("diplomacy.status")}
+                        </span>
+                        {tEnum("stance", activeStance.stance)}
                       </span>
                       <span
                         className="thread-pill"
                         style={{ color: relationshipColor(activeStance.relationship) }}
                       >
-                        <span className="thread-pill__label">Rel</span>
-                        {activeStance.relationship >= 0 ? "+" : ""}
-                        {activeStance.relationship} {relationshipLabel(activeStance.relationship)}
+                        <span className="thread-pill__label">
+                          {t("diplomacy.relationship")}
+                        </span>
+                        {formatRelationship(activeStance.relationship, t)}
                       </span>
                       {activeStance.truce_active && (
                         <span className="thread-pill">
-                          <span className="thread-pill__label">Truce</span>
-                          until T{activeStance.truce_until}
+                          <span className="thread-pill__label">
+                            {t("diplomacy.truce")}
+                          </span>
+                          {t("diplomacy.truceUntil", {
+                            turn: activeStance.truce_until ?? "?",
+                          })}
                         </span>
                       )}
                     </div>
@@ -2164,7 +2281,7 @@ export default function HomePage() {
 
               <div className="diplomacy-audience__messages">
                 {activeConversation.length === 0 ? (
-                  <EmptyCopy>No messages exchanged. Send the first diplomatic signal.</EmptyCopy>
+                  <EmptyCopy>{t("diplomacy.empty")}</EmptyCopy>
                 ) : (
                   [...activeConversation].reverse().map((message, index) => (
                     <MessageCard
@@ -2172,6 +2289,8 @@ export default function HomePage() {
                       message={message}
                       civs={state?.civs ?? []}
                       humanCivId={humanCiv?.id ?? null}
+                      t={t}
+                      tEnum={tEnum}
                     />
                   ))
                 )}
@@ -2179,27 +2298,31 @@ export default function HomePage() {
 
               <div className="diplomacy-audience__composer">
                 <label className="field">
-                  <span className="field-label">Tone</span>
+                  <span className="field-label">{t("diplomacy.tone")}</span>
                   <select value={messageKind} onChange={(e) => setMessageKind(e.target.value)}>
                     {availableMessageKinds.map((kind) => (
                       <option key={kind.id} value={kind.id}>
-                        {kind.label}
+                        {t(kind.labelKey)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field">
-                  <span className="field-label">Message</span>
+                  <span className="field-label">{t("diplomacy.message")}</span>
                   <input
                     type="text"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
-                    placeholder={`Reply to ${activeConversationCiv.name}`}
+                    placeholder={t("diplomacy.replyPlaceholder", {
+                      civ: activeConversationCiv.name,
+                    })}
                   />
                 </label>
                 {activeStance?.truce_active && (
                   <div className="empty-copy">
-                    Truce until turn {activeStance.truce_until}. Threats and war declarations are disabled.
+                    {t("diplomacy.truceBlocked", {
+                      turn: activeStance.truce_until ?? "?",
+                    })}
                   </div>
                 )}
                 <button
@@ -2207,13 +2330,15 @@ export default function HomePage() {
                   onClick={sendMessage}
                   disabled={busy || !isHumanTurn || !messageText.trim()}
                 >
-                  Send
+                  {t("diplomacy.send")}
                 </button>
               </div>
 
               {activeDiplomaticEvents.length > 0 && (
                 <details className="incidents-details">
-                  <summary>Recent Incidents ({activeDiplomaticEvents.length})</summary>
+                  <summary>
+                    {t("diplomacy.incidents", { count: activeDiplomaticEvents.length })}
+                  </summary>
                   <div className="list-stack">
                     {[...activeDiplomaticEvents].reverse().slice(0, 8).map((event, index) => (
                       <div
@@ -2221,7 +2346,12 @@ export default function HomePage() {
                         className="list-row"
                         style={{ cursor: "default" }}
                       >
-                        <span>T{event.turn} · {capitalize(event.kind)}</span>
+                        <span>
+                          {t("diplomacy.incidentRow", {
+                            turn: event.turn,
+                            kind: { ns: "diplomaticEvent", value: event.kind },
+                          })}
+                        </span>
                         <span>
                           {event.relationship_delta >= 0 ? "+" : ""}
                           {event.relationship_delta}
@@ -2246,37 +2376,43 @@ export default function HomePage() {
             <header className="city-drawer__header">
               <div>
                 <div className="plate-label">
-                  {activeCity.is_capital ? "Capital City" : "Settlement"}
+                  {activeCity.is_capital ? t("city.capital") : t("city.settlement")}
                 </div>
                 <strong className="city-drawer__name">{activeCity.name}</strong>
                 <div className="city-drawer__sub">
-                  Tile {activeCity.q}, {activeCity.r}
+                  {t("selection.tile", { q: activeCity.q, r: activeCity.r })}
                 </div>
               </div>
               <button
                 type="button"
                 className="city-drawer__close"
                 onClick={() => setActiveCityId(null)}
-                aria-label="Close city panel"
+                aria-label={t("city.close")}
               >
                 ×
               </button>
             </header>
 
             <div className="city-brief">
-              <MetricStat label="Population" value={activeCity.population} />
+              <MetricStat label={t("stat.population")} value={activeCity.population} />
               <MetricStat
-                label="Health"
+                label={t("stat.health")}
                 value={`${activeCity.health}/${activeCity.max_health}`}
               />
-              <MetricStat label="Food" value={activeCity.food_stored} />
-              <MetricStat label="Production" value={activeCity.production_stored} />
-              <MetricStat label="Border" value={`R${activeCity.border_radius ?? 1}`} />
+              <MetricStat label={t("stat.food")} value={activeCity.food_stored} />
               <MetricStat
-                label="Culture"
+                label={t("stat.production")}
+                value={activeCity.production_stored}
+              />
+              <MetricStat
+                label={t("stat.border")}
+                value={t("city.borderRing", { radius: activeCity.border_radius ?? 1 })}
+              />
+              <MetricStat
+                label={t("stat.culture")}
                 value={
                   activeCity.border_radius >= 3
-                    ? `${activeCity.culture_stored ?? 0} / max`
+                    ? t("city.cultureMax", { stored: activeCity.culture_stored ?? 0 })
                     : `${activeCity.culture_stored ?? 0} / ${
                         activeCity.border_radius >= 2 ? 30 : 10
                       }`
@@ -2285,9 +2421,9 @@ export default function HomePage() {
             </div>
 
             <div className="city-drawer__section">
-              <div className="plate-label">Production Queue</div>
+              <div className="plate-label">{t("city.productionQueue")}</div>
               {activeCity.production_queue.length === 0 ? (
-                <EmptyCopy>Queue is empty. Pick a unit below to start building.</EmptyCopy>
+                <EmptyCopy>{t("city.queueEmpty")}</EmptyCopy>
               ) : (
                 <div className="list-stack">
                   {activeCity.production_queue.map((item, idx) => (
@@ -2298,12 +2434,12 @@ export default function HomePage() {
                     >
                       <span>
                         {idx === 0 ? "▶ " : `${idx + 1}. `}
-                        {capitalize(item)}
+                        {tEnum("unit", item)}
                       </span>
                       <span style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                         {idx === 0 && (
                           <small style={{ color: "var(--ink-muted)" }}>
-                            {activeCity.production_stored} stored
+                            {t("city.queueStored", { stored: activeCity.production_stored })}
                           </small>
                         )}
                         <button
@@ -2311,12 +2447,8 @@ export default function HomePage() {
                           className="city-drawer__cancel"
                           onClick={() => cancelProduction(activeCity.id, idx)}
                           disabled={busy || !isHumanTurn}
-                          title={
-                            idx === 0
-                              ? "Cancel — forfeits stored production"
-                              : "Remove from queue"
-                          }
-                          aria-label="Remove from queue"
+                          title={idx === 0 ? t("city.cancelHead") : t("city.cancelOther")}
+                          aria-label={t("city.cancelOther")}
                         >
                           ×
                         </button>
@@ -2328,9 +2460,9 @@ export default function HomePage() {
             </div>
 
             <div className="city-drawer__section">
-              <div className="plate-label">Build Order</div>
+              <div className="plate-label">{t("city.buildOrder")}</div>
               {buildableUnits.length === 0 ? (
-                <EmptyCopy>Research more technologies to unlock new units.</EmptyCopy>
+                <EmptyCopy>{t("city.buildEmpty")}</EmptyCopy>
               ) : (
                 <div className="list-stack city-drawer__buildables">
                   {buildableUnits.map((unit) => (
@@ -2341,8 +2473,8 @@ export default function HomePage() {
                       onClick={() => queueProduction(activeCity.id, unit.id)}
                       disabled={busy || !isHumanTurn}
                     >
-                      <span>{unit.label}</span>
-                      <span>{unit.cost} prod</span>
+                      <span>{tEnum("unit", unit.id)}</span>
+                      <span>{t("city.buildCost", { cost: unit.cost })}</span>
                     </button>
                   ))}
                 </div>
@@ -2351,11 +2483,13 @@ export default function HomePage() {
 
             <div className="city-drawer__section">
               <div className="plate-label">
-                Structures · {humanCiv?.gold ?? 0} gold
+                {t("city.structures", { gold: humanCiv?.gold ?? 0 })}
               </div>
               <p className="empty-copy" style={{ margin: 0 }}>
-                Each structure costs {STRUCTURE_GOLD_COST} gold and adds
-                +{STRUCTURE_PRODUCTION_BONUS} production. One of each per city.
+                {t("city.structuresHelp", {
+                  cost: STRUCTURE_GOLD_COST,
+                  bonus: STRUCTURE_PRODUCTION_BONUS,
+                })}
               </p>
               <div className="list-stack">
                 {STRUCTURE_CATEGORIES.map((cat) => {
@@ -2379,33 +2513,35 @@ export default function HomePage() {
                         );
                       }}
                       onClick={() =>
-                        setError("Drag a structure onto an empty tile inside this city's borders.")
+                        setError({ key: "error.structureDrop" })
                       }
                       disabled={disabled}
                       title={
                         owned
-                          ? "Already built in this city"
+                          ? t("city.structureOwned")
                           : !canAfford
-                            ? `Need ${STRUCTURE_GOLD_COST} gold`
-                            : "Drag onto an empty tile inside this city's borders"
+                            ? t("city.structureNeedGold", { cost: STRUCTURE_GOLD_COST })
+                            : t("city.structureDragHint")
                       }
                     >
                       <span>
-                        <strong>{cat.label}</strong>
+                        <strong>{tEnum("structure", cat.id)}</strong>
                         <div
                           style={{
                             color: "var(--ink-muted)",
                             fontSize: "0.78rem",
                           }}
                         >
-                          {cat.hint}
+                          {tEnum("structure", cat.id, "hint")}
                         </div>
                       </span>
                       <span>
                         {owned ? (
-                          <span style={{ color: "var(--accent)" }}>✓ Built</span>
+                          <span style={{ color: "var(--accent)" }}>
+                            {t("city.structureBuilt")}
+                          </span>
                         ) : (
-                          `${STRUCTURE_GOLD_COST}g`
+                          t("city.structurePrice", { gold: STRUCTURE_GOLD_COST })
                         )}
                       </span>
                     </button>
@@ -2416,7 +2552,9 @@ export default function HomePage() {
 
             {activeCity.buildings.length > 0 && (
               <details className="incidents-details">
-                <summary>Buildings ({activeCity.buildings.length})</summary>
+                <summary>
+                  {t("city.buildings", { count: activeCity.buildings.length })}
+                </summary>
                 <div className="list-stack">
                   {activeCity.buildings.map((b, i) => (
                     <div
@@ -2424,7 +2562,7 @@ export default function HomePage() {
                       className="list-row"
                       style={{ cursor: "default" }}
                     >
-                      <span>{capitalize(b)}</span>
+                      <span>{tEnum("building", b)}</span>
                     </div>
                   ))}
                 </div>
@@ -2466,29 +2604,28 @@ export default function HomePage() {
               e.stopPropagation();
               setShowSovereign(false);
             }}
-            aria-label="Close sovereign view"
+            aria-label={t("sovereign.close")}
           >
-            × Return
+            {t("common.return")}
           </button>
           <section
             className="intro-screen__panel"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="plate-label intro-screen__chapter">Sovereign</div>
+            <div className="plate-label intro-screen__chapter">{t("sovereign.plate")}</div>
             <h1 className="intro-screen__civ">{humanCiv.name}</h1>
             <div className="intro-screen__leader">
               {setup.leaderName.trim() || humanCiv.leader_name}
             </div>
             <p className="intro-screen__epitaph">
-              {setup.leaderDescription.trim() ||
-                "An age unfolds beneath your banner. The chronicles will record what you make of it."}
+              {setup.leaderDescription.trim() || t("sovereign.defaultDescription")}
             </p>
-            <div className="intro-screen__hint">click anywhere · esc to return</div>
+            <div className="intro-screen__hint">{t("sovereign.hint")}</div>
           </section>
         </div>
       )}
 
-      {error && <div className="toast">{error}</div>}
+      {error && <div className="toast">{t(error.key, error.params)}</div>}
     </main>
   );
 }
@@ -2627,44 +2764,49 @@ function MessageCard({
   message,
   civs,
   humanCivId,
+  t,
+  tEnum,
 }: {
   message: GameStateDTO["messages"][number];
   civs: GameStateDTO["civs"];
   humanCivId?: number | null;
+  t: TFunction;
+  tEnum: (namespace: string, value: string | null | undefined, suffix?: string) => string;
 }) {
   const from = civs.find((civ) => civ.id === message.from_civ_id);
   const to = civs.find((civ) => civ.id === message.to_civ_id);
   const direction =
     humanCivId !== null && humanCivId !== undefined
       ? message.from_civ_id === humanCivId
-        ? "Sent"
-        : "Received"
+        ? "sent"
+        : "received"
       : null;
   return (
-    <article className={`message-card${direction === "Sent" ? " is-sent" : ""}`}>
+    <article className={`message-card${direction === "sent" ? " is-sent" : ""}`}>
       <div className="message-card__meta">
         <strong>
-          {from?.name ?? `Civ ${message.from_civ_id}`} to {to?.name ?? `Civ ${message.to_civ_id}`}
+          {t("message.fromTo", {
+            from: from?.name ?? t("message.civFallback", { id: message.from_civ_id }),
+            to: to?.name ?? t("message.civFallback", { id: message.to_civ_id }),
+          })}
         </strong>
         <span>
-          T{message.turn}
-          {direction ? ` · ${direction}` : ""}
+          {t("message.turn", { turn: message.turn })}
+          {direction
+            ? ` · ${t(direction === "sent" ? "message.sent" : "message.received")}`
+            : ""}
         </span>
       </div>
-      <div className="message-card__kind">{capitalize(message.kind)}</div>
+      <div className="message-card__kind">{tEnum("messageKind", message.kind)}</div>
       <p>{message.text}</p>
     </article>
   );
 }
 
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
-}
-
-function formatNetDelta(net: number): string {
-  if (net > 0) return `+${net} / t`;
-  if (net < 0) return `${net} / t`;
-  return "0 / t";
+function formatNetDelta(net: number, t: TFunction): string {
+  if (net > 0) return t("metric.goldDeltaPositive", { value: net });
+  if (net < 0) return t("metric.goldDeltaNegative", { value: net });
+  return t("metric.goldDeltaZero");
 }
 
 // Composition/staging variety only — lighting and time of day are owned by the
@@ -2709,14 +2851,20 @@ function canAttackOwner(
   return stance?.stance === "war";
 }
 
-function relationshipLabel(score: number): string {
-  if (score <= -60) return "Furious";
-  if (score <= -30) return "Hostile";
-  if (score <= -10) return "Cold";
-  if (score < 10) return "Neutral";
-  if (score < 30) return "Warm";
-  if (score < 60) return "Friendly";
-  return "Devoted";
+/** Relationship band for a score, as a translation key. */
+function relationshipKey(score: number): TranslationKey {
+  if (score <= -60) return "relationship.furious";
+  if (score <= -30) return "relationship.hostile";
+  if (score <= -10) return "relationship.cold";
+  if (score < 10) return "relationship.neutral";
+  if (score < 30) return "relationship.warm";
+  if (score < 60) return "relationship.friendly";
+  return "relationship.devoted";
+}
+
+/** `+42 Friendly` / `-40 Hostile` — signed score plus its translated band. */
+function formatRelationship(score: number, t: TFunction): string {
+  return `${score >= 0 ? "+" : ""}${score} ${t(relationshipKey(score))}`;
 }
 
 function relationshipColor(score: number): string {
@@ -2726,7 +2874,95 @@ function relationshipColor(score: number): string {
   return "#8fcf7a";
 }
 
-function formatError(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return String(e);
+/**
+ * A pending error toast, held as a translation key + params rather than as
+ * text: the toast then renders in whatever language is current, and an async
+ * request that settles after a language switch cannot bake in a stale one.
+ */
+type AppError = { key: TranslationKey; params?: TranslateParams };
+
+/**
+ * Turns an API or network failure into a locale-independent toast descriptor.
+ * Validation details come from the backend in English by contract, so they are
+ * shown verbatim rather than guessed at.
+ */
+function toAppError(e: unknown): AppError {
+  const message = e instanceof Error ? e.message : String(e);
+  const httpMatch = /^(\d{3})\b[^:]*:\s*([\s\S]*)$/.exec(message);
+  if (httpMatch) {
+    return {
+      key: "error.requestFailed",
+      params: { status: httpMatch[1], detail: errorDetail(httpMatch[2]) },
+    };
+  }
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return { key: "error.network" };
+  }
+  return { key: "error.unexpected", params: { message } };
+}
+
+/** FastAPI errors arrive as `{"detail": "..."}`; show just the detail. */
+function errorDetail(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && "detail" in parsed) {
+      const detail = (parsed as { detail?: unknown }).detail;
+      if (typeof detail === "string") return detail;
+    }
+  } catch {
+    // Not JSON — fall through to the raw body.
+  }
+  return body.trim();
+}
+
+/**
+ * True when a key event targets a control that owns its own activation keys
+ * (buttons, links, fields), so screen-level shortcuts can stand aside.
+ */
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.closest(
+      "button, a[href], input, select, textarea, [role='button'], [contenteditable='true']",
+    ) !== null
+  );
+}
+
+function LocaleSwitch({
+  locale,
+  onChange,
+  label,
+  compact,
+}: {
+  locale: Locale;
+  onChange: (locale: Locale) => void;
+  label: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`locale-switch${compact ? " locale-switch--compact" : ""}`}
+      role="group"
+      aria-label={label}
+      title={label}
+    >
+      {LOCALES.map((value) => {
+        const active = value === locale;
+        return (
+          <button
+            key={value}
+            type="button"
+            className={`locale-switch__option${active ? " is-active" : ""}`}
+            onClick={() => onChange(value)}
+            aria-pressed={active}
+            aria-label={LOCALE_LABELS[value].name}
+            title={LOCALE_LABELS[value].name}
+            lang={value}
+          >
+            {compact ? LOCALE_LABELS[value].short : LOCALE_LABELS[value].name}
+          </button>
+        );
+      })}
+    </div>
+  );
 }

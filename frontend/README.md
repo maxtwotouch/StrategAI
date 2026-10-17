@@ -21,20 +21,22 @@ Runs at `http://localhost:3000`. Without `NEXT_PUBLIC_ASSET_API_URL`, the game r
 - **City management** — production queue, gold-purchased structure placement, research panel, tile worked assignment
 - **Audio** — ambient music, battle tracks, TTS intro narration
 - **Turn system** — human actions → end turn → AI turn resolution → chronicle of events
+- **Localization** — English (default) and Simplified Chinese, switchable in-game, persisted in `localStorage`
 
 ## Documentation
 
 | Document | Contents |
 |----------|----------|
 | [`docs/FRONTEND_ARCHITECTURE.md`](docs/FRONTEND_ARCHITECTURE.md) | Component tree, state management, Next.js structure |
-| [`docs/UI_GUIDE.md`](docs/UI_GUIDE.md) | Panel lifecycle, map rendering, diplomatic audience, audio |
+| [`docs/UI_GUIDE.md`](docs/UI_GUIDE.md) | Panel lifecycle, map rendering, diplomatic audience, audio, i18n |
 | [`../docs/ASSET_INTEGRATION.md`](../docs/ASSET_INTEGRATION.md) | Asset service contract, manifest resolution, fallback behavior |
 
 ## Testing
 
 ```bash
-npx tsc --noEmit   # type check
-npm run build       # production build verification
+npx tsc --noEmit      # type check (also catches missing zh-CN keys)
+npm run check:i18n    # locale key/placeholder validation
+npm run build         # production build verification
 ```
 
 ## Conventions
@@ -43,6 +45,9 @@ npm run build       # production build verification
 - **API calls** — All go through `api.*` methods in `lib/api.ts`.
 - **Asset fallback** — Every missing generative asset degrades gracefully to built-in colors, glyphs, or initials.
 - **Single stylesheet** — `app/globals.css` (~1250 lines) with design tokens and all UI surfaces.
+- **Player-facing text** — Lives in `locales/*.json`, never inline. `en.json` defines the key
+  union, so a missing `zh-CN` key is a type error; `npm run check:i18n` flags stray keys and
+  placeholder drift. See [`docs/UI_GUIDE.md`](docs/UI_GUIDE.md) §9.
 
 ## Audio Attribution
 
@@ -57,12 +62,18 @@ credits, licenses, and required attribution text.
 app/page.tsx          ← single client page, owns all game state
 components/
   SquareMap.tsx       ← SVG hex map renderer (~920 lines)
+locales/
+  en.json             ← English copy (canonical key set)
+  zh-CN.json          ← Simplified Chinese copy
+scripts/
+  check-i18n.mjs      ← locale parity/placeholder check
 lib/
   api.ts              ← backend game client + DTOs
   assetApi.ts         ← asset service client
   assetManifest.ts    ← manifest resolver (POST → cache → fallback)
   assetMapping.ts     ← deterministic game→asset param maps
   hex.ts              ← grid math, terrain/unit/glyph tables
+  i18n.ts             ← locale state, translate/tEnum/tPlural, useI18n
   leaderMapping.ts    ← leader→generation params
   turnEvents.ts       ← prev/next state diff → TurnEvent[]
   useAudio.ts         ← audio hook (music, narration)

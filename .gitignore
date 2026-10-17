@@ -14,8 +14,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to the repo root: the unanchored Python-template form of these two
+# patterns also matched the frontend source directory (frontend/lib).
+/lib/
+/lib64/
 parts/
 sdist/
 var/

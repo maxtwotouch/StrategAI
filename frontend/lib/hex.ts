@@ -84,26 +84,10 @@ export const UNIT_GLYPH: Record<string, string> = {
   swordsman: "✦",
 };
 
-export const UNIT_LABEL: Record<string, string> = {
-  warrior: "Warrior",
-  settler: "Settler",
-  scout: "Scout",
-  worker: "Worker",
-  archer: "Archer",
-  horseman: "Horseman",
-  swordsman: "Swordsman",
-};
-
 export const IMPROVEMENT_GLYPH: Record<string, string> = {
   farm: "≈",
   mine: "⛏",
   road: "═",
-};
-
-export const IMPROVEMENT_LABEL: Record<string, string> = {
-  farm: "Farm",
-  mine: "Mine",
-  road: "Road",
 };
 
 export const RESOURCE_GLYPH: Record<string, string> = {
@@ -118,18 +102,6 @@ export const RESOURCE_GLYPH: Record<string, string> = {
   spices: "✦",
 };
 
-export const RESOURCE_LABEL: Record<string, string> = {
-  wheat: "Wheat",
-  cattle: "Cattle",
-  fish: "Fish",
-  iron: "Iron",
-  horses: "Horses",
-  coal: "Coal",
-  gems: "Gems",
-  silk: "Silk",
-  spices: "Spices",
-};
-
 export const FEATURE_GLYPH: Record<string, string> = {
   forest: "♣",
   jungle: "❦",
@@ -137,9 +109,5 @@ export const FEATURE_GLYPH: Record<string, string> = {
   oasis: "❂",
 };
 
-export const FEATURE_LABEL: Record<string, string> = {
-  forest: "Forest",
-  jungle: "Jungle",
-  marsh: "Marsh",
-  oasis: "Oasis",
-};
+// Display names for terrains, features, resources, units, and improvements
+// live in `locales/*.json`; render them with `tEnum()` from `lib/i18n.ts`.

@@ -208,7 +208,7 @@ Three `if` branches in the `HomePage` component:
 | `MiniMap` | CSS-grid minimap |
 | `MessageCard` | Diplomacy message bubble |
 | `AudioGlyph` | SVG speaker icon with mute state |
-| `formatNetDelta`, `capitalize`, `formatError`, `maxHealthFor`, `canAttackOwner`, `relationshipLabel`, `relationshipColor` | Utility functions |
+| `formatNetDelta`, `toAppError`, `errorDetail`, `isInteractiveTarget`, `maxHealthFor`, `canAttackOwner`, `relationshipKey`, `formatRelationship`, `relationshipColor` | Utility functions |
 
 ---
 
@@ -360,7 +360,7 @@ const run = async (fn: () => Promise<GameStateDTO>) => {
     const next = await fn();
     // ... update state
   } catch (e: unknown) {
-    setError(formatError(e));  // 5s auto-clear via useEffect
+    setError(toAppError(e));  // translation key + params; 5s auto-clear via useEffect
   } finally {
     setBusy(false);
   }

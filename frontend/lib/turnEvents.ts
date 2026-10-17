@@ -1,5 +1,6 @@
 import { GameStateDTO, MessageDTO } from "./api";
 import type { LeaderActionCategory } from "./assetApi";
+import type { TranslateParams, TranslationKey } from "./i18n";
 
 export type TurnEvent = {
   id: string;
@@ -15,9 +16,12 @@ export type TurnEvent = {
     | "stance_changed"
     | "message_received"
     | "turn_summary";
-  text: string;
+  /** Translation key + params for the player-facing summary line. */
+  textKey: TranslationKey;
+  textParams?: TranslateParams;
   civIds: number[];
   actionCategory: LeaderActionCategory;
+  /** English prompt text for the asset service — never translated. */
   actionDescription: string;
 };
 
@@ -46,7 +50,8 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
         id: `city-${city.id}`,
         turn,
         kind: "city_founded",
-        text: `${civName(next, city.owner)} founded ${city.name}`,
+        textKey: "event.cityFounded",
+        textParams: { civ: civName(next, city.owner), city: city.name },
         civIds: [city.owner],
         actionCategory: "construction",
         actionDescription: `${civName(next, city.owner)} oversees the founding of ${city.name}, with settlers raising banners and workers marking the first streets of a new city. ${sceneAccent(turn)}`,
@@ -64,7 +69,8 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
           id: `tech-${civ.id}-${tech}-${turn}`,
           turn,
           kind: "tech_completed",
-          text: `${civName(next, civ.id)} discovered ${capitalize(tech.replaceAll("_", " "))}`,
+          textKey: "event.techCompleted",
+          textParams: { civ: civName(next, civ.id), tech: { ns: "tech", value: tech } },
           civIds: [civ.id],
           actionCategory: "scientific",
           actionDescription: `${civName(next, civ.id)} celebrates a breakthrough in ${capitalize(tech.replaceAll("_", " "))}, with scholars presenting instruments, scrolls, and new plans before their ruler. ${sceneAccent(turn)}`,
@@ -80,7 +86,11 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
       id: `unit-created-${unit.id}-${turn}`,
       turn,
       kind: "unit_created",
-      text: `${civName(next, unit.owner)} trained a ${unit.type}`,
+      textKey: "event.unitCreated",
+      textParams: {
+        civ: civName(next, unit.owner),
+        unit: { ns: "unit", value: unit.type },
+      },
       civIds: [unit.owner],
       actionCategory: "military",
       actionDescription: `${civName(next, unit.owner)} musters a newly trained ${unit.type} formation, with armor being strapped on, banners lifted, weapons checked, and officers preparing the troops for campaign orders. ${sceneAccent(turn)}`,
@@ -96,7 +106,8 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
         id: `city-grew-${city.id}-${turn}`,
         turn,
         kind: "city_grew",
-        text: `${city.name} grew to population ${city.population}`,
+        textKey: "event.cityGrew",
+        textParams: { city: city.name, population: city.population },
         civIds: [city.owner],
         actionCategory: "construction",
         actionDescription: `${civName(next, city.owner)} oversees the busy growth of ${city.name}, with masons raising timber scaffolds, families entering new homes, market stalls opening, and workers expanding the settlement streets. ${sceneAccent(turn)}`,
@@ -114,7 +125,11 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
       id: `structure-${structure.city_id}-${structure.category}-${turn}`,
       turn,
       kind: "structure_built",
-      text: `${civName(next, structure.owner)} built ${structure.category}`,
+      textKey: "event.structureBuilt",
+      textParams: {
+        civ: civName(next, structure.owner),
+        structure: { ns: "structure", value: structure.category },
+      },
       civIds: [structure.owner],
       actionCategory: "construction",
       actionDescription: `${civName(next, structure.owner)} directs construction crews near ${city?.name ?? "a growing city"}, with stone blocks, wooden cranes, scaffolding, and laborers completing a new ${structure.category} district. ${sceneAccent(turn)}`,
@@ -136,7 +151,8 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
             id: `lost-${id}-${turn}`,
             turn,
             kind: "unit_lost",
-            text: `Lost ${lost.type} #${id}`,
+            textKey: "event.unitLost",
+            textParams: { unit: { ns: "unit", value: lost.type }, id },
             civIds: [lost.owner],
             actionCategory: "crisis",
             actionDescription: `${civName(next, lost.owner)} responds to the loss of a ${lost.type} unit, standing in a tense war council as messengers report the battlefield disaster. ${sceneAccent(turn)}`,
@@ -153,7 +169,8 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
         id: `met-${id}-${turn}`,
         turn,
         kind: "civ_met",
-        text: `Met ${civName(next, id)}`,
+        textKey: "event.civMet",
+        textParams: { civ: civName(next, id) },
         civIds: humanCivId !== null ? [humanCivId, id] : [id],
         actionCategory: "diplomatic",
         actionDescription: `${humanCivId !== null ? civName(next, humanCivId) : "A newly encountered leader"} meets ${civName(next, id)} for the first time, with envoys, banners, and cautious ceremony between rival courts. ${sceneAccent(turn)}`,
@@ -169,7 +186,11 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
         id: `stance-${s.other_civ_id}-${turn}`,
         turn,
         kind: "stance_changed",
-        text: `${civName(next, s.other_civ_id)} → ${capitalize(s.stance)}`,
+        textKey: "event.stanceChanged",
+        textParams: {
+          civ: civName(next, s.other_civ_id),
+          stance: { ns: "stance", value: s.stance },
+        },
         civIds: humanCivId !== null ? [humanCivId, s.other_civ_id] : [s.other_civ_id],
         actionCategory: s.stance === "war" ? "military" : "diplomatic",
         actionDescription:
@@ -189,7 +210,12 @@ export function diffTurnEvents({ prev, next, humanCivId }: DiffInput): TurnEvent
         id: `msg-${m.from_civ_id}-${turn}-${events.length}`,
         turn,
         kind: "message_received",
-        text: `${civName(next, m.from_civ_id)} (${m.kind}): ${truncate(m.text, 60)}`,
+        textKey: "event.messageReceived",
+        textParams: {
+          civ: civName(next, m.from_civ_id),
+          kind: { ns: "messageKind", value: m.kind },
+          text: truncate(m.text, 60),
+        },
         civIds: [m.from_civ_id, m.to_civ_id],
         actionCategory:
           m.kind === "threat" || m.kind === "declare_war"

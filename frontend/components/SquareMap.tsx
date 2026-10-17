@@ -516,8 +516,10 @@ export function SquareMap(props: StrategyMapProps) {
   return (
     <div className="map-shell">
       <div className="map-hud">
-        <div className="map-chip">{dragging ? "Panning" : "Drag to pan"}</div>
-        <div className="map-chip">Wheel to zoom</div>
+        <div className="map-chip">
+          {dragging ? props.t("map.panning") : props.t("map.dragToPan")}
+        </div>
+        <div className="map-chip">{props.t("map.wheelToZoom")}</div>
         <div className="map-controls">
           <button type="button" onClick={() => zoomBy(0.82)}>
             +
@@ -526,7 +528,7 @@ export function SquareMap(props: StrategyMapProps) {
             −
           </button>
           <button type="button" onClick={recenter}>
-            Recenter
+            {props.t("map.recenter")}
           </button>
         </div>
       </div>

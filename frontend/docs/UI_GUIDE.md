@@ -18,8 +18,12 @@ frontend/
 ├── components/
 │   ├── SquareMap.tsx     SVG-rendered map (drag/zoom, tiles, units, cities)
 │   └── mapTypes.ts       StrategyMapProps
+├── locales/
+│   ├── en.json           English copy — the canonical key set
+│   └── zh-CN.json        Simplified Chinese copy (same keys)
 ├── lib/
 │   ├── api.ts            game backend client + DTOs
+│   ├── i18n.ts           locale dictionaries, translate/tEnum/tPlural, useI18n
 │   ├── hex.ts            grid math + TERRAIN/UNIT/IMPROVEMENT glyph tables
 │   ├── turnEvents.ts     diff prev/next GameState → TurnEvent[]
 │   ├── assetApi.ts       asset service client (POST /leader, etc.)
@@ -27,6 +31,8 @@ frontend/
 │   ├── assetMapping.ts   game taxonomy → asset enums (units, structures, elevation)
 │   ├── leaderMapping.ts  deterministic leader → enum/description map
 │   └── useAudio.ts       intro swell + ambient bed, mute toggle, fades
+├── scripts/
+│   └── check-i18n.mjs    locale parity/placeholder validation (npm run check:i18n)
 └── .env.local            NEXT_PUBLIC_API_URL + NEXT_PUBLIC_ASSET_API_URL
 ```
 
@@ -365,6 +371,9 @@ stance changes, and received messages. The full list lives in `turnEvents.ts`.
   (`--ink`, `--accent`, `--panel`, spacing scale, shadows, font stacks).
 - Display font: `Baskerville` (serif) for headings, leader names, panel
   titles. Body: `Avenir Next`.
+- Both font stacks list CJK faces (`Noto Serif/Sans SC`, `Songti SC`,
+  `PingFang SC`, `Microsoft YaHei`, …) *after* the Latin faces, so Chinese
+  glyphs fall back to a proper CJK face while the English UI is untouched.
 - The map uses inline SVG with `shape-rendering: crispEdges` to avoid
   blurry tile edges at fractional zoom levels.
 - Hover/selection/focus states use `:hover:not(:disabled)` and
@@ -375,13 +384,82 @@ stance changes, and received messages. The full list lives in `turnEvents.ts`.
 
 ---
 
-## 9. Where to Hook In
+## 9. Internationalization
+
+The UI ships in English (`en`, default) and Simplified Chinese (`zh-CN`). No
+i18n library is involved: `lib/i18n.ts` is ~200 lines, and every string lives
+in `locales/*.json` as a **flat, dotted key**.
+
+```
+locales/en.json   ← canonical key set; English is also the fallback
+locales/zh-CN.json
+lib/i18n.ts       ← dictionaries, translate/tEnum/tPlural, useI18n()
+```
+
+### Using it
+
+`page.tsx` calls `useI18n()` once and passes what it needs downwards
+(`SquareMap` receives `t` as a prop):
+
+```tsx
+const { locale, setLocale, t, tEnum, tPlural } = useI18n();
+
+t("city.found")                                  // static copy
+t("diplomacy.replyPlaceholder", { civ: civ.name })    // {placeholder} params
+tEnum("unit", unit.type)                         // data-driven label
+tEnum("structure", cat.id, "hint")               //   …with a ".hint" suffix
+tPlural("city.count", humanCities.length)        // .one / .other pair
+```
+
+`t()` also accepts an enum *descriptor* — `{ ns: "tech", value: techId }` — as
+a param, which is how turn events stay correct when the player switches
+language after the fact:
+
+```ts
+// lib/turnEvents.ts
+textKey: "event.techCompleted",
+textParams: { civ: civName, tech: { ns: "tech", value: tech } },
+```
+
+### Rules
+
+- **English is the schema.** `TranslationKey` is `keyof typeof en`, and
+  `zh-CN.json` is typed as a complete `Record<TranslationKey, string>`, so a
+  **missing** key fails `npm run typecheck` — no runtime surprises.
+- **Stray keys are a script check, not a compile check.** TypeScript accepts
+  extra properties on an imported JSON object, so a key that exists only in
+  `zh-CN.json` is reported by `npm run check:i18n` (which also validates
+  placeholder parity, duplicates, and empty values). Run both:
+  `npm run typecheck && npm run check:i18n`.
+- **Fallback chain:** requested locale → English → the raw key. A backend enum
+  value with no translation degrades to a humanized form
+  (`bronze_working` → `Bronze working`) instead of a blank.
+- **Only display strings move.** API paths, DTO fields, engine enums, saved
+  game data, and the English prompt strings used for image/TTS generation
+  (`actionDescription`, `sceneAccent`, `buildIntroNarration`, everything in
+  `assetMapping.ts`) stay exactly as they are.
+- **Persistence:** the choice is stored in `localStorage` under
+  `inf3600:locale` (same prefix as the audio/cinematic preferences) and
+  restored on mount. Switching never resets the session.
+- **Adding a language:** drop `locales/<tag>.json` in, add the tag to `LOCALES`
+  and `LOCALE_LABELS` in `lib/i18n.ts`, then `npm run check:i18n`.
+
+### Cosmetic CSS
+
+`.tech-choice__cost::after` used to inject the literal `" science"` from CSS.
+That string now comes from `research.costUnit`, so it follows the locale —
+keep new player-facing copy out of `globals.css`.
+
+---
+
+## 10. Where to Hook In
 
 | Adding a... | Where to wire it |
 |---|---|
-| New unit type | `BUILDABLE_UNITS` in `page.tsx`, `UNIT_GLYPH`/`UNIT_LABEL` in `lib/hex.ts`, plus backend `UnitType` enum. |
-| New tech | Mirror in the `TECHS` constant in `page.tsx` and add it to `backend/app/engine/research.py`. |
+| New unit type | `BUILDABLE_UNITS` in `page.tsx`, `UNIT_GLYPH` in `lib/hex.ts`, `unit.<id>` in `locales/*.json`, plus backend `UnitType` enum. |
+| New tech | Mirror in the `TECHS` constant in `page.tsx`, add `tech.<id>` to `locales/*.json`, and add it to `backend/app/engine/research.py`. |
+| New player-facing string | A key in `locales/en.json` **and** `locales/zh-CN.json`, then `t()`/`tEnum()`; run `npm run check:i18n`. |
 | New right-rail panel | Add a `<Panel>` block inside `.war-room__rail--right`. |
 | New overlay | Mirror the `.diplomacy-audience*` or `.intro-screen*` CSS pattern; render at the bottom of the `<main className="war-room">` JSX. |
 | New asset family | Extend `AssetManifest`, add a `generate*` in `assetApi.ts`, fan out a `mapLimit` batch in `assetManifest.ts`, and consume the resolved URL in `SquareMap.tsx` or wherever it surfaces. |
-| New turn-event kind | Emit it from the backend turn report, then handle it in `turnEvents.ts` (`diffTurnEvents`) and add a CSS class `.log-kind--{kind}`. |
+| New turn-event kind | Emit it from the backend turn report, then handle it in `turnEvents.ts` (`diffTurnEvents`, using `textKey`/`textParams`) and add a CSS class `.log-kind--{kind}`. |

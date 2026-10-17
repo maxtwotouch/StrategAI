@@ -4,46 +4,47 @@
 
 import { ApiUnitType, StructureParams, TerrainParams } from "@/lib/assetApi";
 
+// Gold-purchased structure families. Player-facing names and hints live in
+// `locales/*.json` under `structure.<id>`; render them with `tEnum()`.
 export const STRUCTURE_CATEGORIES: ReadonlyArray<{
   id: string;
-  label: string;
-  hint: string;
 }> = [
-  { id: "production", label: "Production Hall", hint: "Workshop, forge, mill" },
-  { id: "fortification", label: "Fortification", hint: "Walls, keep, gatehouse" },
-  { id: "housing", label: "Housing District", hint: "Townhouse, longhouse, manor" },
-  { id: "sacred", label: "Sacred Site", hint: "Temple, shrine, cathedral" },
+  { id: "production" },
+  { id: "fortification" },
+  { id: "housing" },
+  { id: "sacred" },
 ];
 
 export const STRUCTURE_CATEGORY_IDS = STRUCTURE_CATEGORIES.map((cat) => cat.id);
 
-// Display-label / enum-value pairs surfaced in the start-screen dropdowns
-// so the player can compose their own leader. Values match the asset
-// service's enum vocabularies in leader/models.py.
-export const ARCHETYPE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "warrior_king", label: "Warrior King" },
-  { value: "warrior_queen", label: "Warrior Queen" },
-  { value: "philosopher_king", label: "Philosopher King" },
-  { value: "merchant_prince", label: "Merchant Prince" },
-  { value: "spiritual_leader", label: "Spiritual Leader" },
-  { value: "diplomat", label: "Diplomat" },
-  { value: "tyrant", label: "Tyrant" },
-  { value: "visionary", label: "Visionary" },
+// Enum values surfaced in the start-screen dropdowns so the player can compose
+// their own leader. They match the asset service's enum vocabularies in
+// leader/models.py; the labels come from `locales/*.json` (`archetype.<value>`,
+// `culture.<value>`).
+export const ARCHETYPE_OPTIONS: ReadonlyArray<{ value: string }> = [
+  { value: "warrior_king" },
+  { value: "warrior_queen" },
+  { value: "philosopher_king" },
+  { value: "merchant_prince" },
+  { value: "spiritual_leader" },
+  { value: "diplomat" },
+  { value: "tyrant" },
+  { value: "visionary" },
 ];
 
-export const CULTURE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "medieval_european", label: "Medieval European" },
-  { value: "classical_greek", label: "Classical Greek" },
-  { value: "roman_imperial", label: "Roman Imperial" },
-  { value: "ancient_egyptian", label: "Ancient Egyptian" },
-  { value: "east_asian_imperial", label: "East Asian Imperial" },
-  { value: "south_asian", label: "South Asian" },
-  { value: "nordic_viking", label: "Nordic Viking" },
-  { value: "persian", label: "Persian" },
-  { value: "mesopotamian", label: "Mesopotamian" },
-  { value: "mesoamerican", label: "Mesoamerican" },
-  { value: "sub_saharan_african", label: "Sub-Saharan African" },
-  { value: "islamic_golden_age", label: "Islamic Golden Age" },
+export const CULTURE_OPTIONS: ReadonlyArray<{ value: string }> = [
+  { value: "medieval_european" },
+  { value: "classical_greek" },
+  { value: "roman_imperial" },
+  { value: "ancient_egyptian" },
+  { value: "east_asian_imperial" },
+  { value: "south_asian" },
+  { value: "nordic_viking" },
+  { value: "persian" },
+  { value: "mesopotamian" },
+  { value: "mesoamerican" },
+  { value: "sub_saharan_african" },
+  { value: "islamic_golden_age" },
 ];
 
 // --- Units: 7 game unit types collapse onto the 4 the service offers ---

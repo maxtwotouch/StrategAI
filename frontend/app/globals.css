@@ -28,8 +28,12 @@
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 24px;
-  --font-display: "Baskerville", "Palatino Linotype", "Book Antiqua", serif;
-  --font-body: "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Baskerville", "Palatino Linotype", "Book Antiqua", "Noto Serif SC",
+    "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --font-body: "Avenir Next", "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  /* Latin faces are listed first, so the CJK fallbacks above only ever apply to
+     glyphs the Latin faces lack — the English UI renders exactly as before. */
 }
 
 * {
@@ -341,6 +345,9 @@ select:focus {
 
 .start-screen__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
   justify-content: flex-start;
 }
 
@@ -544,6 +551,66 @@ select:focus {
 
 .audio-toggle__wave--outer {
   opacity: 0.68;
+}
+
+/* Language switch — compact EN / 中文 segmented control. Shown on the start and
+   intro screens and in the war-room turn box. */
+.locale-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: linear-gradient(180deg, rgba(33, 41, 50, 0.88), rgba(12, 17, 24, 0.94));
+  border: 1px solid rgba(203, 166, 88, 0.28);
+  border-radius: 5px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 190, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+}
+
+.locale-switch__option {
+  padding: 0.3rem 0.55rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: none;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+/* The global button hover lifts elements; inside a segmented control the
+   segment should only recolor. */
+.locale-switch__option:hover:not(:disabled),
+.locale-switch__option:active:not(:disabled) {
+  transform: none;
+  background: rgba(205, 165, 83, 0.12);
+  border-color: rgba(203, 166, 88, 0.34);
+  color: var(--ink);
+}
+
+.locale-switch__option.is-active,
+.locale-switch__option.is-active:hover:not(:disabled) {
+  color: oklch(0.16 0.02 80);
+  background:
+    linear-gradient(180deg, rgba(188, 145, 63, 0.98), rgba(131, 89, 28, 0.98));
+  border-color: rgba(212, 174, 96, 0.62);
+  font-weight: 700;
+}
+
+.locale-switch__option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.locale-switch--compact .locale-switch__option {
+  padding: 0.24rem 0.4rem;
+  font-size: 0.68rem;
 }
 
 .sovereign-overlay__close {
@@ -1187,10 +1254,6 @@ select:focus {
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-}
-
-.tech-choice__cost::after {
-  content: " science";
 }
 
 .leader-row__portrait {
